@@ -25,6 +25,9 @@ public final class CrossingGateSoundManager {
     private CrossingGateSoundManager() {
     }
 
+    /** この距離(ブロック)以内は最大音量。これを超えると 0 へ向けて線形フェード。 */
+    private static final double FULL_VOLUME_DISTANCE = 12.0D;
+
     /** クライアントプレイヤーが pos から可聴距離内か。プレイヤー不在時は false(鳴らさない)。 */
     private static boolean playerInRange(BlockPos pos) {
         net.minecraft.client.player.LocalPlayer player = Minecraft.getInstance().player;
@@ -35,6 +38,26 @@ public final class CrossingGateSoundManager {
         double dy = (pos.getY() + 0.5D) - player.getY();
         double dz = (pos.getZ() + 0.5D) - player.getZ();
         return (dx * dx + dy * dy + dz * dz) <= MAX_AUDIBLE_DISTANCE_SQ;
+    }
+
+    /** プレイヤーとの距離に応じた音量(近=1.0、FULL_VOLUME_DISTANCE超で線形減衰、MAXで0)。 */
+    private static float volumeForDistance(BlockPos pos) {
+        net.minecraft.client.player.LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return 0.0F;
+        }
+        double dx = (pos.getX() + 0.5D) - player.getX();
+        double dy = (pos.getY() + 0.5D) - player.getY();
+        double dz = (pos.getZ() + 0.5D) - player.getZ();
+        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist <= FULL_VOLUME_DISTANCE) {
+            return 1.0F;
+        }
+        if (dist >= MAX_AUDIBLE_DISTANCE) {
+            return 0.0F;
+        }
+        double t = (dist - FULL_VOLUME_DISTANCE) / (MAX_AUDIBLE_DISTANCE - FULL_VOLUME_DISTANCE);
+        return (float) (1.0D - t);
     }
 
     public static void tick(InstalledObjectBlockEntity blockEntity) {
@@ -150,6 +173,8 @@ public final class CrossingGateSoundManager {
             this.looping = true;
             this.delay = 0;
             this.relative = false;
+            // 距離減衰は MC 任せにせず手動で音量を調整する(可聴端で急に消えるのを防ぎ徐々にフェード)。
+            this.attenuation = SoundInstance.Attenuation.NONE;
             this.volume = 1.0F;
             this.pitch = 1.0F;
             refresh();
@@ -164,6 +189,8 @@ public final class CrossingGateSoundManager {
             this.x = pos.getX() + 0.5D;
             this.y = pos.getY() + 0.5D;
             this.z = pos.getZ() + 0.5D;
+            // プレイヤーとの距離で音量を滑らかに変える(近=最大、可聴端48mで0)。
+            this.volume = volumeForDistance(pos);
         }
 
         private void requestStop() {
