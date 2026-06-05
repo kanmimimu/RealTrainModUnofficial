@@ -18,8 +18,23 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CrossingGateSoundManager {
     private static final ResourceLocation CROSSING_SOUND_ID = ResourceLocation.fromNamespaceAndPath("rtm", "block.crossing_gate");
     private static final Map<String, LoopingCrossingSound> ACTIVE = new ConcurrentHashMap<>();
+    /** 踏切音が聞こえる最大距離(ブロック)。これより遠いと鳴らさない/停止する(=どこでも聞こえる不具合対策)。 */
+    private static final double MAX_AUDIBLE_DISTANCE = 48.0D;
+    private static final double MAX_AUDIBLE_DISTANCE_SQ = MAX_AUDIBLE_DISTANCE * MAX_AUDIBLE_DISTANCE;
 
     private CrossingGateSoundManager() {
+    }
+
+    /** クライアントプレイヤーが pos から可聴距離内か。プレイヤー不在時は false(鳴らさない)。 */
+    private static boolean playerInRange(BlockPos pos) {
+        net.minecraft.client.player.LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return false;
+        }
+        double dx = (pos.getX() + 0.5D) - player.getX();
+        double dy = (pos.getY() + 0.5D) - player.getY();
+        double dz = (pos.getZ() + 0.5D) - player.getZ();
+        return (dx * dx + dy * dy + dz * dz) <= MAX_AUDIBLE_DISTANCE_SQ;
     }
 
     public static void tick(InstalledObjectBlockEntity blockEntity) {
@@ -35,6 +50,11 @@ public final class CrossingGateSoundManager {
             return;
         }
         if (!shouldPlayCrossingSound(blockEntity)) {
+            stop(level, blockEntity.getBlockPos());
+            return;
+        }
+        // 可聴距離外なら鳴らさない/停止(=どこでも聞こえる不具合対策)。
+        if (!playerInRange(blockEntity.getBlockPos())) {
             stop(level, blockEntity.getBlockPos());
             return;
         }
@@ -158,6 +178,7 @@ public final class CrossingGateSoundManager {
                 || blockEntity.isRemoved()
                 || !blockEntity.isPowered()
                 || !shouldPlayCrossingSound(blockEntity)
+                || !playerInRange(blockEntity.getBlockPos())
                 || level.getBlockEntity(blockEntity.getBlockPos()) != blockEntity) {
                 if (level != null) {
                     ACTIVE.remove(key(level, blockEntity.getBlockPos()), this);
