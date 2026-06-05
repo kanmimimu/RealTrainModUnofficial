@@ -2161,9 +2161,14 @@ public class TrainEntity extends Entity {
             candidateYaw = Mth.wrapDegrees(candidateYaw + 180.0F);
         }
         float yawDiff = Math.abs(Mth.wrapDegrees(outgoingYaw - candidateYaw));
-        if (!sameEndpoint && yawDiff > RAIL_CONNECTION_MAX_YAW_DIFF) {
-            if (distSq < 1.0D) RealTrainModUnofficial.LOGGER.warn("[RTM-DBG] eval reject yaw: yawDiff={} outYaw={} candYaw={} distSq={}",
-                (float) yawDiff, (float) outgoingYaw, (float) candidateYaw, (float) distSq);
+        // 端点共有(sameEndpoint)でも「逆走(yaw差>90°)」の接続は拒否する。分岐器のトランクでは
+        // 兄弟分岐(直進↔カーブ)が同じトランク端点を共有するため、出ていく方向と約180°逆向きの
+        // 兄弟分岐へ前台車がU字に乗り移ってしまい、後台車が別分岐に残って車体が裂け弾かれていた。
+        // 正しい継続は進行方向が揃う(yaw差小)。逆走接続はスイッチ内への逆流なので常に不可とする。
+        boolean reversal = yawDiff > 90.0F;
+        if ((!sameEndpoint && yawDiff > RAIL_CONNECTION_MAX_YAW_DIFF) || reversal) {
+            if (distSq < 1.0D) RealTrainModUnofficial.LOGGER.warn("[RTM-DBG] eval reject yaw: yawDiff={} outYaw={} candYaw={} distSq={} same={}",
+                (float) yawDiff, (float) outgoingYaw, (float) candidateYaw, (float) distSq, sameEndpoint);
             return null;
         }
         double score = distSq + yawDiff * 0.02D + (sameEndpoint ? -200.0D : 0.0D);
@@ -3025,7 +3030,9 @@ public class TrainEntity extends Entity {
             candidateYaw = Mth.wrapDegrees(candidateYaw + 180.0F);
         }
         float yawDiff = Math.abs(Mth.wrapDegrees(outgoingYaw - candidateYaw));
-        if (!sameEndpoint && yawDiff > RAIL_CONNECTION_MAX_YAW_DIFF) {
+        // 端点共有でも逆走(yaw差>90°)接続は拒否(分岐器トランクでの兄弟分岐へのU字乗り移り防止)。
+        boolean reversal = yawDiff > 90.0F;
+        if ((!sameEndpoint && yawDiff > RAIL_CONNECTION_MAX_YAW_DIFF) || reversal) {
             return null;
         }
         double score = distSq + yawDiff * 0.02D + (sameEndpoint ? -576.0D : 0.0D);
