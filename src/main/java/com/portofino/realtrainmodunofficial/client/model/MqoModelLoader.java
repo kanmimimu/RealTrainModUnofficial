@@ -21,6 +21,7 @@ import com.portofino.realtrainmodunofficial.modelpack.VehicleModelPackManager;
 import com.portofino.realtrainmodunofficial.script.TrainScriptSystem;
 import com.portofino.realtrainmodunofficial.util.PackTextDecoder;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
+import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -41,6 +42,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -69,6 +71,7 @@ import org.w3c.dom.Node;
  * Metasequoia (.mqo) loader aligned with legacy model library {@code MqoModel}: 0.01 vertex scale, triangulation and quad handling.
  */
 public final class MqoModelLoader {
+    private static final float RTM_DEFAULT_SMOOTHING_ANGLE = 60.0F;
     private static final String TEXTURE_META_SEPARATOR = "|ptmeta=";
     private static final Pattern V_PATTERN = Pattern.compile("V\\((.+?)\\)");
     private static final Pattern UV_PATTERN = Pattern.compile("UV\\((.+?)\\)");
@@ -94,7 +97,7 @@ public final class MqoModelLoader {
     private static final ResourceSearchResult MISSING_RESOURCE = new ResourceSearchResult(null, null, "__missing__");
 
     private static void logModelLoadDetail(String phase, String pattern, Object... args) {
-        RealTrainModUnofficial.LOGGER.info("[ModelLoad:{}] " + pattern, prependArg(phase, args));
+        RealTrainModUnofficial.LOGGER.debug("[ModelLoad:{}] " + pattern, prependArg(phase, args));
     }
 
     private static Object[] prependArg(String first, Object[] rest) {
@@ -167,7 +170,7 @@ public final class MqoModelLoader {
         String scriptPath = resolveVehicleRenderScriptPath(packPath, def);
         String soundScriptPath = def.getSoundScriptPath() != null ? def.getSoundScriptPath() : "";
         // legacy script は init() で trainName/modelName ごとの差分を固定するため、車両ID単位で分離する
-        String key = "v|" + def.getId() + "|" + def.getPackName() + "|" + def.getModelFile() + "|" + def.getTextureOverrides().hashCode() + "|" + scriptPath.hashCode() + "|" + soundScriptPath.hashCode() + "|" + def.isSmoothing();
+        String key = "v|" + def.getId() + "|" + def.getPackName() + "|" + def.getModelFile() + "|" + def.getTextureOverrides().hashCode() + "|" + scriptPath.hashCode() + "|" + soundScriptPath.hashCode() + "|smooth";
         if (FAILED_MODEL_KEYS.contains(key)) {
             return null;
         }
@@ -176,7 +179,7 @@ public final class MqoModelLoader {
             return cached;
         }
         RealTrainModUnofficial.LOGGER.debug("loadModelForVehicle: vehicleId={}, scriptPath='{}'", def.getId(), scriptPath);
-        MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), def.isSmoothing());
+        MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), true);
         if (model != null) {
             RealTrainModUnofficial.LOGGER.info("loadModelForVehicle: model loaded, loading script");
             loadScriptForModel(model, packPath, scriptPath, def.getId());
@@ -301,15 +304,24 @@ public final class MqoModelLoader {
     }
 
     public static MqoModel loadModelForVehiclePart(VehicleDefinition def, String modelFile, Map<String, String> textureOverrides) {
+        return loadModelForVehiclePart(def, modelFile, textureOverrides, "");
+    }
+
+    public static MqoModel loadModelForVehiclePart(VehicleDefinition def, String modelFile, Map<String, String> textureOverrides, String scriptPath) {
         if (def == null || modelFile == null || modelFile.isBlank()) return null;
         Map<String, String> tex = textureOverrides == null ? Map.of() : textureOverrides;
-        String key = "vp|" + def.getPackName() + "|" + modelFile + "|" + tex.hashCode() + "|false";
+        String script = scriptPath == null ? "" : scriptPath;
+        String key = "vp|" + def.getPackName() + "|" + modelFile + "|" + tex.hashCode() + "|smooth|" + script.hashCode();
         MqoModel cached = getCachedModel(key);
         if (cached != null) {
             return cached;
         }
-        MqoModel model = loadInternal(RailPackLoader.resolvePackPath(def.getPackName()), modelFile, tex, false);
+        Path packPath = RailPackLoader.resolvePackPath(def.getPackName());
+        MqoModel model = loadInternal(packPath, modelFile, tex, true);
         if (model != null) {
+            if (!script.isBlank()) {
+                loadScriptForModel(model, packPath, script, def.getId());
+            }
             cacheModel(key, model);
         }
         return model;
@@ -524,8 +536,8 @@ public final class MqoModelLoader {
     }
 
     private static void evictModelCacheLocked() {
-        long limitBytes = Math.max(16L, Config.MODEL_CACHE_LIMIT_MIB.get()) * 1024L * 1024L;
-        long protectNanos = Math.max(0L, Config.MODEL_CACHE_PROTECT_SECONDS.get()) * 1_000_000_000L;
+        long limitBytes = Math.max(1024L, Config.MODEL_CACHE_LIMIT_MIB.get()) * 1024L * 1024L;
+        long protectNanos = Math.max(300L, Config.MODEL_CACHE_PROTECT_SECONDS.get()) * 1_000_000_000L;
         if (modelCacheBytes <= limitBytes) {
             return;
         }
@@ -802,7 +814,7 @@ public final class MqoModelLoader {
         int mirrorType = -1;
         int braceType = -1;
         String currentGroup = "default";
-        float currentFacetAngle = 59.5F;
+        float currentFacetAngle = RTM_DEFAULT_SMOOTHING_ANGLE;
         Pattern OBJ_NAME = Pattern.compile("Object\\s+\"([^\"]*)\"");
 
         String[] lines = mqoText.split("\\R");
@@ -844,7 +856,7 @@ public final class MqoModelLoader {
             if (line.startsWith("face ")) { braceType = 2; continue; }
             if (line.startsWith("Object ")) {
                 mirrorType = -1;
-                currentFacetAngle = 59.5F;
+                currentFacetAngle = RTM_DEFAULT_SMOOTHING_ANGLE;
                 Matcher m = OBJ_NAME.matcher(line);
                 currentGroup = m.find() ? m.group(1) : "default";
                 continue;
@@ -1218,12 +1230,21 @@ public final class MqoModelLoader {
         String[] vidx = vi.trim().split("\\s+");
         float[] uvs = parseUv(uv, vertexCount);
         float avgY = 0f;
+        float faceMinY = Float.MAX_VALUE, faceMaxY = -Float.MAX_VALUE;
         {
             int cnt = Math.min(vertexCount, vidx.length);
             for (int i = 0; i < cnt; i++) {
-                try { avgY += (float) verts.get(Integer.parseInt(vidx[i])).y; } catch (Exception ignored) {}
+                try {
+                    float vy = (float) verts.get(Integer.parseInt(vidx[i])).y;
+                    avgY += vy;
+                    if (vy < faceMinY) faceMinY = vy;
+                    if (vy > faceMaxY) faceMaxY = vy;
+                } catch (Exception ignored) {}
             }
             if (cnt > 0) avgY /= cnt;
+        }
+        if (shouldSkipLegacyShadowPlaneFace(groupName, verts, vidx, vertexCount, faceMinY, faceMaxY)) {
+            return;
         }
         // マテリアル col の a<1 = ガラス等の半透明。グループ名に依らず半透明描画し、その不透明度を適用する。
         boolean translucent = matAlpha < 0.99F
@@ -1236,6 +1257,7 @@ public final class MqoModelLoader {
             b.baseAlpha = baseAlpha;
             b.glassTranslucent = textureInfo.hasGlassBand;
             b.opaqueTexture = textureInfo.opaqueLocation;
+            b.windowTexture = textureInfo.windowLocation;
             return b;
         });
 
@@ -1244,6 +1266,66 @@ public final class MqoModelLoader {
         } else {
             addPolygonFan(verts, vidx, uvs, vertexCount, bb, mirrorType);
         }
+    }
+
+    private static boolean shouldSkipLegacyShadowPlaneFace(String groupName, List<Vec3> verts, String[] vidx,
+                                                           int vertexCount, float faceMinY, float faceMaxY) {
+        if (groupName == null || verts == null || vidx == null) {
+            return false;
+        }
+        String lower = groupName.trim().toLowerCase(Locale.ROOT);
+        float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+        float minZ = Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+        int cnt = Math.min(vertexCount, vidx.length);
+        for (int i = 0; i < cnt; i++) {
+            try {
+                Vec3 v = verts.get(Integer.parseInt(vidx[i]));
+                float x = (float) v.x;
+                float z = (float) v.z;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (z < minZ) minZ = z;
+                if (z > maxZ) maxZ = z;
+            } catch (Exception ignored) {
+            }
+        }
+        if (cnt < 3 || minX == Float.MAX_VALUE || minZ == Float.MAX_VALUE) {
+            return false;
+        }
+        float dx = maxX - minX;
+        float dy = faceMaxY - faceMinY;
+        float dz = maxZ - minZ;
+        // MQO vertices are stored after the legacy 0.01 scale conversion. 旧RTM用パックの
+        // 車体下「影板」は元MQO上で y=-98 / z=±900 付近なので、ここでは -0.98 / ±9.0
+        // として判定する。
+        boolean underBody = faceMinY < -0.10F;
+        boolean broadHorizontalPlate = faceMinY < -0.05F && dy < 0.035F && dx > 0.45F && dz > 1.20F;
+        boolean veryLowFlatPlate = faceMinY < -0.75F && dy < 0.05F && (dz > 0.45F || dx > 0.80F);
+        boolean lowUnderbodyPlate = faceMinY < -0.62F && dy < 0.012F && dx > 0.42F && dz > 0.62F;
+        boolean unnamedLegacyShadowPlate = faceMinY < -0.90F && dy < 0.008F && dx > 0.90F && dz > 2.0F;
+        if (unnamedLegacyShadowPlate) {
+            return true;
+        }
+        // Some legacy packs (e.g. 2419) put the fake underbody shadow inside broad body
+        // groups such as obj1/obj2 instead of a "shadow" group.  RTM's old renderer did
+        // not show these as hard black planes, so strip only large, almost perfectly flat
+        // plates below the vehicle body. 立体の床下機器/台車は dy があるため残る。
+        if ((veryLowFlatPlate || lowUnderbodyPlate || broadHorizontalPlate) && (lower.equals("obj1") || lower.equals("obj2") || lower.equals("obj3")
+                || lower.equals("body") || lower.startsWith("body_"))) {
+            return true;
+        }
+        if (lower.equals("alpha") || lower.startsWith("alpha_")) {
+            boolean e131UnderbodyShadowBox = faceMinY < -0.75F
+                && faceMaxY < 0.05F
+                && (dz > 18.0F || dx > 0.75F);
+            return veryLowFlatPlate || e131UnderbodyShadowBox;
+        }
+        if (!lower.contains("shadow") && !lower.endsWith("_ms")) {
+            return false;
+        }
+        boolean veryLong = dz > 12.0F || dx > 2.2F;
+        boolean slabLike = dy < 1.4F;
+        return veryLowFlatPlate || (underBody && veryLong && slabLike);
     }
 
     private static void addQuad(List<Vec3> verts, String[] vidx, float[] uvs, byte matId, BatchBuilder bb, int mirrorType) {
@@ -1751,6 +1833,18 @@ public final class MqoModelLoader {
             if (found != null) {
                 return new IncludeSource(normalize(found.toString()), PackTextDecoder.readText(found));
             }
+            // assets/<namespace>/ ルートからの解決(RTM の //include は assets 名前空間相対)。
+            try {
+                String rel = normalize(root.relativize(scriptFile).toString());
+                String assetsRoot = assetsNamespaceRoot(rel);
+                if (!assetsRoot.isEmpty()) {
+                    Path p = root.resolve(assetsRoot + normalizedInclude).normalize();
+                    if (Files.exists(p) && Files.isRegularFile(p)) {
+                        return new IncludeSource(normalize(p.toString()), PackTextDecoder.readText(p));
+                    }
+                }
+            } catch (Exception ignored) {
+            }
         }
 
         return null;
@@ -1770,6 +1864,17 @@ public final class MqoModelLoader {
             relative = findEntry(zipFile, normalizedInclude);
         }
         if (relative == null) {
+            // RTM の //include <scripts/...> は "assets/<namespace>/" からの相対パス。
+            // スクリプト親ディレクトリ相対でも生パスでも見つからない場合、assets ルートから解決する
+            // (例: assets/minecraft/scripts/hi03_e259/render.js から <scripts/hi03_lib/x.js> →
+            //  assets/minecraft/scripts/hi03_lib/x.js)。これが無いと CustomMonitor 等の include が
+            //  解決できず init が例外→台車/座席/LCD など丸ごと描画されなくなる。
+            String assetsRoot = assetsNamespaceRoot(current);
+            if (!assetsRoot.isEmpty()) {
+                relative = findEntry(zipFile, assetsRoot + normalizedInclude);
+            }
+        }
+        if (relative == null) {
             return null;
         }
 
@@ -1780,6 +1885,14 @@ public final class MqoModelLoader {
 
     private static String normalize(String path) {
         return path == null ? "" : path.replace('\\', '/');
+    }
+
+    /** "assets/minecraft/scripts/..." → "assets/minecraft/"。assets 配下でなければ ""。 */
+    private static String assetsNamespaceRoot(String entryName) {
+        String n = normalize(entryName);
+        if (!n.startsWith("assets/")) return "";
+        int second = n.indexOf('/', "assets/".length());
+        return second >= 0 ? n.substring(0, second + 1) : "";
     }
 
     @FunctionalInterface
@@ -1877,20 +1990,94 @@ public final class MqoModelLoader {
         return false;
     }
 
+    /** 床下蓋用の2x2白テクスチャ(setShaderColor でグレーに着色して使う)。遅延生成・キャッシュ。 */
+    private static volatile ResourceLocation whiteTextureLoc;
+
+    private static ResourceLocation getCapWhiteTexture() {
+        ResourceLocation loc = whiteTextureLoc;
+        if (loc != null) return loc;
+        com.mojang.blaze3d.platform.NativeImage img = new com.mojang.blaze3d.platform.NativeImage(2, 2, false);
+        for (int y = 0; y < 2; y++) {
+            for (int x = 0; x < 2; x++) {
+                img.setPixelRGBA(x, y, 0xFFFFFFFF);
+            }
+        }
+        DynamicTexture tex = new DynamicTexture(img);
+        loc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "dynamic/white");
+        Minecraft.getInstance().getTextureManager().register(loc, tex);
+        whiteTextureLoc = loc;
+        return loc;
+    }
+
     /**
-     * 元画像をコピーし、アルファを二値化した新しい NativeImage を返す (元は破壊しない)。
-     * alpha >= threshold は不透明(255)、未満は透明(0)。RTM の pass0(通常描画)は
-     * アルファテスト(alpha<0.1 を discard, 残りは不透明)なので、threshold≈26(=0.1*255)で
-     * その挙動を事前適用したテクスチャを作り、POSITION_TEX_COLOR+blend で同じ結果を得る。
+     * RTM系の pass0 用。窓ガラスのような中間アルファは pass1 に回しつつ、
+     * アンチエイリアス縁のような「ほぼ不透明」は pass0 に残して文字やロゴの
+     * 痩せを防ぐ。
      */
-    private static com.mojang.blaze3d.platform.NativeImage copyBinarizeAlpha(com.mojang.blaze3d.platform.NativeImage img, int threshold) {
+    private static com.mojang.blaze3d.platform.NativeImage copyOpaqueOnlyAlpha(com.mojang.blaze3d.platform.NativeImage img) {
         int w = img.getWidth(), h = img.getHeight();
         com.mojang.blaze3d.platform.NativeImage dst = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
                 int p = img.getPixelRGBA(x, y);            // 0xAABBGGRR (リトルエンディアン)
                 int a = (p >>> 24) & 0xFF;
-                int na = a >= threshold ? 0xFF : 0x00;
+                int na = a >= 0xF0 ? 0xFF : 0x00;
+                dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
+            }
+        }
+        return dst;
+    }
+
+    /**
+     * RTM系の pass1 用。ガラス帯など本当に半透明なピクセルだけを残し、
+     * ほぼ不透明な縁は pass0 側へ寄せる。
+     */
+    private static com.mojang.blaze3d.platform.NativeImage copyNonOpaqueAlpha(com.mojang.blaze3d.platform.NativeImage img) {
+        int w = img.getWidth(), h = img.getHeight();
+        com.mojang.blaze3d.platform.NativeImage dst = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int p = img.getPixelRGBA(x, y);
+                int a = (p >>> 24) & 0xFF;
+                int na = (a > 0x00 && a < 0xE0) ? a : 0x00;
+                dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
+            }
+        }
+        return dst;
+    }
+
+    /** ガラス専用上限アルファ(0x73≈0.45)。これ以上の中間アルファ窓もここまで下げて確実に透かす。 */
+    private static final int GLASS_MAX_ALPHA = 0x73;
+
+    private static com.mojang.blaze3d.platform.NativeImage copyStainedGlassAlpha(com.mojang.blaze3d.platform.NativeImage img) {
+        int w = img.getWidth(), h = img.getHeight();
+        com.mojang.blaze3d.platform.NativeImage dst = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int p = img.getPixelRGBA(x, y);
+                int a = (p >>> 24) & 0xFF;
+                int na = (a > 0x00 && a < 0xF0) ? Math.min(a, GLASS_MAX_ALPHA) : 0x00;
+                dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
+            }
+        }
+        return dst;
+    }
+
+    /**
+     * バニラ・ガラス安定方式用テクスチャ。
+     * - alpha >= 0xF0(≈240) … 車体本体 → 255(完全不透明・深度を持つ=スケスケしない)
+     * - 0x1A <= a < 0xF0    … 窓ガラス → min(a, GLASS_MAX_ALPHA)(色付きでも確実に透ける)
+     * - alpha <  0x1A       … 抜き穴   → 0(透過。シェーダの discard 境界に合わせる)
+     * RGB はそのままなので色味は保持。これを blend で1パス描画すると色付きガラスも半透明になる。
+     */
+    private static com.mojang.blaze3d.platform.NativeImage copyGlassAlpha(com.mojang.blaze3d.platform.NativeImage img) {
+        int w = img.getWidth(), h = img.getHeight();
+        com.mojang.blaze3d.platform.NativeImage dst = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int p = img.getPixelRGBA(x, y);
+                int a = (p >>> 24) & 0xFF;
+                int na = a >= 0xF0 ? 0xFF : (a >= 0x1A ? Math.min(a, GLASS_MAX_ALPHA) : 0x00);
                 dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
             }
         }
@@ -1898,7 +2085,7 @@ public final class MqoModelLoader {
     }
 
     private static TextureInfo registerTextureFromZip(TextureBinding binding, TextureOpener opener) {
-        boolean isTranslucent = binding.options().contains("alphablend")
+        boolean alphaBlendOption = binding.options().contains("alphablend")
             || binding.options().contains("translucent")
             || binding.options().contains("glassalpha");
         try (InputStream in = opener.open(binding.path())) {
@@ -1910,26 +2097,26 @@ public final class MqoModelLoader {
                 boolean partialAlpha = hasPartialAlpha(img);
                 boolean glassBand = hasGlassBand(img);
                 int key = Math.abs(binding.cacheKey().hashCode());
-                // 元テクスチャ(アルファ維持) = RTM pass1(AlphaBlend ブレンド重ね)用。
                 DynamicTexture tex = new DynamicTexture(img);
                 ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                     "dynamic/mqo/" + Integer.toHexString(key));
                 Minecraft.getInstance().getTextureManager().register(loc, tex);
-                // pass0(通常描画)用 = アルファテスト相当に二値化(alpha>=26→不透明, <26→透明)。
-                // RTM の pass0 は alpha<0.1 を discard して残りを不透明描画するので、これを事前適用。
-                // AlphaBlend テクスチャだけ別途用意し、不透明テクスチャは元と共用(穴は二値なので同じ)。
+                ResourceLocation baseLoc = loc;
                 ResourceLocation opaqueLoc = loc;
-                if (isTranslucent) {
-                    // 閾値を高め(230)にして、中間アルファ(窓ガラス)を pass0(不透明)から除外する。
-                    // 窓は pass1 のブレンドのみで描かれて透ける。ほぼ完全不透明(alpha>=230=外板)だけ
-                    // pass0 で不透明描画してスケスケを防ぐ。抜き(alpha0)も透過。
-                    com.mojang.blaze3d.platform.NativeImage opaqueImg = copyBinarizeAlpha(img, 230);
+                ResourceLocation windowLoc = loc;
+                if (alphaBlendOption || partialAlpha || glassBand) {
+                    com.mojang.blaze3d.platform.NativeImage opaqueImg = copyOpaqueOnlyAlpha(img);
                     DynamicTexture opaqueTex = new DynamicTexture(opaqueImg);
                     opaqueLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
-                        "dynamic/mqo/" + Integer.toHexString(key) + "_op");
+                        "dynamic/mqo/" + Integer.toHexString(key) + "_opq");
                     Minecraft.getInstance().getTextureManager().register(opaqueLoc, opaqueTex);
+                    windowLoc = loc;
                 }
-                return new TextureInfo(loc, resolveLegacyLightTextures(binding, opener), isTranslucent, partialAlpha, glassBand, opaqueLoc);
+                // 発光(Light)テクスチャの emissive 解決はサブライトテクスチャ(_light0 等)があるときのみ。
+                // ※以前「サブが無ければ元テクスチャを emissive にする」フォールバックを入れたが、Spacia/E259 等の
+                //   AlphaBlend,Light 車体や Light グループが発光パスで二重描画され、チカチカ/急行灯増殖/車体白化を
+                //   起こしたため撤去。踏切ライトの発光は別の安全な手段で対応する。
+                return new TextureInfo(baseLoc, resolveLegacyLightTextures(binding, opener), alphaBlendOption || partialAlpha || glassBand, partialAlpha, glassBand, opaqueLoc, windowLoc);
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.debug("Could not load texture {}: {}", binding.path(), e.getMessage());
@@ -2009,29 +2196,7 @@ public final class MqoModelLoader {
         if (textureInfo == null) {
             return false;
         }
-        // テクスチャに中間アルファ(本当の半透明=ガラス等)があれば、MQO の AlphaBlend 指定や
-        // グループ名に依らず半透明描画する (ユーザー報告「半透明テクスチャが透けない」)。
-        // この判定は isTranslucent ゲートより前に置く (以前はゲートで弾かれて無視されていた)。
-        if (textureInfo.hasPartialAlpha) {
-            return true;
-        }
-        if (!textureInfo.isTranslucent) {
-            return false;
-        }
-        String lower = groupName == null ? "" : groupName.toLowerCase(Locale.ROOT);
-        if (lower.equals("alpha") || lower.equals("a")) {
-            return true;
-        }
-        if (lower.contains("alpha") || lower.contains("glass") || lower.contains("trans") || lower.contains("window")) {
-            return true;
-        }
-        if (lower.contains("light") || lower.contains("lamp") || lower.contains("marker")) {
-            return true;
-        }
-        // テクスチャに中間アルファ(0/255以外)がある=本当の半透明(ガラス等)。グループ名に依らず
-        // 半透明描画する (ユーザー報告「半透明テクスチャが透けてない」)。
-        // cutout 用の二値アルファ(車体の穴)は hasPartialAlpha=false なので不透明のまま=SL車体は消えない。
-        if (textureInfo.hasPartialAlpha) {
+        if (textureInfo.isTranslucent || textureInfo.hasPartialAlpha || textureInfo.hasGlassBand) {
             return true;
         }
         // RTM packs often mark full-body SL/rod textures as AlphaBlend for cutout holes.
@@ -2039,10 +2204,34 @@ public final class MqoModelLoader {
         return false;
     }
 
+    private static boolean isLegacyTransparentGroupName(String lowerGroupName) {
+        if (lowerGroupName == null || lowerGroupName.isBlank()) {
+            return false;
+        }
+        return lowerGroupName.equals("alpha")
+            || lowerGroupName.equals("a")
+            || lowerGroupName.startsWith("alpha_")
+            || lowerGroupName.contains("glass")
+            || lowerGroupName.contains("window")
+            || lowerGroupName.contains("wind")
+            || lowerGroupName.contains("trans")
+            || lowerGroupName.contains("light")
+            || lowerGroupName.contains("lamp")
+            || lowerGroupName.contains("marker");
+    }
+
     private static boolean isWindowsAbsolutePath(String path) {
         if (path == null || path.length() < 2) return false;
         char c = path.charAt(0);
         return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) && path.charAt(1) == ':';
+    }
+
+    private static boolean shouldCullModelFaces(Object entity) {
+        if (entity instanceof TrainEntity train) {
+            VehicleDefinition def = VehicleRegistry.getById(train.getVehicleId());
+            return def != null && def.isDoCulling();
+        }
+        return true;
     }
 
 
@@ -2137,14 +2326,17 @@ public final class MqoModelLoader {
 
     private static InputStream openScriptTextureStream(String domain, String path) throws IOException {
         String normalizedPath = path.replace('\\', '/').replaceFirst("^/+", "");
-        ResourceLocation resourceLocation = ResourceLocation.tryBuild(domain == null || domain.isBlank() ? "minecraft" : domain, normalizedPath);
+        String resolvedDomain = domain == null || domain.isBlank() ? "minecraft" : domain;
+        ResourceLocation resourceLocation = isVanillaResourcePathSafe(resolvedDomain, normalizedPath)
+            ? ResourceLocation.tryBuild(resolvedDomain, normalizedPath)
+            : null;
         if (resourceLocation != null) {
             var resource = Minecraft.getInstance().getResourceManager().getResource(resourceLocation);
             if (resource.isPresent()) {
                 return resource.get().open();
             }
         }
-        String entryName = "assets/" + domain + "/" + normalizedPath;
+        String entryName = "assets/" + resolvedDomain + "/" + normalizedPath;
         Path modsDir = Minecraft.getInstance().gameDirectory.toPath().resolve("mods");
         if (!Files.isDirectory(modsDir)) {
             return null;
@@ -2156,7 +2348,7 @@ public final class MqoModelLoader {
                     continue;
                 }
                 ZipFile zip = new ZipFile(file.toFile());
-                ZipEntry entry = zip.getEntry(entryName);
+                ZipEntry entry = findEntry(zip, entryName);
                 if (entry == null) {
                     zip.close();
                     continue;
@@ -2172,6 +2364,25 @@ public final class MqoModelLoader {
             }
         }
         return null;
+    }
+
+    private static boolean isVanillaResourcePathSafe(String namespace, String path) {
+        if (namespace == null || path == null || namespace.isBlank() || path.isBlank()) {
+            return false;
+        }
+        for (int i = 0; i < namespace.length(); i++) {
+            char c = namespace.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.')) {
+                return false;
+            }
+        }
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' || c == '/')) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static byte[] openScriptTextureBytes(String domain, String path) throws IOException {
@@ -2384,28 +2595,31 @@ public final class MqoModelLoader {
          * グループ名キーワードに依らず必ずブレンド描画する(強制カットアウトしない)。
          */
         final boolean hasGlassBand;
-        /** RTM pass0(通常/不透明描画)用テクスチャ。アルファテスト相当に二値化済み。非AlphaBlendは元と同じ。 */
+        /** RTM pass0(不透明描画)用テクスチャ。車体だけ残し窓は穴。非AlphaBlendは元と同じ。 */
         final ResourceLocation opaqueLocation;
+        /** RTM pass1(半透明)用テクスチャ。窓ガラスだけ残し車体は透過。非AlphaBlendは元と同じ。 */
+        final ResourceLocation windowLocation;
 
         TextureInfo(ResourceLocation location, ResourceLocation[] emissiveTextures, boolean isTranslucent) {
-            this(location, emissiveTextures, isTranslucent, false, false, location);
+            this(location, emissiveTextures, isTranslucent, false, false, location, location);
         }
 
         TextureInfo(ResourceLocation location, ResourceLocation[] emissiveTextures, boolean isTranslucent, boolean hasPartialAlpha) {
-            this(location, emissiveTextures, isTranslucent, hasPartialAlpha, false, location);
+            this(location, emissiveTextures, isTranslucent, hasPartialAlpha, false, location, location);
         }
 
         TextureInfo(ResourceLocation location, ResourceLocation[] emissiveTextures, boolean isTranslucent, boolean hasPartialAlpha, boolean hasGlassBand) {
-            this(location, emissiveTextures, isTranslucent, hasPartialAlpha, hasGlassBand, location);
+            this(location, emissiveTextures, isTranslucent, hasPartialAlpha, hasGlassBand, location, location);
         }
 
-        TextureInfo(ResourceLocation location, ResourceLocation[] emissiveTextures, boolean isTranslucent, boolean hasPartialAlpha, boolean hasGlassBand, ResourceLocation opaqueLocation) {
+        TextureInfo(ResourceLocation location, ResourceLocation[] emissiveTextures, boolean isTranslucent, boolean hasPartialAlpha, boolean hasGlassBand, ResourceLocation opaqueLocation, ResourceLocation windowLocation) {
             this.location = location;
             this.emissiveTextures = emissiveTextures == null ? new ResourceLocation[0] : emissiveTextures;
             this.isTranslucent = isTranslucent;
             this.hasPartialAlpha = hasPartialAlpha;
             this.hasGlassBand = hasGlassBand;
             this.opaqueLocation = opaqueLocation == null ? location : opaqueLocation;
+            this.windowLocation = windowLocation == null ? location : windowLocation;
         }
 
         ResourceLocation emissiveTextureForPass(int pass) {
@@ -2489,6 +2703,69 @@ public final class MqoModelLoader {
         }
     }
 
+    private record SmoothVertexRef(BatchBuilder builder, int index, Vector3f normal) {}
+
+    private static void applySmoothNormalsAcrossBatches(Collection<BatchBuilder> builders) {
+        if (builders == null || builders.isEmpty()) {
+            return;
+        }
+        Map<String, List<SmoothVertexRef>> byPosition = new HashMap<>();
+        for (BatchBuilder builder : builders) {
+            if (builder == null || builder.positions.isEmpty()) {
+                continue;
+            }
+            int vertexCount = builder.positions.size() / 8;
+            for (int i = 0; i < vertexCount; i++) {
+                int o = i * 8;
+                Vector3f normal = new Vector3f(
+                    builder.positions.get(o + 3),
+                    builder.positions.get(o + 4),
+                    builder.positions.get(o + 5)
+                );
+                if (normal.lengthSquared() > 1.0E-8F) {
+                    normal.normalize();
+                } else {
+                    normal.set(0.0F, 1.0F, 0.0F);
+                }
+                byPosition.computeIfAbsent(positionKey(builder.positions, o), k -> new ArrayList<>())
+                    .add(new SmoothVertexRef(builder, i, normal));
+            }
+        }
+        java.util.stream.Stream<List<SmoothVertexRef>> smoothGroups = byPosition.size() > 4096
+            ? byPosition.values().parallelStream()
+            : byPosition.values().stream();
+        smoothGroups.forEach(shared -> {
+            if (shared == null || shared.size() <= 1) {
+                return;
+            }
+            for (SmoothVertexRef ref : shared) {
+                float angle = ref.builder.smoothingAngle > 0.0F ? ref.builder.smoothingAngle : RTM_DEFAULT_SMOOTHING_ANGLE;
+                float cosThreshold = (float) Math.cos(Math.toRadians(angle));
+                Vector3f sum = new Vector3f();
+                for (SmoothVertexRef other : shared) {
+                    if (ref.normal.dot(other.normal) >= cosThreshold) {
+                        sum.add(other.normal);
+                    }
+                }
+                if (sum.lengthSquared() > 1.0E-8F) {
+                    sum.normalize();
+                    int o = ref.index * 8;
+                    synchronized (ref.builder.positions) {
+                        ref.builder.positions.set(o + 3, sum.x);
+                        ref.builder.positions.set(o + 4, sum.y);
+                        ref.builder.positions.set(o + 5, sum.z);
+                    }
+                }
+            }
+        });
+    }
+
+    private static String positionKey(List<Float> positions, int offset) {
+        return Math.round(positions.get(offset) * 1000.0F) + ","
+            + Math.round(positions.get(offset + 1) * 1000.0F) + ","
+            + Math.round(positions.get(offset + 2) * 1000.0F);
+    }
+
     private static final class BatchBuilder {
         final int order;
         final String groupName;
@@ -2503,6 +2780,8 @@ public final class MqoModelLoader {
         boolean glassTranslucent = false;
         /** RTM pass0(不透明描画)用のアルファテスト相当テクスチャ。 */
         ResourceLocation opaqueTexture = null;
+        /** RTM pass1(半透明)用の窓ガラスのみテクスチャ。 */
+        ResourceLocation windowTexture = null;
         final List<Float> positions = new ArrayList<>();
         final Set<String> faceSignatures = new HashSet<>();
         float minU = Float.POSITIVE_INFINITY;
@@ -2565,6 +2844,7 @@ public final class MqoModelLoader {
             built.baseAlpha = baseAlpha;
             built.glassTranslucent = glassTranslucent;
             built.opaqueTexture = opaqueTexture != null ? opaqueTexture : texture;
+            built.windowTexture = windowTexture != null ? windowTexture : texture;
             return built;
         }
 
@@ -2587,7 +2867,7 @@ public final class MqoModelLoader {
                 }
             }
 
-            float angle = this.smoothingAngle > 0.0F ? this.smoothingAngle : 59.5F;
+            float angle = this.smoothingAngle > 0.0F ? this.smoothingAngle : RTM_DEFAULT_SMOOTHING_ANGLE;
             float cosThreshold = (float) Math.cos(Math.toRadians(angle));
             for (int i = 0; i < vertexCount; i++) {
                 int o = i * 8;
@@ -2628,11 +2908,135 @@ public final class MqoModelLoader {
         private final Map<String, List<Batch>> batchesByNormalizedGroup;
 
         private final ScriptModel scriptModel;
+        private final Map<String, List<float[]>> groupQuadCornerCache = new ConcurrentHashMap<>();
+        private final Map<String, net.minecraft.world.phys.Vec3> groupCenterCache = new ConcurrentHashMap<>();
+
+        // 床下の蓋(下向き面)用。車体シェルの底Y・XZ範囲を遅延計算してキャッシュ。
+        // 片面表示のままだと開いた底から中の暗い空間が透けて黒く見えるため、底に下向きの
+        // グレー板を1枚足して塞ぐ(両面表示は使わない=禁止ルール遵守)。
+        private volatile float[] bodyCapRect; // {minX, minZ, maxX, maxZ, bottomY}
+        private volatile boolean bodyCapComputed;
 
         public MqoModel(List<Batch> batches, List<ResourceLocation> materialTextures) {
             this.batches = batches;
             this.batchesByNormalizedGroup = buildBatchIndex(batches);
             this.scriptModel = new ScriptModel(materialTextures);
+        }
+
+        /** 台車・車輪・パンタ等(車体シェルでない)グループ名か。床下蓋のAABB計算から除外する。 */
+        private static boolean isUnderTruckGroup(String lowerGroupName) {
+            if (lowerGroupName == null || lowerGroupName.isBlank()) return true;
+            return lowerGroupName.contains("bogie") || lowerGroupName.contains("truck")
+                || lowerGroupName.contains("daisya") || lowerGroupName.contains("台車")
+                || lowerGroupName.contains("wheel") || lowerGroupName.contains("sharin")
+                || lowerGroupName.contains("車輪") || lowerGroupName.contains("pant")
+                || lowerGroupName.contains("パンタ") || lowerGroupName.contains("rod")
+                || lowerGroupName.contains("axle") || lowerGroupName.contains("spring")
+                || lowerGroupName.contains("coupler") || lowerGroupName.contains("連結")
+                || lowerGroupName.contains("brake");
+        }
+
+        /** 車体シェルの {minX,minZ,maxX,maxZ,bottomY} を遅延計算。蓋を持たない(該当面なし)なら null。 */
+        private float[] getBodyCapRect() {
+            if (bodyCapComputed) return bodyCapRect;
+            synchronized (this) {
+                if (!bodyCapComputed) {
+                    bodyCapRect = computeBodyCapRect();
+                    bodyCapComputed = true;
+                }
+            }
+            return bodyCapRect;
+        }
+
+        private float[] computeBodyCapRect() {
+            float minX = Float.MAX_VALUE, minZ = Float.MAX_VALUE, minY = Float.MAX_VALUE;
+            float maxX = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+            boolean any = false;
+            for (Batch b : batches) {
+                if (b == null || b.data == null || b.vertexCount <= 0) continue;
+                if (isUnderTruckGroup(b.groupNameLower)) continue;
+                for (int i = 0; i < b.vertexCount; i++) {
+                    int o = i * 8;
+                    float x = b.data[o], y = b.data[o + 1], z = b.data[o + 2];
+                    if (x < minX) minX = x; if (x > maxX) maxX = x;
+                    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+                    if (y < minY) minY = y;
+                    any = true;
+                }
+            }
+            if (!any || maxX <= minX || maxZ <= minZ) return null;
+            // 横幅をわずかに内側へ詰める(外板と完全一致だと縁がはみ出して見えるのを防ぐ)。
+            float insetX = (maxX - minX) * 0.02F;
+            float insetZ = (maxZ - minZ) * 0.02F;
+            return new float[]{minX + insetX, minZ + insetZ, maxX - insetX, maxZ - insetZ, minY};
+        }
+
+        /**
+         * 車体底面に下向きのグレー板を1枚描く(fullbright/不透明パス専用)。開いた底から中の
+         * 暗い空間が透けて黒く見えるのを塞ぐ。自前ジオメトリなので両面で描いて確実に見えるようにする
+         * (パックモデルを両面にするわけではないので禁止ルールには抵触しない)。
+         */
+        private void renderBodyBottomCap(PoseStack poseStack, float lightFactor) {
+            float[] r = getBodyCapRect();
+            if (r == null) return;
+            float minX = r[0], minZ = r[1], maxX = r[2], maxZ = r[3], y = r[4];
+            Matrix4f mat = poseStack.last().pose();
+            RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
+            RenderSystem.setShaderTexture(0, getCapWhiteTexture());
+            // 床下機器に馴染む暗めグレー。lightFactor で昼夜の明るさに追従。
+            float g = 0.16F * lightFactor;
+            RenderSystem.setShaderColor(g, g, g, 1.0F);
+            RenderSystem.enableCull();
+            RenderSystem.disableBlend();
+            RenderSystem.depthMask(true);
+            BufferBuilder b = Tesselator.getInstance().begin(
+                VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            // 両巻きで2枚(自前の蓋なので両面OK)。どちらの視点からでも見える。
+            capVertex(b, mat, minX, y, minZ); capVertex(b, mat, maxX, y, minZ);
+            capVertex(b, mat, maxX, y, maxZ); capVertex(b, mat, minX, y, maxZ);
+            capVertex(b, mat, minX, y, maxZ); capVertex(b, mat, maxX, y, maxZ);
+            capVertex(b, mat, maxX, y, minZ); capVertex(b, mat, minX, y, minZ);
+            BufferUploader.drawWithShader(b.buildOrThrow());
+        }
+
+        private static void capVertex(BufferBuilder b, Matrix4f mat, float x, float y, float z) {
+            float tx = mat.m00()*x + mat.m10()*y + mat.m20()*z + mat.m30();
+            float ty = mat.m01()*x + mat.m11()*y + mat.m21()*z + mat.m31();
+            float tz = mat.m02()*x + mat.m12()*y + mat.m22()*z + mat.m32();
+            b.addVertex(tx, ty, tz).setUv(0.5F, 0.5F).setColor(255, 255, 255, 255);
+        }
+
+        /**
+         * 床下の蓋を MultiBufferSource 経由で描く(Iris 等シェーダ有効時=fullbright でない経路)。
+         * RenderType.entitySolid + グレー色で、シェーダのライティングに乗せて描画する。
+         */
+        private void renderBodyBottomCapBuffered(PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay) {
+            float[] r = getBodyCapRect();
+            if (r == null) return;
+            float minX = r[0], minZ = r[1], maxX = r[2], maxZ = r[3], y = r[4];
+            PoseStack.Pose pose = poseStack.last();
+            Matrix4f mat = pose.pose();
+            VertexConsumer vc = buffer.getBuffer(RenderType.entitySolid(getCapWhiteTexture()));
+            int gray = 0x29; // 暗めグレー(41) アルベド。シェーダのライティングで陰影が付く。
+            // 下向き(-Y)の面を両巻きで2枚(自前の蓋なので両面OK)。
+            capVertexBuf(vc, mat, minX, y, minZ, gray, packedLight, overlay, 0, -1, 0);
+            capVertexBuf(vc, mat, maxX, y, minZ, gray, packedLight, overlay, 0, -1, 0);
+            capVertexBuf(vc, mat, maxX, y, maxZ, gray, packedLight, overlay, 0, -1, 0);
+            capVertexBuf(vc, mat, minX, y, maxZ, gray, packedLight, overlay, 0, -1, 0);
+            capVertexBuf(vc, mat, minX, y, maxZ, gray, packedLight, overlay, 0, 1, 0);
+            capVertexBuf(vc, mat, maxX, y, maxZ, gray, packedLight, overlay, 0, 1, 0);
+            capVertexBuf(vc, mat, maxX, y, minZ, gray, packedLight, overlay, 0, 1, 0);
+            capVertexBuf(vc, mat, minX, y, minZ, gray, packedLight, overlay, 0, 1, 0);
+        }
+
+        private static void capVertexBuf(VertexConsumer vc, Matrix4f mat, float x, float y, float z,
+                                          int gray, int packedLight, int overlay, float nx, float ny, float nz) {
+            vc.addVertex(mat, x, y, z)
+                .setColor(gray, gray, gray, 255)
+                .setUv(0.5F, 0.5F)
+                .setOverlay(overlay)
+                .setLight(packedLight)
+                .setNormal(nx, ny, nz);
         }
 
         long estimateMemoryBytes() {
@@ -2666,6 +3070,7 @@ public final class MqoModelLoader {
         private TrainScriptSystem.ScriptModelRenderer scriptRenderer;
         private Boolean hasLegacyRenderFunction;
         private boolean legacyScriptDisabled;
+        private int legacyScriptFailureCount;
         private final boolean[] observedLegacyPassActivity = new boolean[LEGACY_SCRIPT_PASS_COUNT];
         private int legacyPassObservationMask;
         // pass を最後に観測してから経過した呼び出し数。
@@ -2679,6 +3084,7 @@ public final class MqoModelLoader {
             this.scriptRenderer = renderer;
             this.hasLegacyRenderFunction = null;
             this.legacyScriptDisabled = false;
+            this.legacyScriptFailureCount = 0;
             this.legacyPassObservationMask = 0;
             java.util.Arrays.fill(this.observedLegacyPassActivity, false);
         }
@@ -2701,6 +3107,24 @@ public final class MqoModelLoader {
             return scriptModel;
         }
 
+        /** AABB {minX,minY,minZ,maxX,maxY,maxZ} を全頂点から計算。モデルが空なら単位ボックス。 */
+        public float[] computeBounds() {
+            float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
+            float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+            for (Batch b : batches) {
+                if (b == null || b.data == null) continue;
+                for (int i = 0; i < b.vertexCount; i++) {
+                    int o = i * 8;
+                    float x = b.data[o], y = b.data[o + 1], z = b.data[o + 2];
+                    if (x < minX) minX = x; if (x > maxX) maxX = x;
+                    if (y < minY) minY = y; if (y > maxY) maxY = y;
+                    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+                }
+            }
+            if (minX > maxX) return new float[]{-0.5f, 0f, -0.5f, 0.5f, 2f, 0.5f};
+            return new float[]{minX, minY, minZ, maxX, maxY, maxZ};
+        }
+
         public boolean hasGroupNamed(String groupName) {
             if (groupName == null || groupName.isBlank()) {
                 return false;
@@ -2711,6 +3135,87 @@ public final class MqoModelLoader {
                 }
             }
             return false;
+        }
+
+        public net.minecraft.world.phys.Vec3 getGroupCenter(String groupName) {
+            String normalized = normalizeBatchGroupName(groupName);
+            if (normalized.isEmpty()) {
+                return null;
+            }
+            return groupCenterCache.computeIfAbsent(normalized, key -> {
+                List<Batch> groupBatches = batchesByNormalizedGroup.get(key);
+                if (groupBatches == null || groupBatches.isEmpty()) {
+                    return null;
+                }
+                double minX = Double.POSITIVE_INFINITY;
+                double minY = Double.POSITIVE_INFINITY;
+                double minZ = Double.POSITIVE_INFINITY;
+                double maxX = Double.NEGATIVE_INFINITY;
+                double maxY = Double.NEGATIVE_INFINITY;
+                double maxZ = Double.NEGATIVE_INFINITY;
+                for (Batch b : groupBatches) {
+                    if (b == null || b.data == null) continue;
+                    for (int i = 0; i < b.vertexCount; i++) {
+                        int o = i * 8;
+                        double x = b.data[o];
+                        double y = b.data[o + 1];
+                        double z = b.data[o + 2];
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        minZ = Math.min(minZ, z);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                        maxZ = Math.max(maxZ, z);
+                    }
+                }
+                if (!Double.isFinite(minX) || !Double.isFinite(maxX)) {
+                    return null;
+                }
+                return new net.minecraft.world.phys.Vec3(
+                    (minX + maxX) * 0.5D,
+                    (minY + maxY) * 0.5D,
+                    (minZ + maxZ) * 0.5D
+                );
+            });
+        }
+
+        /**
+         * 指定グループの各クワッド面の4隅座標(モデル空間)を返す。各要素は長さ12のfloat[]
+         * (4隅 × x,y,z)。LCD/モニタのスクリプトが面の上にgif等を貼るために使う。
+         * data は QUADS(4頂点/面 × 8float: x,y,z,nx,ny,nz,u,v)。
+         */
+        public java.util.List<float[]> getGroupQuadCorners(java.util.Set<String> groupNames) {
+            java.util.List<float[]> out = new java.util.ArrayList<>();
+            if (groupNames == null || groupNames.isEmpty()) return out;
+            java.util.Set<String> norm = new java.util.HashSet<>();
+            for (String g : groupNames) {
+                if (g != null && !g.isBlank()) norm.add(normalizeBatchGroupName(g));
+            }
+            if (norm.isEmpty()) {
+                return out;
+            }
+            String cacheKey = String.join(",", new java.util.TreeSet<>(norm));
+            List<float[]> cached = groupQuadCornerCache.get(cacheKey);
+            if (cached != null) {
+                return cached;
+            }
+            for (Batch b : batches) {
+                if (b == null || b.data == null) continue;
+                if (!norm.contains(normalizeBatchGroupName(b.groupName))) continue;
+                for (int i = 0; i + 4 <= b.vertexCount; i += 4) {
+                    float[] q = new float[12];
+                    for (int c = 0; c < 4; c++) {
+                        int o = (i + c) * 8;
+                        q[c * 3] = b.data[o];
+                        q[c * 3 + 1] = b.data[o + 1];
+                        q[c * 3 + 2] = b.data[o + 2];
+                    }
+                    out.add(q);
+                }
+            }
+            List<float[]> immutable = List.copyOf(out);
+            groupQuadCornerCache.put(cacheKey, immutable);
+            return immutable;
         }
 
         /**
@@ -2815,26 +3320,9 @@ public final class MqoModelLoader {
             if (ordered.isEmpty()) {
                 return;
             }
-            // シェーダーパイプライン有効時は直接GL (POSITION_TEX_COLOR) を使わない。
-            // Irisはこのシェーダーをgbuffers_texturedに振り分けエミッシブ扱いするため、
-            // 車体・台車が光って見える。シェーダー有効時は entityCutoutNoCull 経由で
-            // gbuffers_entities に通し、FULL_BRIGHT lightmap で明るさを維持する。
-            // RTM's legacy AlphaBlend pass uses GL_BLEND without disabling depth writes.
-            // Minecraft's entityTranslucent does disable depth writes, which makes dense
-            // train interiors shimmer/flicker. Use the direct RTM-style path for scripted
-            // train alpha passes when shaders are not active.
-            // トレインの半透明(AlphaBlend=車体/窓/内装)は全パスで直接GL(深度書き込み保持)に通す。
-            // entityTranslucent は深度書き込みを切るため、pass 0 の車体(body)が視点角度により透けて
-            // 消える (ユーザー報告「ボディが出ない」)。RTM 同様 GL_BLEND + 深度書き込みで solid に描く。
-            // 列車の全ジオメトリ(不透明 body 含む)を直接GL/VBO 経路(fullbright)で高速描画する。
-            // 不透明 body も CPU 頂点変換(ライトマップ経路)だと毎フレーム数万頂点を処理して重い。
-            // VBO 経路なら 1 度アップロードした静的バッファを行列1枚で描けるので劇的に軽い。
-            // 「夜でも発光する」問題は renderSelectedBatches 側で setShaderColor に明るさ係数
-            // (computeFlatBrightness)を掛けて解消済み(pass>=2 は packedLight=FULL で係数≈1)。
-            // 法線ディフューズ陰影は付かない(RTM 原作と同じフラット表示)。
-            boolean fullbright = scriptRenderer != null && scriptRenderer.isRenderingTrain()
-                    && !hasActiveShaderPipeline();
-            renderSelectedBatches(ordered, poseStack, buffer, packedLight, overlay, translucent, scriptRenderer, null, fullbright);
+            Object entity = scriptRenderer != null ? scriptRenderer.getCurrentEntity() : null;
+            boolean fullbright = false;
+            renderSelectedBatches(ordered, poseStack, buffer, packedLight, overlay, translucent, scriptRenderer, entity, fullbright);
         }
 
         // (Set インスタンス → ソート済み Batch リスト) を IdentityHashMap でキャッシュ。
@@ -2858,11 +3346,6 @@ public final class MqoModelLoader {
                 if (scriptModel != null && scriptRenderer != null) {
                     scriptModel.setActiveRenderer(scriptRenderer);
                 }
-                // 列車はリプレイキャッシュを使わない。リプレイは状態を量子化(車輪5°/ドア丸め)して
-                // 再生するためアニメがカクつき、さらにドア開閉中に署名が乱れて車両が消える事があった
-                // (ユーザー報告)。RTM 同様 JS を毎フレーム実行して滑らかさを保つ。描画自体は Phase 1
-                // の VBO 化で十分軽いので、JS 毎フレームでも実用的。軽量化の続きはアニメに影響しない
-                // フラスタムカリング/距離LOD で行う。
                 boolean allowReplay = !(entity instanceof TrainEntity);
                 if (scriptRenderer != null && allowReplay) {
                     long sig = scriptRenderer.computeReplaySignature(pass, entity);
@@ -2881,8 +3364,7 @@ public final class MqoModelLoader {
                     // RTMレガシースクリプトは entity.getBogie(n) / entity.field_70177_z 等
                     // LegacyScriptExecutor のAPIを前提としている。生の TrainEntity ではなく
                     // LegacyScriptExecutor でラップして渡す。
-                    Object scriptEntity = entity instanceof TrainEntity te
-                        ? new TrainScriptSystem.LegacyScriptExecutor(te) : entity;
+                    Object scriptEntity = scriptRenderer != null ? scriptRenderer.scriptEntityFor(entity) : entity;
                     engine.put("poseStack", null);
                     engine.put("pass", pass);
                     engine.put("entity", scriptEntity);
@@ -2922,7 +3404,20 @@ public final class MqoModelLoader {
                 // これらをクリアしてしまうと baked render の filter が無効化されて、
                 // 既にスクリプト側で描いた body 等を baked が再度上書き描画し
                 // z-fighting が発生する (C12 SL: render_rod が <eval>:317 で例外)。
-                RealTrainModUnofficial.LOGGER.warn("Legacy model script failed on pass {} (will retry next frame)", pass, e);
+                legacyScriptFailureCount++;
+                if (legacyScriptFailureCount >= 3) {
+                    legacyScriptDisabled = true;
+                    if (scriptRenderer != null) {
+                        scriptRenderer.clearScriptRegisteredGroups();
+                    }
+                    RealTrainModUnofficial.LOGGER.warn(
+                        "Legacy model script failed on pass {} three times; disabling script and using baked render for this model.",
+                        pass, e);
+                } else {
+                    RealTrainModUnofficial.LOGGER.warn(
+                        "Legacy model script failed on pass {} ({}/3 before disabling).",
+                        pass, legacyScriptFailureCount, e);
+                }
             } finally {
                 if (scriptRenderer != null) {
                     // スクリプトが pushMatrix/popMatrix のバランスを崩したまま終了した場合に
@@ -2966,9 +3461,6 @@ public final class MqoModelLoader {
         private void renderInternal(PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
                                     boolean translucent, GroupPredicate groupFilter, GroupTransform groupTransform,
                                     TrainScriptSystem.ScriptModelRenderer scriptRenderer, Object entity) {
-            // 全体 fullbright にすると車体全部が夜に光る (RTM 原作では Light マテリアル =
-            // 個別バッチの emissive のみが光る挙動)。fullbright は無効化し、各バッチが持つ
-            // emissiveTexture の有無で個別に判定する経路に任せる。
             boolean fullbright = false;
             renderSelectedBatches(this.batches, poseStack, buffer, packedLight, overlay, translucent, groupFilter, groupTransform, scriptRenderer, entity, fullbright);
         }
@@ -2981,6 +3473,12 @@ public final class MqoModelLoader {
         private void renderSelectedBatches(List<Batch> selectedBatches, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
                                            boolean translucent, GroupPredicate groupFilter, GroupTransform groupTransform,
                                            TrainScriptSystem.ScriptModelRenderer scriptRenderer, Object entity, boolean fullbright) {
+            // シェーダー(Iris/Oculus)有効時は、フラットな直接GL経路ではなく法線付きの
+            // バッファ経路で描画する。直接GL経路は頂点法線スムージングが効かず、影modで
+            // 車体がカクついて見えるため(数値は一切変更しない・経路のみ切替)。
+            if (fullbright && com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
+                fullbright = false;
+            }
             // ループ全体で保持する直近値。再設定を skip するため。
             int gr = scriptRenderer != null ? scriptRenderer.getColorRed255()   : 255;
             int gg = scriptRenderer != null ? scriptRenderer.getColorGreen255() : 255;
@@ -2988,6 +3486,7 @@ public final class MqoModelLoader {
             int ga = scriptRenderer != null ? scriptRenderer.applyAlpha255(255) : 255;
             int lastBlendMode = -1; // 0=disabled, 1=blend(depthMask=false), 2=cutout(depthMask=true)
             int lastCullMode = -1;  // 0=両面(cull無効), 1=片面(cull有効)。batch ごとに切替。
+            boolean useCull = shouldCullModelFaces(entity);
             // fullbright(直接GL/VBO)経路はライトマップを使わないので、周囲の明るさを
             // setShaderColor に係数として掛けて疑似的に再現する。これで「高速VBO」かつ
             // 「夜は暗く/昼は明るく(=勝手に発光しない)」を両立する。法線ディフューズは
@@ -3001,7 +3500,7 @@ public final class MqoModelLoader {
                 // 「後ろから見るとボディが消える」ため(ユーザー報告)。半透明ガラスだけ片面にして
                 // 表裏二重ブレンドで暗くなるのを防ぐ。
                 // ループ全体で 1 度だけシェーダ・色を設定。
-                RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
+                RenderSystem.setShader(GameRenderer::getRendertypeCloudsShader);
                 RenderSystem.setShaderColor(gr / 255f * lightFactor, gg / 255f * lightFactor, gb / 255f * lightFactor, ga / 255f);
             }
 
@@ -3012,9 +3511,9 @@ public final class MqoModelLoader {
                 if (groupFilter != null && !groupFilter.shouldRender(batch.groupName)) {
                     continue;
                 }
-                // RTM 2パス: opaque pass(translucent=false)は全 batch を不透明描画、
-                // translucent pass(translucent=true)は AlphaBlend batch のみブレンド重ね描画。
-                // emissive(scriptPass>=2 = 前照灯等)は別系統なので translucent pass でも通す。
+                if (shouldSuppressPackSpecificShadowArtifact(entity, batch.groupNameLower)) {
+                    continue;
+                }
                 int scriptPassNow = scriptRenderer != null ? scriptRenderer.getCurrentPass() : 0;
                 if (translucent && !batch.translucent && scriptPassNow < 2) continue;
                 if (scriptRenderer != null) {
@@ -3036,22 +3535,21 @@ public final class MqoModelLoader {
                     if (scriptPass >= 2 && !scriptTexture && emissiveTexture == null) {
                         continue;
                     }
+                    String lowerGroupName = batch.groupNameLower;
                     ResourceLocation texture = scriptTexture
                         ? scriptRenderer.getBoundTexture()
                         : (emissiveTexture != null ? emissiveTexture : batch.texture);
-                    // RTM 2パス: opaque pass は不透明(アルファテスト相当に二値化済み)テクスチャ、
-                    // translucent pass は元(アルファ維持)テクスチャを使う。script/emissive 指定時は除外。
                     if (!scriptTexture && emissiveTexture == null) {
-                        texture = translucent ? batch.texture : batch.opaqueTexture;
+                        texture = translucent ? batch.windowTexture : batch.opaqueTexture;
                     }
 
-                    String lowerGroupName = batch.groupNameLower;
                     boolean forceCutout;
                     float depthBias;
                     if (scriptTexture) {
                         forceCutout = shouldForceLegacyAlphaCutout(batch, lowerGroupName, true)
                             || shouldForceCabCutout(batch, lowerGroupName, true)
-                            || shouldForceDisplayCutout(batch, lowerGroupName, true);
+                            || shouldForceDisplayCutout(batch, lowerGroupName, true)
+                            || shouldForceShaderSafeCutout(entity, batch, lowerGroupName, true);
                         depthBias = getDepthBias(batch, lowerGroupName, true);
                     } else {
                         // scriptTexture=false の結果はバッチ構築時に 1 度計算してキャッシュ。
@@ -3065,10 +3563,12 @@ public final class MqoModelLoader {
                             batch.cachedDepthBiasNoScriptTex = getDepthBias(batch, lowerGroupName, false);
                             batch.cachedComputed = true;
                         }
-                        forceCutout = batch.cachedForceCutoutNoScriptTex;
+                        forceCutout = batch.cachedForceCutoutNoScriptTex
+                            || shouldForceShaderSafeCutout(entity, batch, lowerGroupName, false);
                         depthBias = batch.cachedDepthBiasNoScriptTex;
                     }
-                    boolean needsBlend = translucent && !forceCutout && (scriptTexture || batch.translucent);
+                    boolean needsBlend = (translucent && batch.translucent)
+                        || (!forceCutout && (scriptTexture || scriptPassNow >= 2));
 
                     int scriptRed   = scriptRenderer != null ? scriptRenderer.getColorRed255()   : 255;
                     int scriptGreen = scriptRenderer != null ? scriptRenderer.getColorGreen255() : 255;
@@ -3090,11 +3590,10 @@ public final class MqoModelLoader {
                             RenderSystem.setShaderColor(scriptRed / 255f * lightFactor, scriptGreen / 255f * lightFactor, scriptBlue / 255f * lightFactor, scriptAlpha / 255f);
                             gr = scriptRed; gg = scriptGreen; gb = scriptBlue; ga = scriptAlpha;
                         }
-                        // 不透明 pass(translucent=false)は片面(cull)。車両下面の裏向きの面が見えて
-                        // 黒い塊(影に見える)になるのを防ぐ。SL の「後ろから消える」は body-数字 の
-                        // 角度バリアント除外が原因で別途修正済みなので、片面でも消えない。
-                        // 半透明 pass(AlphaBlend ブレンド)は両面にして窓を外/内どちらからも見せる。
-                        int desiredCull = translucent ? 0 : 1;
+                        // RTM本家同様、モデル定義の doCulling に従う。
+                        // 車内面は doCulling=false の車両で裏面も描かないと、外から窓越しに
+                        // 内装が見えなくなる。
+                        int desiredCull = useCull ? 1 : 0;
                         if (desiredCull != lastCullMode) {
                             lastCullMode = desiredCull;
                             if (desiredCull == 1) {
@@ -3103,10 +3602,11 @@ public final class MqoModelLoader {
                                 RenderSystem.disableCull();
                             }
                         }
-                        // RTM 2パス: opaque pass(translucent=false)はブレンド無効(シェーダが
-                        // alpha<0.1 を discard するので穴も正しく抜け、残りは不透明・深度書き込み)。
-                        // translucent pass(translucent=true)はブレンド有効で AlphaBlend を重ね描画。
-                        int desiredBlend = translucent ? 1 : 0;
+                        // バニラ・ガラス安定方式: ブレンドはバッチ単位で決める。
+                        // batch.translucent(AlphaBlend=車体/窓/内装) または emissive pass(前照灯等)は
+                        // blend ON。それ以外(台車等)は blend OFF の不透明描画。depthMask は常に ON なので
+                        // α255 は不透明として深度を持ちスケスケしない。
+                        int desiredBlend = (batch.translucent || scriptTexture || scriptPassNow >= 2) ? 1 : 0;
                         if (desiredBlend != lastBlendMode) {
                             lastBlendMode = desiredBlend;
                             if (desiredBlend == 1) {
@@ -3116,12 +3616,8 @@ public final class MqoModelLoader {
                                     GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
                                     GlStateManager.SourceFactor.ONE,
                                     GlStateManager.DestFactor.ZERO);
-                                // 半透明 batch でも深度書き込みは ON にする。京急のように外板+窓が
-                                // 1テクスチャ(glassBand で batch 全体が半透明扱い)の車両では、深度を
-                                // 書かないとボディ外板まで透けて「スケスケ」になる(ユーザー報告)。
-                                // 深度ONなら外板(alpha≈255)は不透明として深度を持ち透けない。窓
-                                // (alpha中間)はブレンドで半透明色が出る(背景が透ける)。「窓越しに内装」は
-                                // 諦めるが、ボディ消失感より軽微。
+                                // RTM本家どおり pass1 の depthMask は ON(デフォルトのまま)。窓は pass0 で
+                                // 既にアルファテスト不透明描画されており、pass1 は同じ位置にブレンドを重ねる。
                                 RenderSystem.depthMask(true);
                             } else if (desiredBlend == 2) {
                                 RenderSystem.enableBlend();
@@ -3152,13 +3648,15 @@ public final class MqoModelLoader {
                             cachedVbo.drawWithShader(
                                 mv,
                                 RenderSystem.getProjectionMatrix(),
-                                net.minecraft.client.renderer.GameRenderer.getPositionTexColorShader());
+                                net.minecraft.client.renderer.GameRenderer.getRendertypeCloudsShader());
                             com.mojang.blaze3d.vertex.VertexBuffer.unbind();
                         } else {
                             // CPU フォールバック (scriptRenderer の UV/色変換が必要なフレーム等)
                             BufferBuilder builder = Tesselator.getInstance().begin(
-                                VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+                                VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
                             Matrix4f mat = poseStack.last().pose();
+                            Matrix3f norm = poseStack.last().normal();
+                            float[] normalOut = new float[3];
                             for (int i = 0; i < batch.vertexCount; i++) {
                                 int o = i * 8;
                                 float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
@@ -3175,9 +3673,17 @@ public final class MqoModelLoader {
                                 float tx = mat.m00()*x + mat.m10()*y + mat.m20()*z + mat.m30();
                                 float ty = mat.m01()*x + mat.m11()*y + mat.m21()*z + mat.m31();
                                 float tz = mat.m02()*x + mat.m12()*y + mat.m22()*z + mat.m32();
-                                builder.addVertex(tx, ty, tz).setUv(u, v).setColor(255, 255, 255, 255);
+                                float tnx = norm.m00()*nx + norm.m10()*ny + norm.m20()*nz;
+                                float tny = norm.m01()*nx + norm.m11()*ny + norm.m21()*nz;
+                                float tnz = norm.m02()*nx + norm.m12()*ny + norm.m22()*nz;
+                                normalizeNormal(tnx, tny, tnz, normalOut);
+                                builder.addVertex(tx, ty, tz)
+                                    .setUv(u, v)
+                                    .setColor(255, 255, 255, 255)
+                                    .setNormal(normalOut[0], normalOut[1], normalOut[2]);
                             }
                             if (batch.vertexCount > 0) {
+                                RenderSystem.setShader(GameRenderer::getRendertypeCloudsShader);
                                 BufferUploader.drawWithShader(builder.buildOrThrow());
                             }
                         }
@@ -3185,8 +3691,8 @@ public final class MqoModelLoader {
                         // Lightmap-aware path: block entities (rails, installed objects)
                         // メタセコイア同様の片面 (cull) 表示。
                         RenderType renderType = needsBlend
-                            ? RenderType.entityTranslucentCull(texture)
-                            : RenderType.entityCutout(texture);
+                            ? (useCull ? RenderType.entityTranslucentCull(texture) : RenderType.entityTranslucent(texture))
+                            : (useCull ? RenderType.entityCutout(texture) : RenderType.entityCutoutNoCull(texture));
                         VertexConsumer consumer = buffer.getBuffer(renderType);
                         PoseStack.Pose pose = poseStack.last();
                         Matrix4f mat = pose.pose();
@@ -3224,6 +3730,8 @@ public final class MqoModelLoader {
                 }
             }
 
+            // (床下の蓋は撤去: ユーザー報告「床に敷いた影のように見えて邪魔」のため。)
+
             if (fullbright) {
                 RenderSystem.enableCull();
                 RenderSystem.depthMask(true);
@@ -3245,11 +3753,13 @@ public final class MqoModelLoader {
             // → 全 body 変形が重なる現象が発生していた。
             // 修正: 1段で完結させる。script を実行し、その直後に baked filter を組み立てて baked render を呼ぶ。
             boolean hasScript = scriptEngine != null;
-            // 半透明の遅延描画は一旦無効化。baked 描画後に直接GLでフラッシュすると描画順/ブレンド
-            // 状態が乱れ、KQパックで床下の黒い影が再発し半透明が崩れたため(ユーザー報告)。
-            // 深度書き込みoff(desiredBlend==1)のみの安定状態に戻す。窓越しの内装は見えにくいが
-            // 影/崩れより軽微。今後やるなら baked と同じ buffer 経由でソートする方式が必要。
-            boolean deferTrans = false;
+            // installed object 側も RTM 本家どおり「全不透明の後に半透明」を守る。
+            // script/baked の順序だけ整え、同じ buffer 上で最後にまとめて流す。
+            // ★ deferTranslucent はスクリプト描画専用の仕組み。scriptRenderer が null の
+            //   (スクリプト無し車両 = E131 等)では使わない。以前は true 固定で、null の
+            //   scriptRenderer に setDeferTranslucent を呼んで NPE → 描画全体が失敗し
+            //   車体も台車も一切見えなくなっていた。
+            boolean deferTrans = scriptRenderer != null;
             try {
                 if (scriptRenderer != null) {
                     scriptRenderer.resetRenderStatistics();
@@ -3264,12 +3774,8 @@ public final class MqoModelLoader {
                     // 同じ group の重複描画は renderRegisteredGroups 側で 「同 pass で再描画させない」
                     // チェックを入れて防ぐ (todo set + scriptedOpaque/TranslucentGroups)。
                     for (int pass = 0; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
-                        if (shouldSkipObservedLegacyPass(pass)) continue;
-                        if (pass == 1 && scriptRenderer != null && !scriptRenderer.hasAlphaPassContent()) continue;
+                        if (!(entity instanceof TrainEntity) && shouldSkipObservedLegacyPass(pass)) continue;
                         if (pass >= 2 && scriptRenderer != null && !scriptRenderer.hasEmissivePassContent()) continue;
-                        if (pass >= 2 && entity instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity te) {
-                            if (!te.isInteriorLightOn()) continue;
-                        }
                         poseStack.pushPose();
                         try {
                             executeScript(poseStack, buffer, packedLight, overlay, pass, entity);
@@ -3335,12 +3841,17 @@ public final class MqoModelLoader {
                            GroupPredicate groupFilter, GroupTransform groupTransform, Object entity) {
             boolean hasScript = scriptEngine != null;
             boolean scriptRendered = false;
+            boolean deferTrans = true;
             try {
                 if (scriptRenderer != null) {
                     scriptRenderer.resetRenderStatistics();
                 }
+                if (deferTrans && scriptRenderer != null) {
+                    scriptRenderer.setDeferTranslucent(true);
+                }
                 if (hasScript) {
                     for (int pass = 0; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
+                        if (pass >= 2 && scriptRenderer != null && !scriptRenderer.hasEmissivePassContent()) continue;
                         // スクリプトが poseStack を破壊する事例 (rotate/translate を push/pop なしで多用、
                         // NaN を渡す等) に対する安全網。push/pop で囲んで corruption を局所化する。
                         poseStack.pushPose();
@@ -3378,6 +3889,10 @@ public final class MqoModelLoader {
             }
             if (hasTranslucentBatches() || (scriptRenderer != null && scriptRenderer.hasAlphaPassContent())) {
                 renderInternal(poseStack, buffer, packedLight, overlay, true, translucentFilter, groupTransform, scriptRenderer, entity);
+            }
+            if (deferTrans && scriptRenderer != null) {
+                scriptRenderer.flushDeferredTranslucent(poseStack, buffer);
+                scriptRenderer.setDeferTranslucent(false);
             }
         }
 
@@ -3513,6 +4028,55 @@ public final class MqoModelLoader {
                 || lowerGroupName.contains("marker");
         }
 
+        private static boolean shouldUseGlassOnlyPass(Batch batch, String lowerGroupName) {
+            if (batch == null || lowerGroupName == null || !batch.translucent) {
+                return false;
+            }
+            // ボディ全体を AlphaBlend 指定している蒸機やロッド物はここに入れない。
+            // 明示的にガラス/窓/alpha グループとして切られているものだけを対象にする。
+            return lowerGroupName.equals("alpha")
+                || lowerGroupName.startsWith("alpha_")
+                || lowerGroupName.contains("glass")
+                || lowerGroupName.contains("window")
+                || lowerGroupName.contains("wind");
+        }
+
+        private static boolean shouldSuppressPackSpecificShadowArtifact(Object entity, String lowerGroupName) {
+            if (!(entity instanceof TrainEntity train) || lowerGroupName == null) {
+                return false;
+            }
+            String vehicleId = train.getVehicleId();
+            if (vehicleId == null) {
+                return false;
+            }
+            String lowerId = vehicleId.toLowerCase(Locale.ROOT);
+            VehicleDefinition def = VehicleRegistry.getById(vehicleId);
+            String lowerModelFile = def == null || def.getModelFile() == null
+                ? ""
+                : def.getModelFile().replace('\\', '/').toLowerCase(Locale.ROOT);
+            // T-ONREC E131 パックは alpha / alpha_ グループの中に、窓ガラスではなく
+            // 車体下へ大きく伸びる補助板が入っている。移植版ではこれが黒い「影板」として
+            // 出てしまう。面単位の除外は bake 時に行い、ここでは丸ごと消さない。
+            if (lowerId.startsWith("t-on_e131")
+                    || lowerModelFile.startsWith("t-onrec/e131/")
+                    || lowerModelFile.contains("/t-onrec/e131/")) {
+                return false;
+            }
+            if (lowerId.startsWith("baru_keikyu")
+                    || lowerId.contains("keikyu")
+                    || lowerModelFile.startsWith("baru_keikyu_")
+                    || lowerModelFile.contains("/baru_keikyu_")) {
+                return lowerGroupName.equals("shadow")
+                    || lowerGroupName.startsWith("shadow_")
+                    || lowerGroupName.endsWith("_shadow");
+            }
+            if ((lowerId.startsWith("d51-498") || lowerModelFile.startsWith("d51-498"))
+                    && lowerGroupName.equals("fl")) {
+                return true;
+            }
+            return false;
+        }
+
         private static boolean isInteriorGroup(String lowerGroupName) {
             return lowerGroupName.contains("seat")
                 || lowerGroupName.contains("chair")
@@ -3560,12 +4124,6 @@ public final class MqoModelLoader {
             if (lowerGroupName.contains("mask") && !isLegacyDisplayGroup(lowerGroupName)) {
                 return true;
             }
-            // テクスチャが明確なガラス帯(中間アルファのまとまり)を持つなら本当の半透明
-            // (ガラス窓・煙等)。グループ名に window/glass が無くても強制カットアウトしない。
-            // 二値カットアウトの SL 車体はガラス帯を持たない(false)ので従来通り不透明維持。
-            if (batch.glassTranslucent) {
-                return false;
-            }
             // RTM 系 SL/D51 等: ボディテクスチャが AlphaBlend で登録されていても、
             // 実体はアルファテスト用（ロッドの隙間など）。ブレンドで描画すると深度書き込みが
             // 切れ、車体越しに反対側のパーツが透けて見える。
@@ -3574,11 +4132,7 @@ public final class MqoModelLoader {
             if (isLegacyDisplayGroup(lowerGroupName) || isScriptDisplayGroup(lowerGroupName)) {
                 return false;
             }
-            boolean hasTransparencyKeyword = lowerGroupName.contains("glass")
-                || lowerGroupName.contains("window")
-                || lowerGroupName.contains("alpha")
-                || lowerGroupName.contains("trans")
-                || lowerGroupName.equals("a");
+            boolean hasTransparencyKeyword = isLegacyTransparentGroupName(lowerGroupName);
             if (!hasTransparencyKeyword) {
                 return true;
             }
@@ -3603,7 +4157,7 @@ public final class MqoModelLoader {
             if (batch == null || scriptTexture || !batch.translucent || !hasActiveShaderPipeline()) {
                 return false;
             }
-            if (!(entity instanceof LargeRailCoreBlockEntity) && !(entity instanceof InstalledObjectBlockEntity)) {
+            if (!(entity instanceof TrainEntity) && !(entity instanceof LargeRailCoreBlockEntity) && !(entity instanceof InstalledObjectBlockEntity)) {
                 return false;
             }
             if (isGlassGroup(lowerGroupName) || isLegacyDisplayGroup(lowerGroupName)) {
@@ -3744,6 +4298,8 @@ public final class MqoModelLoader {
         boolean glassTranslucent = false;
         /** RTM pass0(不透明描画)用のアルファテスト相当テクスチャ。 */
         ResourceLocation opaqueTexture = null;
+        /** RTM pass1(半透明)用の窓ガラスのみテクスチャ。 */
+        ResourceLocation windowTexture = null;
         final float[] data;
         final int vertexCount;
         // scriptTexture=false 時の事前計算結果。SL/通常列車は大半の batch で
@@ -3835,7 +4391,7 @@ public final class MqoModelLoader {
             try {
                 com.mojang.blaze3d.vertex.BufferBuilder bb = com.mojang.blaze3d.vertex.Tesselator.getInstance().begin(
                     com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
-                    com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX_COLOR);
+                    com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
                 for (int i = 0; i < vertexCount; i++) {
                     int o = i * 8;
                     float x = data[o], y = data[o + 1], z = data[o + 2];
@@ -3845,7 +4401,10 @@ public final class MqoModelLoader {
                         float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, nx*nx + ny*ny + nz*nz)));
                         x += nx*il*bias; y += ny*il*bias; z += nz*il*bias;
                     }
-                    bb.addVertex(x, y, z).setUv(u, v).setColor(255, 255, 255, 255);
+                    bb.addVertex(x, y, z)
+                        .setUv(u, v)
+                        .setColor(255, 255, 255, 255)
+                        .setNormal(nx, ny, nz);
                 }
                 com.mojang.blaze3d.vertex.MeshData mesh = bb.build();
                 if (mesh == null) return null;

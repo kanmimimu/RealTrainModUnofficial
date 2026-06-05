@@ -16,6 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -24,6 +25,8 @@ import java.util.List;
 import java.util.ArrayList;
 
 public class VehicleFormationItem extends Item {
+    private static final double FORMATION_CLEARANCE = 0.25D;
+
     public VehicleFormationItem() {
         super(new Properties().stacksTo(1));
     }
@@ -116,14 +119,22 @@ public class VehicleFormationItem extends Item {
         com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info("Spawn train at x={}, y={}, z={}, yaw={}", currentX, currentY, currentZ, currentYaw);
         
         List<TrainEntity> spawnedTrains = new ArrayList<>();
+        double previousHalfLength = 0.0D;
         
         for (int i = 0; i < formation.vehicles.size(); i++) {
             VehicleEntry entry = formation.vehicles.get(i);
             VehicleDefinition def = VehicleRegistry.getById(entry.id);
             if (def == null) continue;
+            double halfLength = estimateTrainHalfLength(def);
+            if (i > 0) {
+                double centerGap = previousHalfLength + halfLength + FORMATION_CLEARANCE;
+                double yawRad = Math.toRadians(currentYaw);
+                currentX += Math.sin(yawRad) * centerGap;
+                currentZ -= Math.cos(yawRad) * centerGap;
+            }
             double offsetY = Math.max(0.0, def.getModelOffset().y);
             
-            if (isOccupiedSpawnArea(level, currentX, currentY + offsetY, currentZ, def.getTrainDistance())) {
+            if (isOccupiedSpawnArea(level, currentX, currentY + offsetY, currentZ, halfLength)) {
                 player.displayClientMessage(Component.literal("編成に含まれる車両のスポーン位置に既に電車があります。"), true);
                 return;
             }
@@ -132,11 +143,7 @@ public class VehicleFormationItem extends Item {
             if (train != null) {
                 level.addFreshEntity(train);
                 spawnedTrains.add(train);
-
-                double distance = def.getTrainDistance();
-                double yawRad = Math.toRadians(currentYaw);
-                currentX += Math.sin(yawRad) * distance;
-                currentZ -= Math.cos(yawRad) * distance;
+                previousHalfLength = halfLength;
             }
         }
         
@@ -146,8 +153,8 @@ public class VehicleFormationItem extends Item {
         }
     }
 
-    private boolean isOccupiedSpawnArea(Level level, double x, double y, double z, float trainDistance) {
-        double radius = Math.max(1.75D, trainDistance * 0.5D);
+    private boolean isOccupiedSpawnArea(Level level, double x, double y, double z, double halfLength) {
+        double radius = Math.max(1.75D, halfLength);
         var bounds = new net.minecraft.world.phys.AABB(
             x - radius,
             y - 1.0,
@@ -160,6 +167,17 @@ public class VehicleFormationItem extends Item {
             TrainEntity.purgeDanglingTrainResidue(serverLevel, bounds);
         }
         return !level.getEntitiesOfClass(TrainEntity.class, bounds, entity -> entity != null && entity.isAlive() && !entity.isRemoved()).isEmpty();
+    }
+
+    private static double estimateTrainHalfLength(VehicleDefinition def) {
+        double halfLength = Math.max(1.75D, def.getTrainDistance());
+        for (VehicleDefinition.BogieDefinition bogie : def.getBogies()) {
+            halfLength = Math.max(halfLength, Math.abs(bogie.position().z) + 0.95D);
+        }
+        for (Vec3 seat : def.getAllSeatPositions()) {
+            halfLength = Math.max(halfLength, Math.abs(seat.z) + 0.95D);
+        }
+        return halfLength;
     }
 
     private RailSpawnData findNearestRailSpawn(Level level, BlockPos clickedPos) {

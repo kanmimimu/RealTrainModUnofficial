@@ -133,17 +133,37 @@ public final class ExternalSoundPackBridge {
     }
 
     private static boolean collectFromDirectory(Path packDir, Map<String, JsonObject> mergedSoundDefs) throws IOException {
+        String rootNamespace = namespaceFromPackName(packDir.getFileName().toString());
+        boolean copiedAny = false;
+        Path rootSoundsJson = packDir.resolve("sounds.json");
+        if (Files.isRegularFile(rootSoundsJson)) {
+            mergeSoundDefinitions(rootNamespace, Files.readString(rootSoundsJson), mergedSoundDefs);
+            copiedAny = true;
+        }
+        Path rootSoundsDir = packDir.resolve("sounds");
+        if (Files.isDirectory(rootSoundsDir)) {
+            try (var walk = Files.walk(rootSoundsDir)) {
+                for (Path source : walk.filter(Files::isRegularFile).toList()) {
+                    Path relative = rootSoundsDir.relativize(source);
+                    Path target = GENERATED_PACK_ROOT.resolve("assets").resolve(rootNamespace).resolve("sounds")
+                        .resolve(lowercasePath(relative));
+                    Files.createDirectories(target.getParent());
+                    Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                    registerCopiedSound(mergedSoundDefs, rootNamespace, relative);
+                    copiedAny = true;
+                }
+            }
+        }
         Path assetsDir = packDir.resolve("assets");
         if (!Files.isDirectory(assetsDir)) {
-            return false;
+            return copiedAny;
         }
-        boolean copiedAny = false;
         try (var namespaces = Files.list(assetsDir)) {
             for (Path namespaceDir : namespaces.toList()) {
                 if (!Files.isDirectory(namespaceDir)) {
                     continue;
                 }
-                String namespace = namespaceDir.getFileName().toString();
+                String namespace = namespaceDir.getFileName().toString().toLowerCase(Locale.ROOT);
                 Path soundsJson = namespaceDir.resolve("sounds.json");
                 if (Files.isRegularFile(soundsJson)) {
                     mergeSoundDefinitions(namespace, Files.readString(soundsJson), mergedSoundDefs);
@@ -154,9 +174,11 @@ public final class ExternalSoundPackBridge {
                     try (var walk = Files.walk(soundsDir)) {
                         for (Path source : walk.filter(Files::isRegularFile).toList()) {
                             Path relative = soundsDir.relativize(source);
-                            Path target = GENERATED_PACK_ROOT.resolve("assets").resolve(namespace).resolve("sounds").resolve(relative);
+                            Path target = GENERATED_PACK_ROOT.resolve("assets").resolve(namespace).resolve("sounds")
+                                .resolve(lowercasePath(relative));
                             Files.createDirectories(target.getParent());
                             Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                            registerCopiedSound(mergedSoundDefs, namespace, relative);
                             copiedAny = true;
                         }
                     }
@@ -168,6 +190,7 @@ public final class ExternalSoundPackBridge {
 
     private static boolean collectFromArchive(Path archive, Map<String, JsonObject> mergedSoundDefs) throws IOException {
         boolean copiedAny = false;
+        String rootNamespace = namespaceFromPackName(archive.getFileName().toString());
         try (ZipFile zipFile = new ZipFile(archive.toFile())) {
             var entries = zipFile.entries();
             while (entries.hasMoreElements()) {
@@ -177,6 +200,27 @@ public final class ExternalSoundPackBridge {
                 }
                 String normalized = normalize(entry.getName());
                 String lower = normalized.toLowerCase(Locale.ROOT);
+                if (lower.equals("sounds.json")) {
+                    try (InputStream input = zipFile.getInputStream(entry)) {
+                        mergeSoundDefinitions(rootNamespace, readUtf8(input), mergedSoundDefs);
+                        copiedAny = true;
+                    }
+                    continue;
+                }
+                if (lower.startsWith("sounds/")) {
+                    String[] parts = normalized.split("/");
+                    Path target = GENERATED_PACK_ROOT.resolve("assets").resolve(rootNamespace).resolve("sounds");
+                    for (int i = 1; i < parts.length; i++) {
+                        target = target.resolve(parts[i].toLowerCase(Locale.ROOT));
+                    }
+                    Files.createDirectories(target.getParent());
+                    try (InputStream input = zipFile.getInputStream(entry)) {
+                        Files.write(target, input.readAllBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+                    }
+                    registerCopiedSound(mergedSoundDefs, rootNamespace, Path.of(String.join("/", java.util.Arrays.copyOfRange(parts, 1, parts.length))));
+                    copiedAny = true;
+                    continue;
+                }
                 if (!lower.startsWith("assets/")) {
                     continue;
                 }
@@ -184,8 +228,10 @@ public final class ExternalSoundPackBridge {
                 if (parts.length < 3) {
                     continue;
                 }
-                String namespace = parts[1];
-                if (lower.equals("assets/" + namespace.toLowerCase(Locale.ROOT) + "/sounds.json")) {
+                // 名前空間は小文字化必須(MC のリソース名前空間は小文字のみ)。RTM パックには
+                // "sound_MasaCrossings" 等の大文字名前空間があり、そのままだと MC が読めず音が鳴らない。
+                String namespace = parts[1].toLowerCase(Locale.ROOT);
+                if (lower.equals("assets/" + namespace + "/sounds.json")) {
                     try (InputStream input = zipFile.getInputStream(entry)) {
                         mergeSoundDefinitions(namespace, readUtf8(input), mergedSoundDefs);
                         copiedAny = true;
@@ -195,17 +241,50 @@ public final class ExternalSoundPackBridge {
                 if (parts.length >= 4 && "sounds".equalsIgnoreCase(parts[2])) {
                     Path target = GENERATED_PACK_ROOT.resolve("assets").resolve(namespace).resolve("sounds");
                     for (int i = 3; i < parts.length; i++) {
-                        target = target.resolve(parts[i]);
+                        target = target.resolve(parts[i].toLowerCase(Locale.ROOT));
                     }
                     Files.createDirectories(target.getParent());
                     try (InputStream input = zipFile.getInputStream(entry)) {
                         Files.write(target, input.readAllBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
                     }
+                    registerCopiedSound(mergedSoundDefs, namespace, Path.of(String.join("/", java.util.Arrays.copyOfRange(parts, 3, parts.length))));
                     copiedAny = true;
                 }
             }
         }
         return copiedAny;
+    }
+
+    private static Path lowercasePath(Path path) {
+        Path lowered = Path.of("");
+        for (Path part : path) {
+            lowered = lowered.resolve(part.toString().toLowerCase(Locale.ROOT));
+        }
+        return lowered;
+    }
+
+    private static void registerCopiedSound(Map<String, JsonObject> mergedSoundDefs, String namespace, Path relativePath) {
+        if (relativePath == null) {
+            return;
+        }
+        String soundPath = normalize(relativePath.toString()).toLowerCase(Locale.ROOT);
+        if (!soundPath.endsWith(".ogg")) {
+            return;
+        }
+        soundPath = soundPath.substring(0, soundPath.length() - ".ogg".length());
+        if (soundPath.isBlank()) {
+            return;
+        }
+        String eventKey = soundPath.replace('/', '.');
+        JsonObject target = mergedSoundDefs.computeIfAbsent(namespace, ignored -> new JsonObject());
+        if (target.has(eventKey)) {
+            return;
+        }
+        JsonObject event = new JsonObject();
+        JsonArray sounds = new JsonArray();
+        sounds.add(namespace + ":" + soundPath);
+        event.add("sounds", sounds);
+        target.add(eventKey, event);
     }
 
     private static void mergeSoundDefinitions(String namespace, String jsonText, Map<String, JsonObject> mergedSoundDefs) {
@@ -217,7 +296,7 @@ public final class ExternalSoundPackBridge {
             JsonObject target = mergedSoundDefs.computeIfAbsent(namespace, ignored -> new JsonObject());
             JsonObject source = parsed.getAsJsonObject();
             for (Map.Entry<String, JsonElement> entry : source.entrySet()) {
-                target.add(entry.getKey(), normalizeSoundEvent(namespace, entry.getValue()));
+                target.add(entry.getKey().toLowerCase(Locale.ROOT), normalizeSoundEvent(namespace, entry.getValue()));
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.debug("Could not merge sounds.json for namespace {}", namespace, e);
@@ -269,10 +348,19 @@ public final class ExternalSoundPackBridge {
     }
 
     private static String namespacedSoundPath(String namespace, String raw) {
-        if (raw == null || raw.isBlank() || namespace == null || namespace.isBlank() || "minecraft".equals(namespace)) {
+        if (raw == null || raw.isBlank()) {
             return raw;
         }
-        return raw.indexOf(':') >= 0 ? raw : namespace + ":" + raw;
+        // 既に "ns:path" 形式ならその名前空間を小文字化、無ければ与えられた名前空間を前置(小文字)。
+        // RTM パックの sounds.json は "sound_MasaCrossings:machine/..." のように大文字名前空間を
+        // 含むことがあり、小文字化しないと MC が .ogg を見つけられず無音になる。
+        int colon = raw.indexOf(':');
+        String ns = colon >= 0 ? raw.substring(0, colon) : namespace;
+        String path = colon >= 0 ? raw.substring(colon + 1) : raw;
+        if (ns == null || ns.isBlank() || "minecraft".equalsIgnoreCase(ns)) {
+            return raw;
+        }
+        return ns.toLowerCase(Locale.ROOT) + ":" + path.toLowerCase(Locale.ROOT);
     }
 
     private static boolean writeMergedSoundsJson(Map<String, JsonObject> mergedSoundDefs) throws IOException {
@@ -315,6 +403,16 @@ public final class ExternalSoundPackBridge {
 
     private static String normalize(String raw) {
         return raw.replace('\\', '/').replaceFirst("^/+", "");
+    }
+
+    private static String namespaceFromPackName(String packName) {
+        String base = packName == null ? "rtm_pack" : packName;
+        int dot = base.lastIndexOf('.');
+        if (dot > 0) {
+            base = base.substring(0, dot);
+        }
+        String normalized = base.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.-]", "_");
+        return normalized.isBlank() ? "rtm_pack" : normalized;
     }
 
     private static boolean isSupportedArchive(Path path) {

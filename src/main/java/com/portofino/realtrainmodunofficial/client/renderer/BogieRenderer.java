@@ -54,7 +54,10 @@ public class BogieRenderer {
         poseStack.pushPose();
         try {
             Vec3 offset = entity != null ? entity.getBogieRenderOffset(bogieIndex, bogieDef, baseYaw, partialTicks) : bogieDef.position();
-            poseStack.translate(offset.x, offset.y + BOGIE_VISUAL_LIFT, offset.z);
+            // 本家RTM準拠: 台車は車体と同じレール面基準(getBogieRenderOffset 側で算出済み)へ置く。
+            // 本家は func_70033_W()=0 で視覚リフトを持たないため、ここでも一切リフトを足さない
+            // (従来の BOGIE_VISUAL_LIFT/-0.05 は車種ごとの浮き・沈みの原因だったので撤去)。
+            poseStack.translate(offset.x, offset.y, offset.z);
             if (entity != null) {
                 poseStack.mulPose(Axis.YP.rotationDegrees(entity.getBogieYawOffset(bogieIndex, bogieDef, baseYaw)));
                 float bogiePitch = entity.getBogiePitch(bogieIndex);
@@ -159,6 +162,9 @@ public class BogieRenderer {
         }
 
         String modelFile = bogieDef.modelFile();
+        if (isDummyBogieModel(modelFile)) {
+            return null;
+        }
         Map<String, String> textureOverrides = bogieDef.textureOverrides();
         if (modelFile.toLowerCase(Locale.ROOT).endsWith(".class")) {
             modelFile = DEFAULT_CLASS_BOGIE_MODEL;
@@ -167,7 +173,7 @@ public class BogieRenderer {
             }
         }
 
-        MqoModel bogieModel = MqoModelLoader.loadModelForVehiclePart(parentDef, modelFile, textureOverrides);
+        MqoModel bogieModel = MqoModelLoader.loadModelForVehiclePart(parentDef, modelFile, textureOverrides, bogieDef.scriptPath());
         if (bogieModel == null) {
             // 台車モデルが見つからない/ロード失敗時は組み込みデフォルト台車にフォールバック。
             // 透明になるよりは何か見えていたほうが利用者の混乱が少ない。
@@ -178,5 +184,22 @@ public class BogieRenderer {
             bogieModel = MqoModelLoader.loadModelForVehiclePart(parentDef, DEFAULT_CLASS_BOGIE_MODEL, fallbackOverrides);
         }
         return bogieModel;
+    }
+
+    public static boolean isDummyBogieModel(String modelFile) {
+        if (modelFile == null) {
+            return true;
+        }
+        String normalized = modelFile.replace('\\', '/').trim().toLowerCase(Locale.ROOT);
+        int slash = normalized.lastIndexOf('/');
+        String leaf = slash >= 0 ? normalized.substring(slash + 1) : normalized;
+        int dot = leaf.lastIndexOf('.');
+        String stem = dot > 0 ? leaf.substring(0, dot) : leaf;
+        return stem.equals("air")
+            || stem.equals("none")
+            || stem.equals("null")
+            || stem.equals("dummy")
+            || stem.equals("empty")
+            || stem.equals("transparent");
     }
 }

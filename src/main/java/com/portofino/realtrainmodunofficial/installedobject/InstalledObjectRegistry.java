@@ -10,6 +10,8 @@ import java.util.Map;
 public final class InstalledObjectRegistry {
     private static final List<InstalledObjectDefinition> ALL = new ArrayList<>();
     private static final Map<String, InstalledObjectDefinition> BY_ID = new HashMap<>();
+    private static final Map<String, InstalledObjectDefinition> FALLBACK_BY_ID = new HashMap<>();
+    private static final java.util.Set<String> MISSING_IDS = new java.util.HashSet<>();
     private static final Map<InstalledObjectCategory, List<InstalledObjectDefinition>> BY_CATEGORY =
         new EnumMap<>(InstalledObjectCategory.class);
 
@@ -19,6 +21,8 @@ public final class InstalledObjectRegistry {
     public static void setDefinitions(List<InstalledObjectDefinition> definitions) {
         ALL.clear();
         BY_ID.clear();
+        FALLBACK_BY_ID.clear();
+        MISSING_IDS.clear();
         BY_CATEGORY.clear();
         for (InstalledObjectDefinition definition : definitions) {
             InstalledObjectDefinition previous = BY_ID.put(definition.getId(), definition);
@@ -42,6 +46,9 @@ public final class InstalledObjectRegistry {
         if (id == null) return null;
         InstalledObjectDefinition found = BY_ID.get(id);
         if (found != null) return found;
+        found = FALLBACK_BY_ID.get(id);
+        if (found != null) return found;
+        if (MISSING_IDS.contains(id)) return null;
         // Legacy fallback: block entities from old saves may use a different packName
         // (e.g. "RTM-Official-Assets.zip" vs the current mod JAR path).
         // Try matching by category:name, ignoring the packName segment.
@@ -57,10 +64,12 @@ public final class InstalledObjectRegistry {
                 if (dFirst < 0 || dLast <= dFirst) continue;
                 if (defId.substring(0, dFirst).equals(category)
                         && defId.substring(dLast + 1).equals(name)) {
+                    FALLBACK_BY_ID.put(id, def);
                     return def;
                 }
             }
         }
+        MISSING_IDS.add(id);
         return null;
     }
 

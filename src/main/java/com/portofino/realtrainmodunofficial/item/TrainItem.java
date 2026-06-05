@@ -20,13 +20,17 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 import java.util.Locale;
 
 public class TrainItem extends Item {
+    private static final double PLACEMENT_OCCUPANCY_HALF_WIDTH = 0.45D;
+
     public enum Category {
         ELECTRIC,
         DIESEL,
@@ -50,11 +54,16 @@ public class TrainItem extends Item {
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
-        if (level.isClientSide()) {
-            return InteractionResult.SUCCESS;
-        }
         Player player = context.getPlayer();
         if (player == null) {
+            return InteractionResult.PASS;
+        }
+        if (level.isClientSide()) {
+            return findNearestRailSpawn(level, context.getClickedPos(), context.getClickLocation(), player.getYRot()) != null
+                ? InteractionResult.SUCCESS
+                : InteractionResult.PASS;
+        }
+        if (player.isShiftKeyDown()) {
             return InteractionResult.PASS;
         }
         // クールダウン中はスポーン不可
@@ -79,7 +88,7 @@ public class TrainItem extends Item {
             player.displayClientMessage(Component.translatable("message.realtrainmodunofficial.train.must_be_on_rail"), true);
             return InteractionResult.FAIL;
         }
-        if (isOccupiedSpawnArea(level, spawnData.x(), spawnData.y() + 0.25D, spawnData.z(), spawnData.yaw(), def)) {
+        if (isOccupiedSpawnArea(level, spawnData.x(), spawnData.y() + 0.25D, spawnData.z(), spawnData.yaw(), def, spawnData.map())) {
             player.displayClientMessage(Component.translatable("message.realtrainmodunofficial.train.already_exists"), true);
             return InteractionResult.FAIL;
         }
@@ -97,9 +106,18 @@ public class TrainItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         if (level.isClientSide) {
-            ClientHooks.openTrainSelectScreen(player, player.getItemInHand(hand), category);
+            if (!isLookingAtBlock(level, player)) {
+                ClientHooks.openTrainSelectScreen(player, player.getItemInHand(hand), category);
+            }
         }
         return InteractionResultHolder.success(player.getItemInHand(hand));
+    }
+
+    private static boolean isLookingAtBlock(Level level, Player player) {
+        Vec3 start = player.getEyePosition(1.0F);
+        Vec3 end = start.add(player.getViewVector(1.0F).scale(player.blockInteractionRange()));
+        HitResult hit = level.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
+        return hit.getType() == HitResult.Type.BLOCK;
     }
 
     @Override
@@ -126,10 +144,8 @@ public class TrainItem extends Item {
         if (definition == null || definition.isCarType()) {
             return false;
         }
-        String key = (safe(definition.getId()) + " " + safe(definition.getDisplayName()) + " "
-            + safe(definition.getModelFile()) + " " + safe(definition.getVehicleType())).toLowerCase(java.util.Locale.ROOT);
         String type = safe(definition.getVehicleType()).toUpperCase(java.util.Locale.ROOT);
-        boolean test = "TC".equals(type) || key.contains("test") || key.contains("shader") || key.contains("試験");
+        boolean test = "TEST".equals(type);
         return switch (category == null ? Category.ELECTRIC : category) {
             case TEST -> test;
             case DIESEL -> false;
@@ -142,14 +158,19 @@ public class TrainItem extends Item {
     }
 
     private boolean isOccupiedSpawnArea(Level level, double x, double y, double z, float yaw, VehicleDefinition def) {
-        double halfLength = Math.max(1.75D, def.getTrainDistance() * 0.5D);
+        return isOccupiedSpawnArea(level, x, y, z, yaw, def, null);
+    }
+
+    private boolean isOccupiedSpawnArea(Level level, double x, double y, double z, float yaw, VehicleDefinition def,
+                                        com.portofino.realtrainmodunofficial.rail.util.RailMap spawnMap) {
+        double halfLength = Math.max(1.75D, def.getTrainDistance());
         for (VehicleDefinition.BogieDefinition bogie : def.getBogies()) {
             halfLength = Math.max(halfLength, Math.abs(bogie.position().z) + 0.95D);
         }
         for (Vec3 seat : def.getAllSeatPositions()) {
             halfLength = Math.max(halfLength, Math.abs(seat.z) + 0.95D);
         }
-        double halfWidth = getSpawnHalfWidth(def);
+        double halfWidth = PLACEMENT_OCCUPANCY_HALF_WIDTH;
         double radius = Math.max(halfLength, halfWidth) + 1.0D;
         var bounds = new net.minecraft.world.phys.AABB(
             x - radius,
@@ -166,10 +187,12 @@ public class TrainItem extends Item {
         final double finalHalfWidth = halfWidth;
         List<TrainEntity> overlaps = level.getEntitiesOfClass(TrainEntity.class, bounds, entity -> entity != null && entity.isAlive() && !entity.isRemoved()).stream()
             .filter(entity -> Math.abs(entity.getY() - y) <= 3.5D)
+            // 別レール上の列車は占有とみなさない（隣接レールへの真横配置を許可）。
+            .filter(entity -> spawnMap == null || entity.getActiveRailMap() == null || entity.getActiveRailMap() == spawnMap)
             .filter(entity -> rectanglesOverlap(
                 x, z, yaw, finalHalfWidth, finalHalfLength,
                 entity.getX(), entity.getZ(), entity.getYRot(),
-                entity.getBodyHalfWidthForPlacement() * 0.8D,
+                PLACEMENT_OCCUPANCY_HALF_WIDTH,
                 entity.getBodyHalfLengthForPlacement() * 0.9D
             ))
             .toList();
@@ -300,7 +323,61 @@ public class TrainItem extends Item {
         }
         // 吸着距離を約2ブロックに制限する。以前は 8 ブロック(64)圏内の最寄りレールを掴むため、
         // 隣の平行レールに列車が吸い付いていた (ユーザー報告)。クリックしたレール付近にのみ置く。
-        return bestDistSq <= 4.0 ? best : null;
+        if (bestDistSq <= 4.0 && best != null) {
+            return best;
+        }
+        // フォールバック: 検出ブロック(当たり判定/道床)が無いレール(ballastWidth=0 や本修正前に
+        // 敷設した既存レール)は、上のブロック走査ではコア(=端)から16ブロック以内しか見つからず
+        // 「レール端しか列車が置けない」状態になる。周辺チャンクの BlockEntity からレールコアを
+        // 直接拾い、クリック近傍を通るレールを探すことで、コア位置・レール長・敷設時期に依らず
+        // レール全長のどこでも設置できるようにする(本家RTM準拠の挙動)。
+        return scanNearbyCoresForSpawn(level, clickedPos, clickedPoint, preferredYaw);
+    }
+
+    /**
+     * クリック位置周辺のチャンクに含まれるレールコア(LargeRailCoreBlockEntity)を直接走査し、
+     * クリック点に最も近いレール上の点(約2ブロック以内)を返す。検出用の当たり判定ブロックが
+     * 無いレールでも、コアの位置に依らずレール全長のどこでも列車を設置できるようにするための保険。
+     */
+    private static RailSpawnData scanNearbyCoresForSpawn(Level level, BlockPos clickedPos, Vec3 clickedPoint, float preferredYaw) {
+        final int chunkRadius = 3; // ±3 チャンク(約 112 ブロック)を走査。コアは疎なので軽量。
+        int baseChunkX = clickedPos.getX() >> 4;
+        int baseChunkZ = clickedPos.getZ() >> 4;
+        RailSpawnData best = null;
+        double bestDistSq = 4.0; // 吸着しきい値(約2ブロック)
+        java.util.Set<BlockPos> visitedCores = new java.util.HashSet<>();
+        for (int cx = baseChunkX - chunkRadius; cx <= baseChunkX + chunkRadius; cx++) {
+            for (int cz = baseChunkZ - chunkRadius; cz <= baseChunkZ + chunkRadius; cz++) {
+                net.minecraft.world.level.chunk.ChunkAccess chunk = level.getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false);
+                if (!(chunk instanceof net.minecraft.world.level.chunk.LevelChunk levelChunk)) {
+                    continue;
+                }
+                for (net.minecraft.world.level.block.entity.BlockEntity be : levelChunk.getBlockEntities().values()) {
+                    if (!(be instanceof LargeRailCoreBlockEntity core) || !core.isLoaded()) {
+                        continue;
+                    }
+                    if (!visitedCores.add(core.getBlockPos())) {
+                        continue;
+                    }
+                    for (RailMap map : core.getAllRailMaps()) {
+                        if (map == null) continue;
+                        int max = getSpawnSplit(map);
+                        for (int i = 0; i <= max; i++) {
+                            double[] pos = map.getRailPos(max, i);
+                            double dx = pos[1] - clickedPoint.x;
+                            double dy = map.getRailHeight(max, i) - clickedPoint.y;
+                            double dz = pos[0] - clickedPoint.z;
+                            double d2 = dx * dx + dy * dy + dz * dz;
+                            if (d2 < bestDistSq) {
+                                bestDistSq = d2;
+                                best = createSpawnData(map, max, i, preferredYaw);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return best;
     }
 
     private static RailMap getRailMapAt(Level level, BlockPos pos, Vec3 targetPoint) {

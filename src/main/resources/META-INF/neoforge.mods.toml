@@ -86,6 +86,8 @@ config="${mod_id}.mixins.json"
     ordering="NONE"
     side="BOTH"
 
+# ATSA(ATS Assist)は別mod(atsa サブプロジェクト/別jar, 開発者325)へ分離済み。ここでは宣言しない。
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

@@ -45,7 +45,7 @@ public class WireItem extends Item implements ModelSelectableItem {
         if (player == null) {
             return InteractionResult.PASS;
         }
-        String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         InstalledObjectDefinition definition = InstalledObjectRegistry.getById(selectedId);
         if (definition == null || definition.getCategory() != InstalledObjectCategory.WIRE) {
             if (level.isClientSide) {
@@ -56,7 +56,8 @@ public class WireItem extends Item implements ModelSelectableItem {
 
         BlockPos clickedPos = context.getClickedPos();
         if (!(level.getBlockEntity(clickedPos) instanceof InstalledObjectBlockEntity clicked)
-            || clicked.getCategory() != InstalledObjectCategory.INSULATOR) {
+            || (clicked.getCategory() != InstalledObjectCategory.INSULATOR
+                && clicked.getCategory() != InstalledObjectCategory.OVERHEAD_LINE_POLE)) {
             if (!level.isClientSide) {
                 player.displayClientMessage(Component.literal("ワイヤーは碍子同士でのみ設置できます"), true);
             }
@@ -112,7 +113,7 @@ public class WireItem extends Item implements ModelSelectableItem {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
-        String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         if (selectedId != null && !selectedId.isBlank()) {
             InstalledObjectDefinition def = InstalledObjectRegistry.getById(selectedId);
             String name = def != null ? def.getDisplayName() : selectedId;

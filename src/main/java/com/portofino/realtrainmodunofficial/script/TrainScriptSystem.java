@@ -8,11 +8,15 @@ import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEnti
 import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.util.PackTextDecoder;
+import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
+import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.util.Mth;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -81,6 +85,9 @@ public class TrainScriptSystem {
         "  Vec3Impl.prototype.lengthSquared = function() { return this.x*this.x + this.y*this.y + this.z*this.z; };\n" +
         "  Vec3Impl.prototype.normalize = function() { var l = this.length(); return l > 0 ? new Vec3Impl(this.x/l, this.y/l, this.z/l) : new Vec3Impl(0,0,0); };\n" +
         "  Vec3Impl.prototype.distanceTo = function(o) { return this.sub(o).length(); };\n" +
+        // NGT Vec3.getYaw/getPitch 互換(SRB の help 表示やマーカー方向計算で使用)。
+        "  Vec3Impl.prototype.getYaw = function() { return Math.atan2(this.x, this.z) * 180 / Math.PI; };\n" +
+        "  Vec3Impl.prototype.getPitch = function() { return Math.atan2(this.y, Math.sqrt(this.x*this.x + this.z*this.z)) * 180 / Math.PI; };\n" +
         "  Vec3Impl.prototype.rotateAroundX = function(deg) {\n" +
         "    var r = deg * Math.PI / 180; var c = Math.cos(r), s = Math.sin(r);\n" +
         "    return new Vec3Impl(this.x, c*this.y - s*this.z, s*this.y + c*this.z);\n" +
@@ -111,11 +118,16 @@ public class TrainScriptSystem {
         "  V.prototype.subtract = function(o) { return this.sub(o); };\n" +
         "  V.prototype.scale = function(s) { return new V(this.x*s, this.y*s, this.z*s); };\n" +
         "  V.prototype.multiply = function(s) { return this.scale(s); };\n" +
+        // NGT Vec3.multi(d): スカラー倍。Vec3 を渡された場合は成分積。
+        "  V.prototype.multi = function(s) { if (s && typeof s === 'object') return new V(this.x*(s.x||0), this.y*(s.y||0), this.z*(s.z||0)); return new V(this.x*s, this.y*s, this.z*s); };\n" +
+        "  V.prototype.copy = function() { return new V(this.x, this.y, this.z); };\n" +
         "  V.prototype.dot = function(o) { return this.x*o.x + this.y*o.y + this.z*o.z; };\n" +
         "  V.prototype.length = function() { return Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z); };\n" +
         "  V.prototype.lengthSquared = function() { return this.x*this.x + this.y*this.y + this.z*this.z; };\n" +
         "  V.prototype.normalize = function() { var l = this.length(); return l > 0 ? new V(this.x/l, this.y/l, this.z/l) : new V(0,0,0); };\n" +
         "  V.prototype.distanceTo = function(o) { return this.sub(o).length(); };\n" +
+        "  V.prototype.getYaw = function() { return Math.atan2(this.x, this.z) * 180 / Math.PI; };\n" +
+        "  V.prototype.getPitch = function() { return Math.atan2(this.y, Math.sqrt(this.x*this.x + this.z*this.z)) * 180 / Math.PI; };\n" +
         "  V.prototype.rotateAroundX = function(deg) { var r = deg*Math.PI/180, c = Math.cos(r), s = Math.sin(r); return new V(this.x, c*this.y - s*this.z, s*this.y + c*this.z); };\n" +
         "  V.prototype.rotateAroundY = function(deg) { var r = deg*Math.PI/180, c = Math.cos(r), s = Math.sin(r); return new V(c*this.x + s*this.z, this.y, -s*this.x + c*this.z); };\n" +
         "  V.prototype.rotateAroundZ = function(deg) { var r = deg*Math.PI/180, c = Math.cos(r), s = Math.sin(r); return new V(c*this.x - s*this.y, s*this.x + c*this.y, this.z); };\n" +
@@ -138,24 +150,34 @@ public class TrainScriptSystem {
         "  appendText: function() {},\n" +
         "  applyTextStyles: function() {}\n" +
         "};\n" +
-        "NGTLog = { debug: function() {}, info: function() {}, warn: function() {}, error: function() {} };\n" +
-        "NGTUtil = { getCurrentTime: function() { return java.lang.System.currentTimeMillis(); }, isClient: function() { return true; }, getCurrentWorld: function() { return null; }, getCurrentPlayer: function() { return null; }, getMCVersion: function() { return '1.21.1'; }, isLanguage: function() { return false; } };\n" +
+        "NGTLog = { debug: function() {}, info: function() {}, warn: function() {}, error: function() {}, sendChatMessage: function(player, msg){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) __SRB__.chat(player, ''+msg); }catch(e){} }, sendChatMessageToAll: function(msg){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) __SRB__.chat((typeof __RTMU_MC__!=='undefined'&&__RTMU_MC__)?__RTMU_MC__.getPlayer():null, ''+msg); }catch(e){} } };\n" +
+        "NGTUtil = { getCurrentTime: function() { return java.lang.System.currentTimeMillis(); }, getUniqueId: function() { return java.lang.System.nanoTime(); }, isClient: function() { return true; }, getCurrentWorld: function() { return null; }, getCurrentPlayer: function() { return null; }, getMCVersion: function() { return '1.21.1'; }, isLanguage: function() { return false; } };\n" +
         "NGTMath = { toRadians: function(d) { return d * Math.PI / 180.0; }, toDegrees: function(r) { return r * 180.0 / Math.PI; }, sin: Math.sin, cos: Math.cos, tan: Math.tan, atan2: Math.atan2, sqrt: Math.sqrt, floor: Math.floor, ceil: Math.ceil, clamp: function(v,a,b) { return Math.max(a, Math.min(b, v)); }, normalizeAngle: function(a) { while(a>=180)a-=360; while(a<-180)a+=360; return a; } };\n" +
         // ModelPackManager: スクリプトの sound lib include で頻出するので空 stub
         "if (typeof ModelPackManager === 'undefined') ModelPackManager = { INSTANCE: { getResource: function() { return null; }, getModel: function() { return null; } } };\n" +
         // RTM 拡張パックで使われる TrainControllerManager (ATO/ATC など) のスタブ。
         // 実装は無いので getController は空オブジェクトを返し、null チェックが効くようにする。
-        "if (typeof TrainControllerManager === 'undefined') {\n" +
+        "var __ptCtl = function() { return { isActive: false, stopDistance: 0, targetSpeed: 0, mode: 0, value: 0, isEnable: function() { return false; }, isEnabled: function() { return false; }, isWorking: function() { return false; }, isValid: function() { return false; }, getMode: function() { return 0; }, getState: function() { return 0; }, getTargetSpeed: function() { return 0; }, getTargetDistance: function() { return 0; }, getDistance: function() { return 0; }, getStopDistance: function() { return 0; }, getSpeed: function() { return 0; }, getValue: function() { return 0; }, setTarget: function() {}, setEnable: function() {}, setEnabled: function() {}, enable: function() {}, disable: function() {}, update: function() {}, reset: function() {} }; };\n" +
+        "var __ptPatchController = function(c) { c = c || {}; if (!c.tascController || typeof c.tascController.isEnable !== 'function') c.tascController = __ptCtl(); if (!c.atoController || typeof c.atoController.isEnable !== 'function') c.atoController = __ptCtl(); if (!c.atsController || typeof c.atsController.isEnable !== 'function') c.atsController = __ptCtl(); if (!c.atcController || typeof c.atcController.isEnable !== 'function') c.atcController = __ptCtl(); if (typeof c.isEnable !== 'function') c.isEnable = function() { return false; }; if (typeof c.isEnabled !== 'function') c.isEnabled = function() { return false; }; if (typeof c.getSpeedLimit !== 'function') c.getSpeedLimit = function() { return 0; }; if (!c.speedOrderList) c.speedOrderList = []; return c; };\n" +
+        "if (typeof TrainControllerManager === 'undefined' || !TrainControllerManager) {\n" +
         // 空ではなくダミーオブジェクトを返す。getTrainController(entity).tascController などへの
         // 連鎖アクセスが頻出するため、null 返しだと「Cannot get property X of null」で死ぬ。
+        // 各サブコントローラ共通のダミーメソッド群。スクリプト(SD8200 等)は isEnable() など
+        // 多様なメソッドを呼ぶため、未定義だと「X is not a function」で server script が毎tick死ぬ。
+        // 真偽系は false、数値系は 0、設定/更新系は no-op を返す広めの stub にして根本的に潰す。
         "  var __ptDummyController = {\n" +
-        "    tascController: { isActive: false, getTargetSpeed: function() { return 0; }, getTargetDistance: function() { return 0; }, setTarget: function() {}, update: function() {} },\n" +
-        "    atoController: { isActive: false, getTargetSpeed: function() { return 0; }, setTarget: function() {}, update: function() {} },\n" +
-        "    atsController: { isActive: false, update: function() {} },\n" +
-        "    atcController: { isActive: false, update: function() {} },\n" +
+        "    tascController: __ptCtl(),\n" +
+        "    atoController: __ptCtl(),\n" +
+        "    atsController: __ptCtl(),\n" +
+        "    atcController: __ptCtl(),\n" +
         "    isActive: false,\n" +
+        "    speedOrderList: [],\n" +
+        "    isEnable: function() { return false; },\n" +
+        "    isEnabled: function() { return false; },\n" +
         "    update: function() {},\n" +
-        "    getState: function() { return 0; }\n" +
+        "    getState: function() { return 0; },\n" +
+        "    getSpeedLimit: function() { return 0; },\n" +
+        "    getSpeed: function() { return 0; }\n" +
         "  };\n" +
         "  TrainControllerManager = {\n" +
         "    INSTANCE: {\n" +
@@ -169,6 +191,8 @@ public class TrainScriptSystem {
         "    getTrainController: function() { return __ptDummyController; }\n" +
         "  };\n" +
         "}\n" +
+        "try { var __ptOldGetTC = TrainControllerManager.getTrainController; TrainControllerManager.getTrainController = function(e) { try { return __ptPatchController(__ptOldGetTC ? __ptOldGetTC(e) : null); } catch (ex) { return __ptPatchController(null); } }; } catch (e) { TrainControllerManager.getTrainController = function() { return __ptPatchController(null); }; }\n" +
+        "try { var __ptOldGetC = TrainControllerManager.getController; TrainControllerManager.getController = function(e) { try { return __ptPatchController(__ptOldGetC ? __ptOldGetC(e) : null); } catch (ex) { return __ptPatchController(null); } }; } catch (e) { TrainControllerManager.getController = function() { return __ptPatchController(null); }; }\n" +
         // 重要: LEGACY_API_PREPEND は user script と同じ eval 内で先頭に prepend される。
         // injectScriptCompatibility() の別 eval で定義した var NGTMath は別 binding に
         // 閉じてしまうことがあり、user script 実行時に「NGTMath.getSin is not a function」
@@ -192,7 +216,38 @@ public class TrainScriptSystem {
         "  ceil: function(x) { return Math.ceil(x); },\n" +
         "  clamp: function(v, a, b) { return Math.max(a, Math.min(b, v)); },\n" +
         "  normalizeAngle: function(a) { while(a>=180)a-=360; while(a<-180)a+=360; return a; }\n" +
-        "};\n";
+        "};\n" +
+        // NGTUtilClient / MCWrapperClient も user script と同じ eval で確実に定義する(別 eval の
+        // 定義は見えないため)。getMinecraft は __RTMU_MC__(クライアント実体)へ橋渡し。
+        "function __rtmuMcShim() { return { field_71462_r: ((typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getCurrentScreen() : null), func_135016_M: function() { return { func_135041_c: function() { return { func_135034_a: function() { return ((typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getLanguageCode() : 'en_us'); } }; } }; } }; }\n" +
+        "var NGTUtilClient = { getMinecraft: function() { return __rtmuMcShim(); }, getPlayer: function() { try { return (typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getPlayer() : null; } catch (e) { return null; } }, bindTexture: function(t) { try { if (typeof renderer !== 'undefined' && renderer) renderer.bindTexture(t); } catch(e){} } };\n" +
+        "var MCWrapperClient = { getPlayer: function() { try { return (typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getPlayer() : null; } catch (e) { return null; } }, getMinecraft: function() { return __rtmuMcShim(); } };\n" +
+        // RTM 共通ラッパー/レール系グローバルも user script eval で定義(別 eval の定義は見えないため)。
+        // entity 位置などは null 安全に。レール系は SRB の preview/敷設で参照される。
+        "function __srbNum(v){ return (v==null)?0:(v.doubleValue?v.doubleValue():v); }\n" +
+        // マーカー描画の基準 entityX は entity のレンダー補間位置(renderPosX)。PoseStack の原点も
+        // 同じ補間位置なので相殺し、固定マーカーは真のワールド座標に完全固定される(移動・補間でブレない)。
+        // getX()(tick位置)を使うと原点(補間)とズレて固定アンカーがドリフトする。フォールバックで getX。
+        "var MCWrapper = { getPosX: function(e){ try{ if(typeof __RTMU_MC__!=='undefined'&&__RTMU_MC__) return __RTMU_MC__.renderPosX(e); return e?e.getX():0; }catch(x){return e?e.getX():0;} }, getPosY: function(e){ try{ if(typeof __RTMU_MC__!=='undefined'&&__RTMU_MC__) return __RTMU_MC__.renderPosY(e); return e?e.getY():0; }catch(x){return e?e.getY():0;} }, getPosZ: function(e){ try{ if(typeof __RTMU_MC__!=='undefined'&&__RTMU_MC__) return __RTMU_MC__.renderPosZ(e); return e?e.getZ():0; }catch(x){return e?e.getZ():0;} }, getWorld: function(e){ try{ return e?e.level():null; }catch(x){return null;} } };\n" +
+        // BlockUtil.getMOPFromPlayer = プレイヤー視線レイキャスト。RTM の MOP 形状(field_72307_f=hitVec, func_178782_a=BlockPos)で返す。
+        "var BlockUtil = { setBlock: function() {},\n" +
+        "  getMOPFromPlayer: function(player, dist, includeFluids){ try{ if(typeof __RTMU_MC__==='undefined'||!__RTMU_MC__) return null; var r=__RTMU_MC__.raycast(dist||512); if(!r) return null; var hx=r.getHitX(),hy=r.getHitY(),hz=r.getHitZ(); var bx=r.getBlockX(),by=r.getBlockY(),bz=r.getBlockZ(); return { field_72307_f:{ field_72450_a:hx, field_72448_b:hy, field_72449_c:hz }, field_72311_b:bx, field_72312_c:by, field_72309_d:bz, func_178782_a:function(){ return { func_177958_n:function(){return bx;}, func_177956_o:function(){return by;}, func_177952_p:function(){return bz;} }; } }; }catch(e){ return null; } } };\n" +
+        "if (typeof Mouse === 'undefined') Mouse = { isButtonDown: function(b){ try{ return (typeof __RTMU_MC__!=='undefined'&&__RTMU_MC__)?__RTMU_MC__.isMouseDown(b|0):false; }catch(e){return false;} } };\n" +
+        "if (typeof RTMBlock === 'undefined') RTMBlock = { marker: { __rtmuToken: 'marker' } };\n" +
+        "if (typeof RTMItem === 'undefined') RTMItem = { itemLargeRail: { __rtmuToken: 'itemLargeRail' } };\n" +
+        "if (typeof RTMResource === 'undefined') RTMResource = { RAIL: { defaultName: 'default', __rtmuToken: 'RAIL' } };\n" +
+        "if (typeof ResourceStateRail === 'undefined') ResourceStateRail = function(type, x){ this.type=type; this.modelId=''; this.setResourceName=function(n){ this.modelId=n; }; this.readFromNBT=function(nbt){}; this.writeToNBT=function(){ return (typeof NBTTagCompound!=='undefined')?new NBTTagCompound():{}; }; };\n" +
+        "if (typeof ItemRail === 'undefined') ItemRail = { getProperty: function(item){ return null; } };\n" +
+        "if (typeof RailDir === 'undefined') RailDir = { STRAIGHT: 0, NORTH: 0, EAST: 2, SOUTH: 4, WEST: 6 };\n" +
+        "if (typeof NBTTagCompound === 'undefined') NBTTagCompound = function(){ this.__m={}; this.func_74782_a=function(k,v){ this.__m[k]=v; }; this.func_74775_l=function(k){ return this.__m[k]||new NBTTagCompound(); }; this.func_74778_a=function(k,v){ this.__m[k]=v; }; this.func_74779_i=function(k){ return this.__m[k]||''; }; };\n" +
+        // TileEntityLargeRailBase は RTMU の LargeRailCoreBlockEntity 型に束ねる(Java.type)。
+        // これで `tile instanceof TileEntityLargeRailBase` が実レールBEで true になり、レール接続検出が効く。
+        "try { TileEntityLargeRailBase = Java.type('com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity'); } catch(e) { if (typeof TileEntityLargeRailBase === 'undefined') TileEntityLargeRailBase = function(){}; }\n" +
+        "if (typeof TileEntitySign === 'undefined') TileEntitySign = function(){};\n" +
+        // RailPosition は __SRB__ ブリッジ経由で RTMU の実 RailPosition を生成(new で返り値オブジェクトが採用される)。\n
+        "if (typeof RailPosition === 'undefined') RailPosition = function(x,y,z,dir,type){ try{ return __SRB__.createRailPosition(x|0,y|0,z|0,dir|0,(type!=null?__srbNum(type):0),-1,0,0,0,0,0); }catch(e){ return { blockX:x,blockY:y,blockZ:z,direction:dir,switchType:type,anchorYaw:0,anchorPitch:0,anchorLengthHorizontal:-1,anchorLengthVertical:-1,cantCenter:0,cantEdge:0,height:0,setHeight:function(h){this.height=h;},init:function(){} }; } };\n" +
+        // RailPosition.REVISION: 8方向の[dx,dz]オフセット(RTMU RailPosition.REVISION と同値)。render の getNearestEdgePos 等が参照。
+        "RailPosition.REVISION = [[0.0,-0.5],[-0.5,-0.5],[-0.5,0.0],[-0.5,0.499999],[0.0,0.499999],[0.499999,0.499999],[0.499999,0.0],[0.499999,-0.5]];\n";
     private static final String SCRIPT_MODEL_KEY = "__ptScriptModel";
     private static volatile boolean graalPolyglotUnavailable = false;
     private static TrainScriptSystem instance;
@@ -569,9 +624,56 @@ public class TrainScriptSystem {
         result = result.replace(packages + oldLibRoot + ".renderer.model.VecAccuracy", "VecAccuracy");
         result = result.replace(packages + oldLibRoot + ".math.Vec3", "Vec3");
         result = result.replace("Packages.net.minecraft.util.ResourceLocation", "ResourceLocationCompat");
+        // 1.12.2 Forge の Loader (mod 存在チェック) は 1.21.1(NeoForge)に無いのでスタブへ。
+        result = result.replace("Packages.net.minecraftforge.fml.common.Loader", "LoaderCompat");
         result = result.replace("if (!stream) return null;", "if (!stream) return __ptDummyTextureData();");
         result = result.replace("Java.from(", "__ptJavaFrom(");
+        result = appendSuperRailBuilderOverrides(result);
         return result;
+    }
+
+    /**
+     * SuperRailBuilder3 のサーバスクリプトを検出したら、レール生成/削除/レール所持判定の各関数を
+     * RTMU ネイティブ敷設(__SRB__ ブリッジ)へ差し替える上書き定義を末尾に追加する。
+     * GUI・制御フロー(onUpdate/dataMap)・render はそのまま活かし、低レベル RTM/MCP API の不一致を回避する。
+     */
+    private static String appendSuperRailBuilderOverrides(String script) {
+        if (script == null || !script.contains("SuperRailBuilderVersion")) {
+            return script;
+        }
+        boolean isServer = script.contains("function buildNormalRail");
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n;(function(){ try {\n");
+        // --- server/render 共通: プレイヤー/インベントリの MCP API を触る関数を差し替える ---
+        // getPlayerRail は「手持ちレールのモデルID(真偽値兼用)」を __SRB__ 経由で返す。
+        // player は server では rider ラッパー(__srbReal)、render では実 LocalPlayer。
+        sb.append("  getSelectedSlotItem = function(player){ return null; };\n");
+        sb.append("  hasPlayerMarker = function(player){ return false; };\n");
+        sb.append("  getPlayerRail = function(player) { try { var p = (player && player.__srbReal)?player.__srbReal:player; var id = __SRB__.heldRailModelId(p); return (id && (''+id).length>0)?(''+id):null; } catch(e){ return null; } };\n");
+        // doFollowing: ホストプレイヤーの上へ車体をテレポート(MCP field を避け getX/Y/Z を使う)。
+        // doFollowing はサーバ側のみで車をプレイヤー上へ移動させ、クライアントはサーバ同期＋補間で
+        // 滑らかに追従する。マーカーは MCWrapper.getPosX(=レンダー補間位置)基準で描くので一致して荒ぶらない。
+        // クライアントで毎フレーム動かすと描画とズレるため、ここでは動かさない。
+        sb.append("  doFollowing = function(entity, hostPlayer){ try{ if(!entity||!hostPlayer) return; var w=entity.field_70170_p; if(w && w.isClientSide && w.isClientSide()) return; var p=hostPlayer.__srbReal?hostPlayer.__srbReal:hostPlayer; if(!p||!p.getX) return; entity.func_70107_b(p.getX(), p.getY()+2, p.getZ()); try{entity.field_70159_w=0; entity.field_70181_x=0; entity.field_70179_y=0;}catch(e2){} }catch(e){} };\n");
+        // getTileEntity: 1.12.2 の net.minecraft.util.math.BlockPos を new せず、座標直接版 func_175625_s を使う。
+        // 当たり判定/道床ブロックはコアに解決して返す(__SRB__.railCoreAt)。レール沿いどこでも接続検出が効き、
+        // 接続マーカーが接線ロックされる(本家挙動)。フォールバックで素の func_175625_s。
+        sb.append("  getTileEntity = function(world, x, y, z){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) return __SRB__.railCoreAt(world, Math.floor(x), Math.floor(y), Math.floor(z)); return world.func_175625_s(Math.floor(x), Math.floor(y), Math.floor(z)); }catch(e){ try{ return world.func_175625_s(Math.floor(x), Math.floor(y), Math.floor(z)); }catch(e2){ return null; } } };\n");
+        // getTileEntityPos は func_174877_v(MCP)を使うので、座標は __SRB__.tilePos 経由で取る(レール接続検出用)。
+        sb.append("  getTileEntityPos = function(tile){ try{ var p=__SRB__.tilePos(tile); return {x:p[0],y:p[1],z:p[2]}; }catch(e){ return {x:0,y:0,z:0}; } };\n");
+        if (isServer) {
+            // --- server 専用: rider ラッパー + 敷設ブリッジ ---
+            sb.append("  var __srbWrap = function(p){ if(!p) return null; if(p.__srbReal) return p; return { __srbReal:p, func_145782_y:function(){return p.getId();}, func_184210_p:function(){try{p.stopRiding();}catch(e){}}, func_70078_a:function(t){} }; };\n");
+            sb.append("  getRider = function(entity){ try{ var ps=entity.func_184188_bt(); var r=(ps&&ps.size()>0)?ps.get(0):null; return __srbWrap(r); }catch(e){ return null; } };\n");
+            sb.append("  getRidingEntity = function(entity){ try{ return __srbWrap(entity.func_184187_bx()); }catch(e){ return null; } };\n");
+            sb.append("  createRailPosition = function(data) { return __SRB__.createRailPosition(data.blockX|0, data.blockY|0, data.blockZ|0, data.markerDir|0, (data.switchType!=null?Number(data.switchType):0), (data.anchorLength!=null?Number(data.anchorLength):-1), (data.anchorPitch!=null?Number(data.anchorPitch):0), (data.anchorYaw!=null?Number(data.anchorYaw):0), (data.cantCenter!=null?Number(data.cantCenter):0), (data.cantEdge!=null?Number(data.cantEdge):0), (data.height!=null?Number(data.height):0)); };\n");
+            sb.append("  buildNormalRail = function(world, startRP, endRP, railItem) { try { __SRB__.buildNormalRail(world, startRP, endRP, railItem); } catch(e){ try{NGTLog.error('SRB buildNormalRail err: '+e);}catch(e2){} } };\n");
+            sb.append("  buildBranchRail = function(world, rps, railItem) { try { var l=new java.util.ArrayList(); for(var i=0;i<rps.length;i++) l.add(rps[i]); __SRB__.buildBranchRail(world, l, railItem); } catch(e){} };\n");
+            sb.append("  deleteRail = function(world, x, y, z) { try { return __SRB__.deleteRail(world, x|0, y|0, z|0); } catch(e){ return false; } };\n");
+            sb.append("  deleteRailRP = function(world, rp) { return deleteRail(world, rp.blockX, rp.blockY, rp.blockZ); };\n");
+        }
+        sb.append("} catch(e){} })();\n");
+        return script + sb.toString();
     }
 
     private static void injectScriptCompatibility(ScriptEngine scriptEngine, ScriptModelRenderer renderer) {
@@ -615,6 +717,16 @@ public class TrainScriptSystem {
             // ScriptCore を互換オブジェクトとしてバインド
             scriptEngine.put("ScriptCoreJava", coreCompat);
             scriptEngine.put("ScriptUtilJava", new ScriptUtilCompat());
+            // SRB3 等のキー駆動 GUI 用に LWJGL2 Keyboard.isKeyDown を実キー入力へ橋渡し(クライアントのみ)。
+            // サーバ(クライアントクラス不在)では NoClassDefFoundError を握りつぶして false 動作にフォールバック。
+            try {
+                scriptEngine.put("__RTMU_KEY__", new com.portofino.realtrainmodunofficial.client.ScriptKeyboardCompat());
+                scriptEngine.put("__RTMU_MC__", new com.portofino.realtrainmodunofficial.client.ScriptClientCompat());
+            } catch (Throwable ignored) {
+                // bind されなければ Keyboard/MC 系は null/false を返す(従来動作)。
+            }
+            // SuperRailBuilder3 のレール敷設/削除を RTMU ネイティブへ橋渡しするブリッジ。
+            scriptEngine.put("__SRB__", new SrbRailBridge());
             try {
                 scriptEngine.eval("load('nashorn:mozilla_compat.js');");
             } catch (Exception ignored) {
@@ -702,7 +814,7 @@ public class TrainScriptSystem {
                 "  OUTLINE: { id: 3 },\n" +
                 "  PICK: { id: 4 }\n" +
                 "};\n" +
-                "var TessellatorCompat = { instance: { startDrawingQuads: function() {}, addVertex: function(x, y, z) {}, addVertexWithUV: function(x, y, z, u, v) {}, setColorRGBA_F: function(r, g, b, a) {}, setColorRGBA: function(r, g, b, a) {}, setNormal: function(x, y, z) {}, draw: function() {} } };\n" +
+                "var TessellatorCompat = { instance: { startDrawingQuads: function() { renderer.tessellatorStart(); }, addVertex: function(x, y, z) { renderer.tessellatorAddVertex(x, y, z); }, addVertexWithUV: function(x, y, z, u, v) { renderer.tessellatorAddVertexWithUV(x, y, z, u, v); }, setColorRGBA_F: function(r, g, b, a) { renderer.tessellatorSetColor(r, g, b, a); }, setColorRGBA: function(r, g, b, a) { renderer.tessellatorSetColor((r || 0) / 255.0, (g || 0) / 255.0, (b || 0) / 255.0, (a || 0) / 255.0); }, setNormal: function(x, y, z) { renderer.tessellatorSetNormal(x, y, z); }, draw: function() { renderer.tessellatorDraw(); } } };\n" +
                 "var GLHelper = { disableLighting: function() { renderer.disableLighting(); }, enableLighting: function() { renderer.enableLighting(); }, setBrightness: function(v) { renderer.setBrightness(v); }, setLightmapMaxBrightness: function() { renderer.setLightmapMaxBrightness(); }, preMoveTexUV: function(u, v) { renderer.setUvOffset(u, v); }, postMoveTexUV: function() { renderer.clearUvOffset(); } };\n" +
                 "var NGTMath = {\n" +
                 "  toRadians: function(deg) { return deg * Math.PI / 180; },\n" +
@@ -716,15 +828,24 @@ public class TrainScriptSystem {
                 "  lerp: function(a, b, t) { return a + (b - a) * t; }\n" +
                 "};\n" +
                 "try { Packages.jp['" + oldRoot + "']['" + oldLibRoot + "'].math.NGTMath = NGTMath; } catch (e) {}\n" +
-                "var ResourceLocationCompat = function(domain, path) { this.domain = domain || 'minecraft'; this.path = path || ''; this.func_110624_b = function() { return this.domain; }; this.func_110623_a = function() { return this.path; }; };\n" +
+                "var ResourceLocationCompat = function(domain, path) { if (path === undefined) { var s = String(domain || ''); var i = s.indexOf(':'); this.domain = i >= 0 ? s.substring(0, i) : 'minecraft'; this.path = i >= 0 ? s.substring(i + 1) : s; } else { this.domain = domain || 'minecraft'; this.path = path || ''; } this.namespace = this.domain; this.resourcePath = this.path; this.func_110624_b = function() { return this.domain; }; this.func_110623_a = function() { return this.path; }; this.getNamespace = function() { return this.domain; }; this.getPath = function() { return this.path; }; this.toString = function() { return this.domain + ':' + this.path; }; };\n" +
                 "var ResourceLocation = ResourceLocationCompat;\n" +
                 // LWJGL2 Keyboard stub (imported by some RTM packs via importPackage(Packages.org.lwjgl.input))
-                "if (typeof Keyboard === 'undefined') Keyboard = { KEY_O: 24, KEY_L: 38, KEY_Q: 16, KEY_I: 23, KEY_P: 25, KEY_U: 22, KEY_J: 36, KEY_K: 37, KEY_RIGHT: 205, KEY_LEFT: 203, KEY_UP: 200, KEY_DOWN: 208, KEY_LBRACKET: 26, KEY_RBRACKET: 27, KEY_RETURN: 28, KEY_SPACE: 57, KEY_LSHIFT: 42, KEY_LCONTROL: 29, isKeyDown: function(key) { return false; } };\n" +
-                "if (typeof MCWrapperClient === 'undefined') MCWrapperClient = { getPlayer: function() { return null; }, getMinecraft: function() { return null; }, bindTexture: function(texture) { if (typeof renderer !== 'undefined' && renderer) renderer.bindTexture(texture); } };\n" +
-                "if (typeof NGTUtilClient === 'undefined') NGTUtilClient = { bindTexture: function(texture) { if (typeof renderer !== 'undefined' && renderer) renderer.bindTexture(texture); } };\n" +
+                "if (typeof Keyboard === 'undefined') Keyboard = { KEY_ESCAPE: 1, KEY_O: 24, KEY_L: 38, KEY_Q: 16, KEY_I: 23, KEY_P: 25, KEY_U: 22, KEY_J: 36, KEY_K: 37, KEY_F: 33, KEY_G: 34, KEY_H: 35, KEY_C: 46, KEY_V: 47, KEY_B: 48, KEY_N: 49, KEY_M: 50, KEY_RIGHT: 205, KEY_LEFT: 203, KEY_UP: 200, KEY_DOWN: 208, KEY_HOME: 199, KEY_END: 207, KEY_INSERT: 210, KEY_DELETE: 211, KEY_LBRACKET: 26, KEY_RBRACKET: 27, KEY_RETURN: 28, KEY_SPACE: 57, KEY_LSHIFT: 42, KEY_LCONTROL: 29, KEY_RCONTROL: 157, isKeyDown: function(key) { try { return (typeof __RTMU_KEY__ !== 'undefined' && __RTMU_KEY__) ? __RTMU_KEY__.isKeyDown(key) : false; } catch (e) { return false; } } };\n" +
+                "function __rtmuMcShim() { return { field_71462_r: ((typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getCurrentScreen() : null), func_135016_M: function() { return { func_135041_c: function() { return { func_135034_a: function() { return ((typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getLanguageCode() : 'en_us'); } }; } }; } }; }\n" +
+                "if (typeof MCWrapperClient === 'undefined') MCWrapperClient = { getPlayer: function() { try { return (typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getPlayer() : null; } catch (e) { return null; } }, getMinecraft: function() { return __rtmuMcShim(); }, bindTexture: function(texture) { if (typeof renderer !== 'undefined' && renderer) renderer.bindTexture(texture); } };\n" +
+                "if (typeof NGTUtilClient === 'undefined') NGTUtilClient = { getMinecraft: function() { return __rtmuMcShim(); }, getPlayer: function() { try { return (typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getPlayer() : null; } catch (e) { return null; } }, bindTexture: function(texture) { if (typeof renderer !== 'undefined' && renderer) renderer.bindTexture(texture); } };\n" +
                 "if (typeof NGTLog === 'undefined') NGTLog = { debug: function() {}, info: function() {}, warn: function() {}, error: function() {} };\n" +
                 "if (typeof GuiChat === 'undefined') GuiChat = function() {};\n" +
                 "if (typeof Minecraft === 'undefined') Minecraft = { func_71410_x: function() { return null; }, getMinecraft: function() { return null; } };\n" +
+                // --- SuperRailBuilder3 等の 1.12.2 RTM スクリプト互換グローバル ---
+                // 本家 RTM の Java クラスは 1.21.1 に存在しないため、スクリプトが eval 時に
+                // 参照するトップレベルのグローバルを最小限スタブする。
+                "if (typeof RTMCore === 'undefined') RTMCore = { VERSION: 'RTMU-1.21.1', MODID: 'rtm' };\n" +
+                "if (typeof Blocks === 'undefined') Blocks = {};\n" +
+                "if (Blocks.field_150325_L === undefined) Blocks.field_150325_L = { __rtmuBlock: 'minecraft:white_wool' };\n" +
+                "if (typeof LoaderCompat === 'undefined') LoaderCompat = { isModLoaded: function(n) { return false; } };\n" +
+                "if (typeof BlockUtil === 'undefined') BlockUtil = { setBlock: function() {} };\n" +
                 "function __ptDummyTextureData() { return { images: [{}], size: 1, rate: 1, width: 1, height: 1 }; }\n" +
                 "function " + oldFileLoaderName + "_getInputStream(resource) { return null; }\n" +
                 "var " + oldFileLoaderName + " = { getInputStream: " + oldFileLoaderName + "_getInputStream };\n" +
@@ -762,21 +883,21 @@ public class TrainScriptSystem {
                 // groupsStr を毎フレーム再計算せず、初回構築時の固定文字列をそのまま渡す。
                 // Java 側は同じ文字列インスタンスで来ればキャッシュ済みの解析結果を返せる。
                 "  this.render = function(renderer) { if (renderer) { try { renderer.renderParts(this.groupsStr); } catch(e) {} } };\n" +
-                "  this.getObjects = function(model) { return []; };\n" +
+                "  this.getObjects = function(model) { return renderer ? renderer.getScriptModelObjects(this.groupsStr) : []; };\n" +
                 "  this.containsName = function(name) { return this.groups.indexOf(name) >= 0; };\n" +
                 "}\n" +
                 "function ModelParts() {\n" +
                 "  this.groups = Array.prototype.slice.call(arguments);\n" +
                 "  this.groupsStr = __joinGroups(this.groups);\n" +
                 "  this.render = function(renderer) { if (renderer) { try { renderer.renderParts(__joinGroups(this.groups)); } catch(e) {} } };\n" +
-                "  this.getObjects = function(model) { return []; };\n" +
+                "  this.getObjects = function(model) { return renderer ? renderer.getScriptModelObjects(this.groupsStr) : []; };\n" +
                 "  this.containsName = function(name) { return this.groups.indexOf(name) >= 0; };\n" +
                 "}\n" +
                 "function ActionParts(type) {\n" +
                 "  this.groups = Array.prototype.slice.call(arguments, 1);\n" +
                 "  this.groupsStr = __joinGroups(this.groups);\n" +
                 "  this.render = function(renderer) { if (renderer) { try { renderer.renderParts(__joinGroups(this.groups)); } catch(e) {} } };\n" +
-                "  this.getObjects = function(model) { return []; };\n" +
+                "  this.getObjects = function(model) { return renderer ? renderer.getScriptModelObjects(this.groupsStr) : []; };\n" +
                 "  this.containsName = function(name) { return this.groups.indexOf(name) >= 0; };\n" +
                 "}\n" +
                 "var PartsRenderer = renderer;\n" +
@@ -903,7 +1024,15 @@ public class TrainScriptSystem {
                 "}\n" +
                 "if (typeof playCompressorSound !== 'function' && typeof playComplessorSound === 'function') playCompressorSound = playComplessorSound;\n" +
                 "if (typeof CustomTexture !== 'undefined') {\n" +
-                "  CustomTexture._load = function(path) { return { images: [path], size: path && String(path).toLowerCase().indexOf('.gif') >= 0 ? 64 : 1, rate: 8, width: 1, height: 1 }; };\n" +
+                "  CustomTexture._load = function(path) {\n" +
+                "    var size = 1, width = 1, height = 1;\n" +
+                "    try { if (renderer && typeof renderer.getScriptTextureFrameCount === 'function') size = Math.max(1, renderer.getScriptTextureFrameCount('minecraft', String(path))); } catch (e) { size = path && String(path).toLowerCase().indexOf('.gif') >= 0 ? 64 : 1; }\n" +
+                "    try { if (renderer && typeof renderer.getScriptTextureWidth === 'function') width = Math.max(1, renderer.getScriptTextureWidth('minecraft', String(path))); } catch (e) {}\n" +
+                "    try { if (renderer && typeof renderer.getScriptTextureHeight === 'function') height = Math.max(1, renderer.getScriptTextureHeight('minecraft', String(path))); } catch (e) {}\n" +
+                "    var images = [];\n" +
+                "    for (var i = 0; i < size; i++) images.push(path);\n" +
+                "    return { images: images, size: size, rate: 8, width: width, height: height };\n" +
+                "  };\n" +
                 "  if (CustomTexture.prototype) {\n" +
                 "    CustomTexture.prototype.bindTexture = function(entity, frameIndex) { if (renderer && typeof renderer.bindScriptTexture === 'function') renderer.bindScriptTexture('minecraft', this.texturePath, frameIndex || 0); };\n" +
                 "    CustomTexture.prototype.bindDefaultTexture = function(renderer) { if (renderer && typeof renderer.clearScriptTexture === 'function') renderer.clearScriptTexture(); if (renderer && typeof renderer.clearUvWindow === 'function') renderer.clearUvWindow(); };\n" +
@@ -913,38 +1042,55 @@ public class TrainScriptSystem {
                 "}\n"
             );
             scriptEngine.eval(
-                "if (typeof CustomAnimator !== 'undefined' && CustomAnimator.prototype && !CustomAnimator.prototype.__ptAnimatorWrapped) {\n" +
-                "  CustomAnimator.prototype.__ptAnimatorWrapped = true;\n" +
-                "  CustomAnimator.prototype.__ptOldSetFacesFromParts = CustomAnimator.prototype.setFacesFromParts;\n" +
-                "  CustomAnimator.prototype.setFacesFromParts = function(part) { this.__ptParts = part; try { return this.__ptOldSetFacesFromParts.apply(this, arguments); } catch (e) {} };\n" +
+                "if (typeof CustomAnimator !== 'undefined' && CustomAnimator.prototype && !CustomAnimator.prototype.__ptAnimatorFacesWrapped) {\n" +
+                "  CustomAnimator.prototype.__ptAnimatorFacesWrapped = true;\n" +
                 "  CustomAnimator.prototype.__ptOldRender = CustomAnimator.prototype.render;\n" +
-                "  CustomAnimator.prototype.render = function(renderer, entity, pass, isLit) {\n" +
-                "    if (!entity || pass !== 1) return;\n" +
-                "    var data = this.hashMap && this.hashMap.get ? (this.hashMap.get(entity) || {}) : {};\n" +
-                "    var list = data.animationList || [];\n" +
-                "    if (list.length === 0 || !this.__ptParts) { try { return this.__ptOldRender.apply(this, arguments); } catch (e) { return; } }\n" +
-                "    var cycle = data.cycleTick || 1;\n" +
-                "    var tick = 0; try { tick = renderer.getTick(entity) % cycle; } catch (e) {}\n" +
-                "    for (var i = 0; i < list.length; i++) {\n" +
-                "      var item = list[i];\n" +
-                "      if (!(item.startTick <= tick && (tick < item.endTick || item.endTick === -1))) continue;\n" +
-                "      var set = item.animationSet;\n" +
-                "      var su = set.splitU || 1;\n" +
-                "      var sv = set.splitV || 1;\n" +
-                "      var u0 = (item.indexU || 0) / su;\n" +
-                "      var v0 = (item.indexV || 0) / sv;\n" +
-                "      var u1 = u0 + 1 / su;\n" +
-                "      var v1 = v0 + 1 / sv;\n" +
-                "      try { set.texture.bindTexture(entity, item.frameIndex || 0); renderer.setUvWindow(u0, v0, u1, v1); this.__ptParts.render(renderer); } finally { renderer.clearUvWindow(); renderer.clearScriptTexture(); }\n" +
-                "      return;\n" +
+                "  CustomAnimator.prototype.setFacesFromParts = function(part) {\n" +
+                "    this.__ptParts = part;\n" +
+                "    this.preVertexList = [];\n" +
+                "    try { if (renderer && typeof renderer.markScriptManagedParts === 'function') renderer.markScriptManagedParts(part); } catch (e0) {}\n" +
+                "    if (!renderer || typeof renderer.getScriptQuadVertexLists !== 'function') return;\n" +
+                "    var faces = Java.from(renderer.getScriptQuadVertexLists(part));\n" +
+                "    for (var i = 0; i < faces.length; i++) {\n" +
+                "      var face = Java.from(faces[i]);\n" +
+                "      var v = [];\n" +
+                "      for (var j = 0; j < face.length; j++) {\n" +
+                "        var p = Java.from(face[j]);\n" +
+                "        v.push([+p[0], +p[1], +p[2]]);\n" +
+                "      }\n" +
+                "      if (v.length === 4) this.preVertexList.push(v);\n" +
                 "    }\n" +
+                "  };\n" +
+                "  CustomAnimator.prototype.render = function(renderer, entity, pass, isLit) {\n" +
+                "    if (renderer && typeof renderer.disableReplayCacheForFrame === 'function') renderer.disableReplayCacheForFrame();\n" +
+                "    return this.__ptOldRender ? this.__ptOldRender.apply(this, arguments) : undefined;\n" +
                 "  };\n" +
                 "}\n"
             );
             scriptEngine.eval(
                 "if (typeof CustomMonitor_LCD !== 'undefined') {\n" +
-                "  CustomMonitor_LCD = function(modelSet, modelObj, baseParts, texturePath) { this.baseParts = baseParts; this.gif = new CustomTexture(modelObj, texturePath); };\n" +
-                "  CustomMonitor_LCD.prototype = { constructor: CustomMonitor_LCD, render: function(renderer, entity, pass, partialTick) { if (!entity || pass !== 1 || !this.baseParts) return; var id = 0; try { id = Math.floor(entity.getTrainStateData(8)); } catch (e) {} if (typeof lcdDisplaySet !== 'undefined' && lcdDisplaySet[id]) { var set = lcdDisplaySet[id]; var tick = 0; try { tick = renderer.getTick(entity); } catch (e) {} id = set[Math.floor((tick % (set.length * 200)) / 200)] || set[0] || id; } try { this.gif.bindTexture(entity, id); this.baseParts.render(renderer); } finally { renderer.clearUvWindow(); renderer.clearScriptTexture(); } } };\n" +
+                "  CustomMonitor_LCD = function(modelSet, modelObj, baseParts, texturePath) { this.baseParts = baseParts; this.texturePath = texturePath; this.gif = new CustomTexture(modelObj, texturePath); };\n" +
+                "  CustomMonitor_LCD.prototype = { constructor: CustomMonitor_LCD, render: function(renderer, entity, pass, partialTick) { if (!entity || pass > 2 || !this.baseParts) return; var id = 0; try { id = Math.floor(entity.getTrainStateData(8)); } catch (e) {} if (typeof lcdDisplaySet !== 'undefined' && lcdDisplaySet[id]) { var set = lcdDisplaySet[id]; var tick = 0; try { tick = renderer.getTick(entity); } catch (e) {} id = set[Math.floor((tick % (set.length * 200)) / 200)] || set[0] || id; } else { try { var frames = renderer.getScriptTextureFrameCount('minecraft', this.texturePath); var tick2 = renderer.getTick(entity); if (frames > 0) id = Math.floor(tick2 / 2) % frames; } catch (e2) {} } try { if (typeof renderer.setLightmapMaxBrightness === 'function') renderer.setLightmapMaxBrightness(); if (renderer && typeof renderer.renderGifOnParts === 'function') renderer.renderGifOnParts(this.baseParts, 'minecraft', this.texturePath, id); else { this.gif.bindTexture(entity, id); this.baseParts.render(renderer); } } finally { if (typeof renderer.enableLighting === 'function') renderer.enableLighting(); renderer.clearUvWindow(); renderer.clearScriptTexture(); } } };\n" +
+                "}\n"
+            );
+            scriptEngine.eval(
+                "if (typeof DoorRenderer !== 'undefined' && DoorRenderer.prototype && !DoorRenderer.prototype.__ptDoorUpdateWrapped) {\n" +
+                "  DoorRenderer.prototype.__ptDoorUpdateWrapped = true;\n" +
+                "  DoorRenderer.prototype._isUpdateTick = function(entity, pass, renderer) { if (!entity || pass !== 0) return false; var currentTick = renderer.getTick(entity); var key = 'prevTick_' + (entity.getUUID ? entity.getUUID() : 'entity'); var prevTick = this.hashMap.get(key); this.hashMap.put(key, currentTick); return prevTick !== currentTick; };\n" +
+                "  DoorRenderer.prototype._calcZPos = function(entity, pass, partialTick) { if (!entity || pass > 2) return 0; var m = 0; try { if (this.dir === DoorRenderer.dir.left && renderer && typeof renderer.getDoorMovementL === 'function') m = renderer.getDoorMovementL(entity); else if (this.dir === DoorRenderer.dir.right && renderer && typeof renderer.getDoorMovementR === 'function') m = renderer.getDoorMovementR(entity); else { var state = Math.floor(entity.getTrainStateData(4)); var open = this.dir === DoorRenderer.dir.left ? ((state & 2) === 2) : ((state & 1) === 1); m = open ? 1 : 0; } } catch (e) { m = 0; } if (m < 0) m = 0; if (m > 1) m = 1; var pos = this.moveMaxZ * m; var map = this.hashMap.get(entity) || new java.util.HashMap(); map.put('posZ', pos); map.put('cachedRenderPos', pos); this.hashMap.put(entity, map); return this.isInvertMove ? -pos : pos; };\n" +
+                "}\n"
+            );
+            scriptEngine.eval(
+                "if (typeof CustomMonitor_JRE_1 !== 'undefined') {\n" +
+                "  CustomMonitor_JRE_1 = function(modelSet, modelObj, baseParts) { this.baseParts = baseParts; this.hashMap = new java.util.HashMap(); };\n" +
+                "  CustomMonitor_JRE_1.prototype = { constructor: CustomMonitor_JRE_1, setOption: function() {}, render: function() {}, getHashMap: function(entity) { return this.hashMap.get(entity) || {}; }, setHashMapData: function(entity, key, value) { var data = this.getHashMap(entity); data[key] = value; this.hashMap.put(entity, data); }, getHashMapData: function(entity, key) { return this.getHashMap(entity)[key]; } };\n" +
+                "}\n" +
+                "if (typeof CustomMonitor_JRE_2 !== 'undefined') {\n" +
+                "  var __ptJre2EntrySet = CustomMonitor_JRE_2.EntrySet || {};\n" +
+                "  CustomMonitor_JRE_2 = function(modelSet, modelObj, baseParts) { this.baseParts = baseParts; this.entrySet = {}; this.hashMap = new java.util.HashMap(); };\n" +
+                "  CustomMonitor_JRE_2.EntrySet = __ptJre2EntrySet;\n" +
+                "  ['tc','mc1','mc2','t','tsd','m1','m2','m3','m4','m5','m6','m7','m8'].forEach(function(k) { if (!CustomMonitor_JRE_2.EntrySet[k]) CustomMonitor_JRE_2.EntrySet[k] = { iconF: 'entry_' + k, iconB: 'entry_' + k }; });\n" +
+                "  CustomMonitor_JRE_2.prototype = { constructor: CustomMonitor_JRE_2, addEntrySet: function(trainName, type, options) { this.entrySet[trainName] = { type: type || {}, options: options || {} }; }, addEntriesSet: function(trainNameList, type, options) { if (!trainNameList) return; for (var i = 0; i < trainNameList.length; i++) this.addEntrySet(trainNameList[i], type, options); }, setOption: function(options, entity) { var data = this.getHashMap(entity); data.options = options || {}; this.hashMap.put(entity, data); }, render: function() {}, getHashMap: function(entity) { return this.hashMap.get(entity) || {}; }, setHashMapData: function(entity, key, value) { var data = this.getHashMap(entity); data[key] = value; this.hashMap.put(entity, data); }, getHashMapData: function(entity, key) { return this.getHashMap(entity)[key]; } };\n" +
                 "}\n"
             );
             scriptEngine.eval(
@@ -1398,9 +1544,14 @@ public class TrainScriptSystem {
         // RTM 1.12.2 obfuscated field names used by legacy render scripts
         public final float field_70177_z; // yRot
         public final float field_70125_A; // xRot
+        public final int field_70173_aa; // tickCount
+        public final net.minecraft.world.entity.Entity field_70153_n; // riding/driver compat
         // Door animation state (accessed as properties by legacy scripts)
         public final float doorMoveL;
         public final float doorMoveR;
+        public final float seatRotation;
+        public final float pantograph_F;
+        public final float pantograph_B;
         // Brake pressure fields used by sd8200-style scripts for gauge animation
         public final float brakeCount;
         public final float brakeAirCount;
@@ -1410,14 +1561,24 @@ public class TrainScriptSystem {
         public final double zCoord;
         // Wheel rotation in degrees (accessed as entity.wheelRotationR in scripts)
         public final float wheelRotationR;
+        // RTM 1.7.10 obfuscated world field (entity.field_70170_p)。lib_FormationFix 等が
+        // entity.field_70170_p.field_72995_K(world.isRemote) を参照するため公開する。
+        public final com.portofino.realtrainmodunofficial.entity.TrainEntity.WorldCompat field_70170_p;
 
         public LegacyScriptExecutor(TrainEntity train) {
             this.train = train;
+            this.field_70170_p = train != null ? train.field_70170_p
+                : new com.portofino.realtrainmodunofficial.entity.TrainEntity.WorldCompat(null);
             this.count = train == null ? 0L : Math.max(0L, (long) train.tickCount);
             this.field_70177_z = train == null ? 0.0F : train.getYRot();
             this.field_70125_A = train == null ? 0.0F : train.getXRot();
+            this.field_70173_aa = train == null ? 0 : train.tickCount;
+            this.field_70153_n = resolvePrimaryPassenger(train);
             this.doorMoveL = train == null ? 0.0F : train.doorMoveL;
             this.doorMoveR = train == null ? 0.0F : train.doorMoveR;
+            this.seatRotation = train == null ? 0.0F : train.getSeatRotation();
+            this.pantograph_F = train == null ? 0.0F : train.pantograph_F;
+            this.pantograph_B = train == null ? 0.0F : train.pantograph_B;
             // brakeCount: 0–8 equivalent brake notch position for gauge display
             this.brakeCount = train == null ? 0.0F : Math.max(0, -train.getNotch());
             // brakeAirCount: simulated MR pressure (starts at max 800, decreases with braking)
@@ -1425,15 +1586,9 @@ public class TrainScriptSystem {
             this.xCoord = train == null ? 0.0 : train.getX();
             this.yCoord = train == null ? 0.0 : train.getY();
             this.zCoord = train == null ? 0.0 : train.getZ();
-            // Wheel rotation: accumulate distance over ticks
-            if (train != null) {
-                float wheelRadiusBlocks = 0.43F;
-                float circumference = (float) (2.0 * Math.PI * wheelRadiusBlocks);
-                float distPerTick = Math.abs(train.getSpeed());
-                this.wheelRotationR = (float) (((train.tickCount * distPerTick) / circumference) * 360.0);
-            } else {
-                this.wheelRotationR = 0.0F;
-            }
+            // 走行距離ベースの累積回転角(TrainEntity.tick で毎tick加算)。
+            // 旧 tickCount×速度 は速度変化で巨大ジャンプ→空転の原因だったので使わない。
+            this.wheelRotationR = train == null ? 0.0F : train.getWheelRotationDegrees();
         }
 
         public long getCount() {
@@ -1572,6 +1727,47 @@ public class TrainScriptSystem {
             train.syncVehicleState(stateType, value);
         }
 
+        public Object getData(Object key) {
+            if (train == null || key == null) {
+                return 0;
+            }
+            String value = train.getScriptDataValue(String.valueOf(key));
+            if (value == null || value.isBlank()) {
+                return 0;
+            }
+            try {
+                if (value.indexOf('.') >= 0) {
+                    return Double.parseDouble(value);
+                }
+                return Integer.parseInt(value);
+            } catch (NumberFormatException ignored) {
+                return value;
+            }
+        }
+
+        public Object getData(long key) {
+            return getData(Long.toString(key));
+        }
+
+        public Object getData(int key) {
+            return getData(Integer.toString(key));
+        }
+
+        public void setData(Object key, Object value) {
+            if (train == null || key == null) {
+                return;
+            }
+            train.setScriptDataValue(String.valueOf(key), value == null ? "" : String.valueOf(value));
+        }
+
+        public void setData(long key, Object value) {
+            setData(Long.toString(key), value);
+        }
+
+        public void setData(int key, Object value) {
+            setData(Integer.toString(key), value);
+        }
+
         // ---- RTM compat fields / methods ----
 
         public float getSeatRotation() {
@@ -1655,6 +1851,25 @@ public class TrainScriptSystem {
             return train == null ? 0 : train.getPassengers().size();
         }
 
+        public net.minecraft.world.entity.Entity func_184207_aI() {
+            return resolvePrimaryPassenger(train);
+        }
+
+        public java.util.List<net.minecraft.world.entity.Entity> func_184188_bt() {
+            return train == null ? java.util.List.of() : train.getPassengers();
+        }
+
+        public net.minecraft.world.entity.Entity func_184187_bx() {
+            return func_184207_aI();
+        }
+
+        private static net.minecraft.world.entity.Entity resolvePrimaryPassenger(TrainEntity train) {
+            if (train == null) {
+                return null;
+            }
+            return train.getPassengers().isEmpty() ? null : train.getPassengers().get(0);
+        }
+
         // ---- Train dimensions ----
 
         public double getTrainLength() {
@@ -1670,8 +1885,9 @@ public class TrainScriptSystem {
 
         public BogieCompat getBogie(int index) {
             if (train == null) return null;
-            float yaw = train.getBogieWorldYaw(index);
-            float pitch = train.getBogiePitch(index);
+            int mapped = train.scriptBogieIndexToDefinitionIndex(index);
+            float yaw = train.getBogieWorldYaw(mapped);
+            float pitch = train.getBogiePitch(mapped);
             return new BogieCompat(yaw, pitch);
         }
 
@@ -1975,6 +2191,7 @@ public class TrainScriptSystem {
         private MultiBufferSource buffer;
         private int packedLight;
         private int basePackedLight;
+        private boolean lightmapMaxForced;
         private int overlay;
         private int currentPass;
         private Object currentEntity;
@@ -1992,6 +2209,8 @@ public class TrainScriptSystem {
         private float uvOffsetU;
         private float uvOffsetV;
         private int matrixDepth = 0;
+        private Vec3 scriptLocalOrigin = Vec3.ZERO;
+        private final ArrayDeque<Vec3> scriptLocalStack = new ArrayDeque<>();
         private int renderPartsCalls = 0;
         private int renderedBatchCount = 0;
         private final Set<String> scriptedOpaqueGroups = new LinkedHashSet<>();
@@ -2007,6 +2226,34 @@ public class TrainScriptSystem {
         // Groups registered via registerParts() during init() — script "owns" these, baked render skips them
         private final Set<String> scriptRegisteredGroups = new LinkedHashSet<>();
         private final Map<Long, Object> scriptData = new HashMap<>();
+        private TrainEntity cachedExecutorTrain;
+        private LegacyScriptExecutor cachedExecutor;
+        private boolean replayCacheDisabledForFrame = false;
+        private final List<TessVertex> tessellatorVertices = new ArrayList<>();
+        private float tessColorRed = 1.0F;
+        private float tessColorGreen = 1.0F;
+        private float tessColorBlue = 1.0F;
+        private float tessColorAlpha = 1.0F;
+        private float tessNormalX = 0.0F;
+        private float tessNormalY = 1.0F;
+        private float tessNormalZ = 0.0F;
+        private boolean tessNormalSet = false;
+
+        private static final class TessVertex {
+            final float x;
+            final float y;
+            final float z;
+            final float u;
+            final float v;
+
+            TessVertex(float x, float y, float z, float u, float v) {
+                this.x = x;
+                this.y = y;
+                this.z = z;
+                this.u = u;
+                this.v = v;
+            }
+        }
 
         // ==== 半透明遅延描画 (Deferred Translucent) ====
         // スクリプトは body_o(窓含む)→body_i(椅子) の順に「不透明→半透明」を即描画するため、
@@ -2026,13 +2273,19 @@ public class TrainScriptSystem {
             final net.minecraft.resources.ResourceLocation boundTexture;
             final org.joml.Matrix4f pose;
             final org.joml.Matrix3f normal;
+            // UV ウィンドウ状態(方向幕など CustomAnimator が setUvWindow したまま renderParts する場合に保存)
+            final boolean uvWindowActive;
+            final float uvU0, uvV0, uvU1, uvV1;
             DeferredTranslucent(Set<String> groups, int pass, int packedLight, int overlay,
                                 float r, float g, float b, float a,
                                 net.minecraft.resources.ResourceLocation boundTexture,
-                                org.joml.Matrix4f pose, org.joml.Matrix3f normal) {
+                                org.joml.Matrix4f pose, org.joml.Matrix3f normal,
+                                boolean uvWindowActive, float uvU0, float uvV0, float uvU1, float uvV1) {
                 this.groups = groups; this.pass = pass; this.packedLight = packedLight; this.overlay = overlay;
                 this.r = r; this.g = g; this.b = b; this.a = a; this.boundTexture = boundTexture;
                 this.pose = pose; this.normal = normal;
+                this.uvWindowActive = uvWindowActive;
+                this.uvU0 = uvU0; this.uvV0 = uvV0; this.uvU1 = uvU1; this.uvV1 = uvV1;
             }
         }
 
@@ -2050,6 +2303,8 @@ public class TrainScriptSystem {
             int sPass = this.currentPass, sLight = this.packedLight, sOverlay = this.overlay;
             float sr = this.colorRed, sg = this.colorGreen, sb = this.colorBlue, sa = this.colorAlpha;
             net.minecraft.resources.ResourceLocation sTex = this.boundTexture;
+            boolean sUvActive = this.uvWindowActive;
+            float sUu0 = this.uvU0, sUv0 = this.uvV0, sUu1 = this.uvU1, sUv1 = this.uvV1;
             try {
                 for (DeferredTranslucent d : deferredTranslucents) {
                     this.currentPass = d.pass;
@@ -2057,6 +2312,9 @@ public class TrainScriptSystem {
                     this.overlay = d.overlay;
                     this.colorRed = d.r; this.colorGreen = d.g; this.colorBlue = d.b; this.colorAlpha = d.a;
                     this.boundTexture = d.boundTexture;
+                    // UV ウィンドウを復元(方向幕など setUvWindow した状態でキューに入ったエントリのため)
+                    this.uvWindowActive = d.uvWindowActive;
+                    this.uvU0 = d.uvU0; this.uvV0 = d.uvV0; this.uvU1 = d.uvU1; this.uvV1 = d.uvV1;
                     poseStack.pushPose();
                     try {
                         poseStack.last().pose().set(d.pose);
@@ -2071,6 +2329,8 @@ public class TrainScriptSystem {
                 this.currentPass = sPass; this.packedLight = sLight; this.overlay = sOverlay;
                 this.colorRed = sr; this.colorGreen = sg; this.colorBlue = sb; this.colorAlpha = sa;
                 this.boundTexture = sTex;
+                this.uvWindowActive = sUvActive;
+                this.uvU0 = sUu0; this.uvV0 = sUv0; this.uvU1 = sUu1; this.uvV1 = sUv1;
                 this.deferTranslucent = prevDefer;
                 deferredTranslucents.clear();
             }
@@ -2085,7 +2345,8 @@ public class TrainScriptSystem {
             deferredTranslucents.add(new DeferredTranslucent(
                 new LinkedHashSet<>(groups), pass, this.packedLight, this.overlay,
                 this.colorRed, this.colorGreen, this.colorBlue, this.colorAlpha,
-                this.boundTexture, pose, normal));
+                this.boundTexture, pose, normal,
+                this.uvWindowActive, this.uvU0, this.uvV0, this.uvU1, this.uvV1));
             return true;
         }
 
@@ -2108,6 +2369,9 @@ public class TrainScriptSystem {
         public static final int OP_CLEAR_UV_WINDOW = 13;
         public static final int OP_SET_LIGHTMAP_MAX = 14;
         public static final int OP_BIND_LEGACY_ROLLSIGN = 15;
+        public static final int OP_RENDER_TEXTURE_WINDOW = 16;
+        public static final int OP_ENABLE_LIGHTING = 17;
+        public static final int OP_SET_BRIGHTNESS = 18;
 
         public static final class OpList {
             int[] kinds = new int[32];
@@ -2159,19 +2423,16 @@ public class TrainScriptSystem {
          */
         public long computeReplaySignature(int pass, Object entity) {
             if (!(entity instanceof TrainEntity t)) return 0L;
-            // 停車中・走行中ともに cache 対象にする。走行中は wheel rotation / bogie yaw を
-            // 量子化バケツに丸めることで、定速走行時に同じバケツが再来 → cache hit。
-            // 5° 刻みなら 360°/5°=72 バケツ。1 秒の起動 cool down 後はほぼ常時 hit。
-            int doorL = Math.round(t.doorMoveL);
-            int doorR = Math.round(t.doorMoveR);
+            if (Math.abs(t.getSpeed()) > 0.001F) {
+                return 0L;
+            }
+            int doorL = Math.round(t.doorMoveL * 32.0F);
+            int doorR = Math.round(t.doorMoveR * 32.0F);
             int lightMode = t.getLightMode();
             int notch = t.getNotch();
             int rev = t.getReverser();
             int dest = t.getDestinationIndex();
             int interior = t.isInteriorLightOn() ? 1 : 0;
-            // wheel rotation を 5° バケツに量子化 (定速走行で循環 → 1秒後にキャッシュ満載)
-            float wheelRot = getWheelRotationR(t);
-            int wheelBucket = ((int) Math.floor(((wheelRot % 360.0F) + 360.0F) % 360.0F / 5.0F)) % 72;
             long h = pass;
             h = h * 31 + doorL;
             h = h * 31 + doorR;
@@ -2180,7 +2441,6 @@ public class TrainScriptSystem {
             h = h * 31 + rev;
             h = h * 31 + dest;
             h = h * 31 + interior;
-            h = h * 73 + wheelBucket;
             return h == 0L ? 1L : h;
         }
 
@@ -2198,6 +2458,7 @@ public class TrainScriptSystem {
         }
 
         public void beginRecording(long signature) {
+            replayCacheDisabledForFrame = false;
             if (signature == 0L) {
                 currentRecording = null;
                 currentSignature = 0L;
@@ -2214,11 +2475,17 @@ public class TrainScriptSystem {
         }
 
         public void endRecording(boolean keep) {
-            if (currentRecording != null && keep && currentSignature != 0L) {
+            if (currentRecording != null && keep && currentSignature != 0L && !replayCacheDisabledForFrame) {
                 replayCache.put(currentSignature, currentRecording);
             }
             currentRecording = null;
             currentSignature = 0L;
+            replayCacheDisabledForFrame = false;
+        }
+
+        public void disableReplayCacheForFrame() {
+            replayCacheDisabledForFrame = true;
+            currentRecording = null;
         }
 
         private void executeOpList(OpList list) {
@@ -2228,7 +2495,7 @@ public class TrainScriptSystem {
                 float f0 = list.floats[b], f1 = list.floats[b+1], f2 = list.floats[b+2], f3 = list.floats[b+3], f4 = list.floats[b+4];
                 String s = list.strings[i];
                 switch (k) {
-                    case OP_TRANSLATE -> { if (poseStack != null) poseStack.translate(f0, f1, f2); }
+                    case OP_TRANSLATE -> translate(f0, f1, f2);
                     case OP_ROTATE_AXIS -> rotate(f0, String.valueOf(list.chars[i]), f1, f2, f3);
                     case OP_ROTATE_FREE -> rotate(f0, f1, f2, f3);
                     case OP_PUSH -> pushMatrix();
@@ -2237,10 +2504,30 @@ public class TrainScriptSystem {
                     case OP_RENDER_PARTS -> renderParts(s);
                     case OP_SET_COLOR -> setColor(f0, f1, f2, f3);
                     case OP_RESET_COLOR -> resetColor();
+                    case OP_BIND_TEX -> bindScriptTextureFromRecord(s, Math.round(f0));
+                    case OP_CLEAR_TEX -> clearScriptTexture();
+                    case OP_SET_UV_WINDOW -> setUvWindow(f0, f1, f2, f3);
+                    case OP_CLEAR_UV_WINDOW -> clearUvWindow();
                     case OP_SET_LIGHTMAP_MAX -> setLightmapMaxBrightness();
+                    case OP_SET_BRIGHTNESS -> setBrightness(Math.round(f0));
+                    case OP_ENABLE_LIGHTING -> enableLighting();
+                    case OP_RENDER_TEXTURE_WINDOW -> renderTextureWindowFromRecord(s, Math.round(f0), f1, f2, f3, f4);
                     default -> { /* skip */ }
                 }
             }
+        }
+
+        private void bindScriptTextureFromRecord(String record, int frameIndex) {
+            if (record == null || record.isBlank()) {
+                clearScriptTexture();
+                return;
+            }
+            String[] parts = record.split("\\n", 2);
+            if (parts.length < 2 || parts[1].isBlank()) {
+                clearScriptTexture();
+                return;
+            }
+            bindScriptTexture(parts[0], parts[1], frameIndex);
         }
 
         // renderParts() の入力文字列 → 解析済み結果のキャッシュ。
@@ -2329,9 +2616,9 @@ public class TrainScriptSystem {
                     }
                 }
             }
-            // 初回の数回だけログを吐く。spacia は body01..body06 等で約 10 回呼ばれる。
+            // 初回調査用。通常プレイでは script 初期化ログだけでもかなり多くなるため debug に留める。
             if (scriptRegisteredGroups.size() < 200) {
-                RealTrainModUnofficial.LOGGER.info(
+                RealTrainModUnofficial.LOGGER.debug(
                     "[registerParts] partsType={} extracted={} usable={} rejected={} totalRegistered={}",
                     parts == null ? "null" : parts.getClass().getSimpleName(),
                     names == null ? 0 : names.size(),
@@ -2376,20 +2663,9 @@ public class TrainScriptSystem {
         public void renderRegisteredGroups(List<String> rawNames) {
             if (rawNames == null || rawNames.isEmpty() || mqoModel == null
                 || poseStack == null || buffer == null) {
-                if (renderPartsCalls < 50) {
-                    RealTrainModUnofficial.LOGGER.info(
-                        "[renderRegGroups:SKIP] rawNames={} mqoModel={} poseStack={} buffer={}",
-                        rawNames == null ? "null" : String.valueOf(rawNames.size()),
-                        mqoModel != null, poseStack != null, buffer != null);
-                }
                 return;
             }
-            if (renderPartsCalls < 50) {
-                RealTrainModUnofficial.LOGGER.info(
-                    "[renderRegGroups:CALL] count={} first={}",
-                    rawNames.size(), rawNames.get(0));
-                renderPartsCalls++;
-            }
+            renderPartsCalls++;
             java.util.Set<String> normalized = new java.util.LinkedHashSet<>();
             for (String n : rawNames) {
                 String x = normalizeLegacyGroupName(n);
@@ -2399,43 +2675,49 @@ public class TrainScriptSystem {
                 // group として描かれるためここでフィルタする。
                 // shadow 完全一致のみ。 shadowXX など別の group まで巻き込まないようにする。
                 if (x.equalsIgnoreCase("shadow")) continue;
+                if (currentPass >= 2 && isLightOffGroup(x)) continue;
+                if (shouldSuppressOerMseScriptHoodGroup(x)) continue;
                 normalized.add(x);
             }
             if (normalized.isEmpty()) return;
+            if (currentPass >= 2) {
+                normalized = filterLegacyScriptEmissiveGroups(normalized);
+                if (normalized.isEmpty()) return;
+            }
             // 角度バリアント (body-30 / body-90 / body-180 / bogie1-90 等) のフィルタ。
             // RTM の連結曲げ用に用意された「曲げ角ごとの代替メッシュ」で、本家は曲げ角に応じ
             // 1 つだけ描画する。移植版は同じ Parts に登録された全部を重ねて描くため、
             // 直線状態でも曲げボディが翼のように外へはみ出す (ポリゴン重なり)。
             // 0°(サフィックス無し)の本体が同じ描画呼び出しに含まれる時だけ曲げ変種を除外し、
             // 直線/単行の見た目を本家に合わせる。
-            if (!isTtpSteamBodyGroupSet(normalized)) {
+            if (!shouldKeepNumberedVariantGroups(normalized)) {
                 normalized = filterAngleVariantGroups(normalized);
             }
             if (normalized.isEmpty()) return;
             try {
-                // opaque は毎 pass 描画 (script が pass ごとに位置を変える椅子/ロッド用、 色不変)。
-                mqoModel.renderNamedGroups(poseStack, buffer, packedLight, overlay, false, normalized, this);
-                scriptedOpaqueGroups.addAll(normalized);
+                int renderPackedLight = effectivePackedLightForScriptParts(normalized);
+                // RTM 本家の vehicle script は pass0=不透明(alpha==255)、pass1=半透明(alpha<255)。
+                // ここで pass1 でも不透明側を描いてしまうと、KQ のような AlphaBlend 車両で
+                // 窓/ガラス用グループの不透明マスクが床下に黒板のように残る。
+                if (currentPass != 1) {
+                    mqoModel.renderNamedGroups(poseStack, buffer, renderPackedLight, overlay, false, normalized, this);
+                    scriptedOpaqueGroups.addAll(normalized);
+                }
 
                 if (currentPass >= 2) {
                     // emissive pass: renderSelectedBatches が「emissiveTexture を持たない batch」を
                     // スキップするので、 ここでは発光マテリアル (Light) のみ描画される (前照灯/室内灯)。
                     // 半透明発光も「全不透明の後」に描くため遅延キューへ。
                     if (!enqueueOrDrawTranslucent(poseStack, buffer, currentPass, normalized)) {
-                        mqoModel.renderNamedGroups(poseStack, buffer, packedLight, overlay, true, normalized, this);
+                        mqoModel.renderNamedGroups(poseStack, buffer, renderPackedLight, overlay, true, normalized, this);
                     }
                     scriptedTranslucentGroups.addAll(normalized);
                 } else {
-                    // 通常 translucent (AlphaBlend = 車体/窓/内装) は「最初に半透明を描いたパス」でのみ
-                    // 描画する。 RTM 本家同様 1 パスで order 順に描けば、 窓の後ろの内装が深度的に
-                    // 透けて見える。 複数 pass で重ね描きしないので z-fighting (外装チラつき) も出ない。
-                    // 同一 pass 内で同じ group を別位置で複数回 renderParts する (椅子複数脚) のは許可。
-                    if (firstTranslucentPass < 0) {
-                        firstTranslucentPass = currentPass;
-                    }
-                    if (currentPass == firstTranslucentPass) {
+                    // 通常 translucent (AlphaBlend = 車体/窓/内装) は本家RTMと同様に pass1 でだけ描く。
+                    // pass0 では opaqueTexture 側だけ、pass1 では windowTexture 側だけ出す。
+                    if (currentPass == 1) {
                         if (!enqueueOrDrawTranslucent(poseStack, buffer, currentPass, normalized)) {
-                            mqoModel.renderNamedGroups(poseStack, buffer, packedLight, overlay, true, normalized, this);
+                            mqoModel.renderNamedGroups(poseStack, buffer, renderPackedLight, overlay, true, normalized, this);
                         }
                         scriptedTranslucentGroups.addAll(normalized);
                     }
@@ -2488,7 +2770,29 @@ public class TrainScriptSystem {
         }
 
         private static String stripMirrorSuffix(String n) {
-            return n.endsWith("(mx)") ? n.substring(0, n.length() - 4) : n;
+            // RTM の鏡像/向き変種サフィックスは多様: (mx)/(my)/(mz) 単軸, (mxz)/(mxy)/(mxyz) 複数軸,
+            // (r) 反転, さらにそれらが積み重なる場合もある(例 "body-35(mxz)", "body-100(r)")。
+            // 以前は (mx) や単軸しか剥がせず、(mxz)/(r) 付きの曲げ変種が角度判定をすり抜けて
+            // 原点姿勢で描画され、パーツの飛び散り/車番の重複を起こしていた。
+            // 末尾の括弧が「鏡像/向きトークン(m,x,y,z,r のみ)」なら、すべて(連続も)剥がす。
+            String s = n;
+            while (s.length() >= 3 && s.endsWith(")")) {
+                int open = s.lastIndexOf('(');
+                if (open <= 0 || open >= s.length() - 1) break;
+                String inside = s.substring(open + 1, s.length() - 1);
+                if (inside.isEmpty()) break;
+                boolean mirrorToken = true;
+                for (int i = 0; i < inside.length(); i++) {
+                    char c = inside.charAt(i);
+                    if (c != 'm' && c != 'x' && c != 'y' && c != 'z' && c != 'r') {
+                        mirrorToken = false;
+                        break;
+                    }
+                }
+                if (!mirrorToken) break;
+                s = s.substring(0, open);
+            }
+            return s;
         }
 
         /** 末尾「-数字」の数値を返す ((mx) は先に剥がす)。無ければ -1。 */
@@ -2511,7 +2815,7 @@ public class TrainScriptSystem {
             return angleSuffixValue(n) >= ANGLE_SUFFIX_THRESHOLD;
         }
 
-        private boolean isTtpSteamBodyGroupSet(java.util.Set<String> names) {
+        private boolean shouldKeepNumberedVariantGroups(java.util.Set<String> names) {
             if (!(currentEntity instanceof TrainEntity train)) {
                 return false;
             }
@@ -2520,11 +2824,10 @@ public class TrainScriptSystem {
                 return false;
             }
             String lowerId = id.toLowerCase(Locale.ROOT);
-            // TTP の SL (ttp_c*, ttp_b20*) は body-35 / body-80 / body-90 等を「曲線用の捨てパーツ」
-            // ではなく実際のボイラー部品として使う。C10/C12 等は素の "body" を持たず body-数字 だけで
-            // 構成される車両もあるため、group 構成(hasBody)では判定せず vehicleId だけで判定する。
-            // これに当てはまる車両は角度バリアント除外を一切かけない(ボイラー外板が消えないように)。
-            return lowerId.startsWith("ttp_c") || lowerId.startsWith("ttp_b20");
+            // TTP/TkmTP は body-35/body-90/common-35/bogie-35 等を曲線用の捨てパーツではなく
+            // 実モデルの分割部品として使う車両が多い。ここで落とすと車体の大半が消えて
+            // スクリプト部品だけが残るため、TTP 全体では番号付きグループをそのまま描く。
+            return lowerId.startsWith("ttp_");
         }
 
         public boolean hasAlphaPassContent() {
@@ -2589,10 +2892,14 @@ public class TrainScriptSystem {
             restoreMatrixDepth(0);
             this.poseStack = poseStack;
             this.buffer = buffer;
-            // pass 2+ is the "emissive/fullbright" pass in legacy RTM scripts.
-            boolean emissivePass = pass >= 2;
-            this.packedLight = emissivePass ? 0x00F000F0 : packedLight;
+            // pass 2+ is the legacy emissive pass, but do not make the whole script pass
+            // fullbright. Some train scripts (Spacia etc.) call render_parts() again in pass
+            // 2, and a pass-wide fullbright makes exterior body meshes flash/glow in daylight.
+            // Only explicit GLHelper.setLightmapMaxBrightness() or filtered emissive batches
+            // should become fullbright.
+            this.packedLight = packedLight;
             this.basePackedLight = packedLight;
+            this.lightmapMaxForced = false;
             this.overlay = overlay;
             this.currentPass = pass;
             this.currentEntity = entity;
@@ -2601,6 +2908,8 @@ public class TrainScriptSystem {
             clearUvWindow();
             clearUvOffset();
             this.matrixDepth = 0;
+            this.scriptLocalOrigin = Vec3.ZERO;
+            this.scriptLocalStack.clear();
         }
 
         public void clearRenderContext() {
@@ -2614,6 +2923,20 @@ public class TrainScriptSystem {
             clearUvWindow();
             clearUvOffset();
             this.matrixDepth = 0;
+            this.scriptLocalOrigin = Vec3.ZERO;
+            this.scriptLocalStack.clear();
+        }
+
+        public Object scriptEntityFor(Object entity) {
+            if (entity instanceof TrainEntity train) {
+                // Legacy scripts read many values as plain fields (count, doorMoveL,
+                // field_70173_aa, seatRotation, etc.). A cached wrapper freezes those
+                // fields and stops tick-driven displays like E259 rollsign/LCD.
+                cachedExecutorTrain = train;
+                cachedExecutor = new LegacyScriptExecutor(train);
+                return cachedExecutor;
+            }
+            return entity;
         }
 
         public void setColor(double red, double green, double blue, double alpha) {
@@ -2669,6 +2992,10 @@ public class TrainScriptSystem {
             return currentPass;
         }
 
+        public Object getCurrentEntity() {
+            return currentEntity;
+        }
+
         public void onBatchRendered() {
             renderedBatchCount++;
         }
@@ -2681,14 +3008,17 @@ public class TrainScriptSystem {
 
         public void clearScriptTexture() {
             boundTexture = null;
+            recordOp(OP_CLEAR_TEX, 0, 0, 0, 0, 0, null, ' ');
         }
 
         public void setUvWindow(double u0, double v0, double u1, double v1) {
+            disableReplayCacheForFrame();
             uvWindowActive = true;
             uvU0 = (float) u0;
             uvV0 = (float) v0;
             uvU1 = (float) u1;
             uvV1 = (float) v1;
+            recordOp(OP_SET_UV_WINDOW, uvU0, uvV0, uvU1, uvV1, 0, null, ' ');
         }
 
         public void clearUvWindow() {
@@ -2697,6 +3027,7 @@ public class TrainScriptSystem {
             uvV0 = 0.0F;
             uvU1 = 1.0F;
             uvV1 = 1.0F;
+            recordOp(OP_CLEAR_UV_WINDOW, 0, 0, 0, 0, 0, null, ' ');
         }
 
         /**
@@ -2709,6 +3040,7 @@ public class TrainScriptSystem {
         }
 
         public void setUvOffset(double u, double v) {
+            disableReplayCacheForFrame();
             uvOffsetActive = true;
             uvOffsetU = (float) u;
             uvOffsetV = (float) v;
@@ -2751,10 +3083,428 @@ public class TrainScriptSystem {
         }
 
         public void bindScriptTexture(String domain, String path, int frameIndex) {
-            boundTexture = MqoModelLoader.getScriptTexture(domain, path, frameIndex);
+            String safeDomain = domain == null || domain.isBlank() ? "minecraft" : domain;
+            boundTexture = MqoModelLoader.getScriptTexture(safeDomain, path, frameIndex);
+            if (path != null && !path.isBlank()) {
+                recordOp(OP_BIND_TEX, frameIndex, 0, 0, 0, 0, safeDomain + "\n" + path, ' ');
+            }
+        }
+
+        public List<Object> getScriptModelObjects(String groupsCsv) {
+            return Collections.emptyList();
+        }
+
+        public void markScriptManagedParts(Object parts) {
+            if (parts == null) {
+                return;
+            }
+            List<String> groupNames = extractGroupNames(parts);
+            for (String name : groupNames) {
+                String normalized = normalizeLegacyGroupName(name);
+                if (!normalized.isEmpty() && mqoModel != null && mqoModel.hasGroupNamed(normalized)) {
+                    scriptRegisteredGroups.add(normalized);
+                }
+            }
+        }
+
+        public List<List<List<Double>>> getScriptQuadVertexLists(Object parts) {
+            List<List<List<Double>>> out = new ArrayList<>();
+            if (mqoModel == null || parts == null) return out;
+            List<String> groupNames = extractGroupNames(parts);
+            if (groupNames.isEmpty()) return out;
+            Set<String> groups = new LinkedHashSet<>();
+            for (String name : groupNames) {
+                String normalized = normalizeLegacyGroupName(name);
+                if (!normalized.isEmpty()) {
+                    groups.add(normalized);
+                }
+            }
+            if (groups.isEmpty()) return out;
+            for (float[] q : mqoModel.getGroupQuadCorners(groups)) {
+                if (q == null || q.length < 12) continue;
+                q = sortQuadCornersForLegacyOverlay(q);
+                List<List<Double>> face = new ArrayList<>(4);
+                for (int i = 0; i < 4; i++) {
+                    List<Double> vertex = new ArrayList<>(3);
+                    vertex.add((double) q[i * 3]);
+                    vertex.add((double) q[i * 3 + 1]);
+                    vertex.add((double) q[i * 3 + 2]);
+                    face.add(vertex);
+                }
+                out.add(face);
+            }
+            return out;
+        }
+
+        private static float[] sortQuadCornersForLegacyOverlay(float[] q) {
+            float cx = 0.0F;
+            float cy = 0.0F;
+            float cz = 0.0F;
+            for (int i = 0; i < 4; i++) {
+                cx += q[i * 3];
+                cy += q[i * 3 + 1];
+                cz += q[i * 3 + 2];
+            }
+            cx *= 0.25F;
+            cy *= 0.25F;
+            cz *= 0.25F;
+
+            float e1x = q[3] - q[0];
+            float e1y = q[4] - q[1];
+            float e1z = q[5] - q[2];
+            float e2x = q[9] - q[0];
+            float e2y = q[10] - q[1];
+            float e2z = q[11] - q[2];
+            float nx = e1y * e2z - e1z * e2y;
+            float ny = e1z * e2x - e1x * e2z;
+            float nz = e1x * e2y - e1y * e2x;
+            float nl = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+            if (nl < 1.0E-6F) {
+                return q;
+            }
+            nx /= nl;
+            ny /= nl;
+            nz /= nl;
+
+            float upRefX = 0.0F;
+            float upRefY = 1.0F;
+            float upRefZ = 0.0F;
+            if (Math.abs(ny) > 0.98F) {
+                upRefX = 0.0F;
+                upRefY = 0.0F;
+                upRefZ = 1.0F;
+            }
+            float rx = upRefY * nz - upRefZ * ny;
+            float ry = upRefZ * nx - upRefX * nz;
+            float rz = upRefX * ny - upRefY * nx;
+            float rl = (float) Math.sqrt(rx * rx + ry * ry + rz * rz);
+            if (rl < 1.0E-6F) {
+                return q;
+            }
+            rx /= rl;
+            ry /= rl;
+            rz /= rl;
+            float ux = ny * rz - nz * ry;
+            float uy = nz * rx - nx * rz;
+            float uz = nx * ry - ny * rx;
+
+            java.util.List<float[]> vertices = new java.util.ArrayList<>(4);
+            for (int i = 0; i < 4; i++) {
+                float vx = q[i * 3];
+                float vy = q[i * 3 + 1];
+                float vz = q[i * 3 + 2];
+                float dx = vx - cx;
+                float dy = vy - cy;
+                float dz = vz - cz;
+                float localX = dx * rx + dy * ry + dz * rz;
+                float localY = dx * ux + dy * uy + dz * uz;
+                vertices.add(new float[] { vx, vy, vz, localX, localY });
+            }
+            vertices.sort((a, b) -> {
+                int byY = Float.compare(b[4], a[4]);
+                return byY != 0 ? byY : Float.compare(a[3], b[3]);
+            });
+            java.util.List<float[]> top = new java.util.ArrayList<>(vertices.subList(0, 2));
+            java.util.List<float[]> bottom = new java.util.ArrayList<>(vertices.subList(2, 4));
+            top.sort(java.util.Comparator.comparingDouble(v -> v[3]));
+            bottom.sort(java.util.Comparator.comparingDouble(v -> v[3]));
+
+            float[] out = new float[12];
+            float[][] ordered = new float[][] { top.get(0), bottom.get(0), bottom.get(1), top.get(1) };
+            for (int i = 0; i < 4; i++) {
+                out[i * 3] = ordered[i][0];
+                out[i * 3 + 1] = ordered[i][1];
+                out[i * 3 + 2] = ordered[i][2];
+            }
+            return out;
+        }
+
+        public void tessellatorStart() {
+            disableReplayCacheForFrame();
+            tessellatorVertices.clear();
+            tessColorRed = colorRed;
+            tessColorGreen = colorGreen;
+            tessColorBlue = colorBlue;
+            tessColorAlpha = colorAlpha;
+            tessNormalX = 0.0F;
+            tessNormalY = 1.0F;
+            tessNormalZ = 0.0F;
+            tessNormalSet = false;
+        }
+
+        public void tessellatorAddVertex(double x, double y, double z) {
+            tessellatorAddVertexWithUV(x, y, z, 0.0D, 0.0D);
+        }
+
+        public void tessellatorAddVertexWithUV(double x, double y, double z, double u, double v) {
+            tessellatorVertices.add(new TessVertex((float) x, (float) y, (float) z, mapU((float) u, 0.0F, 1.0F), mapV((float) v, 0.0F, 1.0F)));
+        }
+
+        public void tessellatorSetColor(double r, double g, double b, double a) {
+            tessColorRed = Mth.clamp((float) r, 0.0F, 1.0F);
+            tessColorGreen = Mth.clamp((float) g, 0.0F, 1.0F);
+            tessColorBlue = Mth.clamp((float) b, 0.0F, 1.0F);
+            tessColorAlpha = Mth.clamp((float) a, 0.0F, 1.0F);
+        }
+
+        public void tessellatorSetNormal(double x, double y, double z) {
+            tessNormalX = (float) x;
+            tessNormalY = (float) y;
+            tessNormalZ = (float) z;
+            tessNormalSet = true;
+        }
+
+        public void tessellatorDraw() {
+            if (tessellatorVertices.isEmpty() || poseStack == null || buffer == null) {
+                tessellatorVertices.clear();
+                return;
+            }
+            onBatchRendered();
+            net.minecraft.resources.ResourceLocation texture = boundTexture;
+            if (texture == null) {
+                texture = MqoModelLoader.getScriptTexture("minecraft", "textures/block/white_wool.png", 0);
+            }
+            com.mojang.blaze3d.vertex.VertexConsumer vc =
+                buffer.getBuffer(net.minecraft.client.renderer.RenderType.entityTranslucent(texture));
+            org.joml.Matrix4f mat = poseStack.last().pose();
+            int r = Math.round(Mth.clamp(tessColorRed, 0.0F, 1.0F) * 255.0F);
+            int g = Math.round(Mth.clamp(tessColorGreen, 0.0F, 1.0F) * 255.0F);
+            int b = Math.round(Mth.clamp(tessColorBlue, 0.0F, 1.0F) * 255.0F);
+            int a = Math.round(Mth.clamp(tessColorAlpha, 0.0F, 1.0F) * 255.0F);
+            final float overlayBias = 0.0035F;
+            for (int i = 0; i + 3 < tessellatorVertices.size(); i += 4) {
+                TessVertex v0 = tessellatorVertices.get(i);
+                TessVertex v1 = tessellatorVertices.get(i + 1);
+                TessVertex v3 = tessellatorVertices.get(i + 3);
+                float nx = tessNormalX;
+                float ny = tessNormalY;
+                float nz = tessNormalZ;
+                if (!tessNormalSet) {
+                    float e1x = v1.x - v0.x, e1y = v1.y - v0.y, e1z = v1.z - v0.z;
+                    float e2x = v3.x - v0.x, e2y = v3.y - v0.y, e2z = v3.z - v0.z;
+                    nx = e1y * e2z - e1z * e2y;
+                    ny = e1z * e2x - e1x * e2z;
+                    nz = e1x * e2y - e1y * e2x;
+                    float nl = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+                    if (nl > 1.0E-6F) {
+                        nx /= nl;
+                        ny /= nl;
+                        nz /= nl;
+                    } else {
+                        nx = 0.0F;
+                        ny = 1.0F;
+                        nz = 0.0F;
+                    }
+                }
+                for (int c = 0; c < 4; c++) {
+                    TessVertex vtx = tessellatorVertices.get(i + c);
+                    vc.addVertex(mat,
+                            vtx.x + nx * overlayBias,
+                            vtx.y + ny * overlayBias,
+                            vtx.z + nz * overlayBias)
+                        .setColor(r, g, b, a)
+                        .setUv(vtx.u, vtx.v)
+                        .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                        .setLight(packedLight)
+                        .setNormal(nx, ny, nz);
+                }
+            }
+            tessellatorVertices.clear();
+        }
+
+        /**
+         * 指定グループ(LCD面)の各クワッド面の上に、gif/画像テクスチャをフルUV(0-1)で貼り付けて描画する。
+         * E259 等の CustomMonitor_LCD は別オーバーレイモデルを NGTLib 直接GLで重ねるが、その API は
+         * 1.21 に無いため、ここでは LCD 面の実頂点に直接 gif クワッドを描く(発光・面法線方向に微小オフセット)。
+         * @param groupsCsv 対象グループ名(カンマ/スペース区切り, 例 "lcd1")
+         */
+        public void renderGifOnGroup(String groupsCsv, String domain, String path, int frameIndex) {
+            if (mqoModel == null || poseStack == null || buffer == null || groupsCsv == null) return;
+            java.util.Set<String> groups = new java.util.HashSet<>();
+            for (String g : groupsCsv.split("[ ,]+")) {
+                if (!g.isBlank()) groups.add(g.trim());
+            }
+            renderTextureWindowOnNormalizedGroupsWithRecord(groups, domain, path, frameIndex,
+                0.0F, 0.0F, 1.0F, 1.0F);
+        }
+
+        public void renderGifOnParts(Object parts, String domain, String path, int frameIndex) {
+            if (parts == null) return;
+            java.util.List<String> groupNames = extractGroupNames(parts);
+            if (groupNames.isEmpty()) return;
+            java.util.Set<String> groups = new java.util.LinkedHashSet<>();
+            for (String name : groupNames) {
+                String normalized = normalizeLegacyGroupName(name);
+                if (!normalized.isEmpty()) {
+                    groups.add(normalized);
+                }
+            }
+            renderTextureWindowOnNormalizedGroupsWithRecord(groups, domain, path, frameIndex,
+                0.0F, 0.0F, 1.0F, 1.0F);
+        }
+
+        public void renderTextureWindowOnParts(Object parts, String domain, String path, int frameIndex,
+                                               double u0, double v0, double u1, double v1) {
+            if (parts == null || path == null || path.isBlank()) return;
+            java.util.List<String> groupNames = extractGroupNames(parts);
+            if (groupNames.isEmpty()) return;
+            java.util.Set<String> groups = new java.util.LinkedHashSet<>();
+            for (String name : groupNames) {
+                String normalized = normalizeLegacyGroupName(name);
+                if (!normalized.isEmpty()) {
+                    groups.add(normalized);
+                }
+            }
+            if (groups.isEmpty()) return;
+            renderTextureWindowOnNormalizedGroupsWithRecord(groups, domain, path, frameIndex,
+                (float) u0, (float) v0, (float) u1, (float) v1);
+        }
+
+        private void renderTextureWindowOnNormalizedGroupsWithRecord(java.util.Set<String> groups, String domain, String path,
+                                                                     int frameIndex, float u0, float v0, float u1, float v1) {
+            if (groups == null || groups.isEmpty() || path == null || path.isBlank()) return;
+            disableReplayCacheForFrame();
+            if (!replaying) {
+                String record = String.join(",", groups) + "\n"
+                    + (domain == null || domain.isBlank() ? "minecraft" : domain) + "\n"
+                    + path;
+                recordOp(OP_RENDER_TEXTURE_WINDOW, frameIndex, u0, v0, u1, v1, record, ' ');
+            }
+            renderTextureWindowOnNormalizedGroups(groups, domain, path, frameIndex, u0, v0, u1, v1);
+        }
+
+        private void renderTextureWindowFromRecord(String record, int frameIndex,
+                                                   float u0, float v0, float u1, float v1) {
+            if (record == null || record.isBlank()) return;
+            String[] parts = record.split("\\n", 3);
+            if (parts.length < 3) return;
+            java.util.Set<String> groups = new java.util.LinkedHashSet<>();
+            for (String group : parts[0].split(",")) {
+                if (!group.isBlank()) {
+                    groups.add(group.trim());
+                }
+            }
+            renderTextureWindowOnNormalizedGroups(groups, parts[1], parts[2], frameIndex, u0, v0, u1, v1);
+        }
+
+        private void renderTextureWindowOnNormalizedGroups(java.util.Set<String> groups, String domain, String path,
+                                                           int frameIndex, float u0, float v0, float u1, float v1) {
+            renderTexturedQuadsOnNormalizedGroups(groups, domain, path, frameIndex, u0, v0, u1, v1);
+        }
+
+        private void renderGifOnNormalizedGroups(java.util.Set<String> groups, String domain, String path, int frameIndex) {
+            renderTexturedQuadsOnNormalizedGroups(groups, domain, path, frameIndex, 0.0F, 0.0F, 1.0F, 1.0F);
+        }
+
+        private void renderTexturedQuadsOnNormalizedGroups(java.util.Set<String> groups, String domain, String path,
+                                                           int frameIndex, float u0, float v0, float u1, float v1) {
+            if (mqoModel == null || poseStack == null || buffer == null || groups == null || groups.isEmpty()) return;
+            java.util.List<float[]> quads = mqoModel.getGroupQuadCorners(groups);
+            if (quads.isEmpty()) return;
+            onBatchRendered();
+            net.minecraft.resources.ResourceLocation tex =
+                MqoModelLoader.getScriptTexture(domain == null || domain.isBlank() ? "minecraft" : domain, path, frameIndex);
+            com.mojang.blaze3d.vertex.VertexConsumer vc =
+                buffer.getBuffer(net.minecraft.client.renderer.RenderType.entityTranslucent(tex));
+            org.joml.Matrix4f mat = poseStack.last().pose();
+            int light = packedLight;
+            for (float[] q : quads) {
+                q = orientOverlayQuad(q);
+                // 面法線(隅0→1, 0→3 の外積)方向へ微小オフセットして z-fight 回避
+                float e1x = q[3] - q[0], e1y = q[4] - q[1], e1z = q[5] - q[2];
+                float e2x = q[9] - q[0], e2y = q[10] - q[1], e2z = q[11] - q[2];
+                float nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+                float nl = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+                if (nl > 1.0E-6F) { nx /= nl; ny /= nl; nz /= nl; } else { nx = ny = nz = 0; }
+                float off = 0.003F;
+                float[][] uv = {{u0, v0}, {u0, v1}, {u1, v1}, {u1, v0}};
+                for (int c = 0; c < 4; c++) {
+                    float vx = q[c * 3] + nx * off, vy = q[c * 3 + 1] + ny * off, vz = q[c * 3 + 2] + nz * off;
+                    vc.addVertex(mat, vx, vy, vz)
+                        .setColor(255, 255, 255, 255)
+                        .setUv(uv[c][0], uv[c][1])
+                        .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                        .setLight(light)
+                        .setNormal(nx, ny, nz);
+                }
+            }
+        }
+
+        private static float[] orientOverlayQuad(float[] q) {
+            if (q == null || q.length < 12) {
+                return q;
+            }
+            float e1x = q[3] - q[0], e1y = q[4] - q[1], e1z = q[5] - q[2];
+            float e2x = q[9] - q[0], e2y = q[10] - q[1], e2z = q[11] - q[2];
+            float nx = e1y * e2z - e1z * e2y;
+            float ny = e1z * e2x - e1x * e2z;
+            float nz = e1x * e2y - e1y * e2x;
+            float nl = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+            if (nl > 1.0E-6F) {
+                nx /= nl; ny /= nl; nz /= nl;
+            } else {
+                nx = 0; ny = 1; nz = 0;
+            }
+
+            float upx = 0.0F, upy = 1.0F, upz = 0.0F;
+            if (Math.abs(ny) > 0.65F) {
+                upx = 0.0F; upy = 0.0F; upz = -1.0F;
+            }
+            float dot = upx * nx + upy * ny + upz * nz;
+            upx -= nx * dot; upy -= ny * dot; upz -= nz * dot;
+            float ul = (float) Math.sqrt(upx * upx + upy * upy + upz * upz);
+            if (ul <= 1.0E-6F) {
+                upx = 0.0F; upy = 0.0F; upz = -1.0F;
+                dot = upx * nx + upy * ny + upz * nz;
+                upx -= nx * dot; upy -= ny * dot; upz -= nz * dot;
+                ul = (float) Math.sqrt(upx * upx + upy * upy + upz * upz);
+            }
+            if (ul > 1.0E-6F) {
+                upx /= ul; upy /= ul; upz /= ul;
+            }
+            float rx = upy * nz - upz * ny;
+            float ry = upz * nx - upx * nz;
+            float rz = upx * ny - upy * nx;
+            float rl = (float) Math.sqrt(rx * rx + ry * ry + rz * rz);
+            if (rl > 1.0E-6F) {
+                rx /= rl; ry /= rl; rz /= rl;
+            }
+
+            float cx = 0, cy = 0, cz = 0;
+            for (int i = 0; i < 4; i++) {
+                cx += q[i * 3]; cy += q[i * 3 + 1]; cz += q[i * 3 + 2];
+            }
+            cx *= 0.25F; cy *= 0.25F; cz *= 0.25F;
+
+            int tl = -1, bl = -1, br = -1, tr = -1;
+            float bestTl = -Float.MAX_VALUE, bestBl = -Float.MAX_VALUE;
+            float bestBr = -Float.MAX_VALUE, bestTr = -Float.MAX_VALUE;
+            for (int i = 0; i < 4; i++) {
+                float dx = q[i * 3] - cx, dy = q[i * 3 + 1] - cy, dz = q[i * 3 + 2] - cz;
+                float su = dx * rx + dy * ry + dz * rz;
+                float sv = dx * upx + dy * upy + dz * upz;
+                float sTl = -su + sv, sBl = -su - sv, sBr = su - sv, sTr = su + sv;
+                if (sTl > bestTl) { bestTl = sTl; tl = i; }
+                if (sBl > bestBl) { bestBl = sBl; bl = i; }
+                if (sBr > bestBr) { bestBr = sBr; br = i; }
+                if (sTr > bestTr) { bestTr = sTr; tr = i; }
+            }
+            if (tl < 0 || bl < 0 || br < 0 || tr < 0) {
+                return q;
+            }
+            float[] out = new float[12];
+            int[] order = {tl, bl, br, tr};
+            for (int i = 0; i < 4; i++) {
+                int src = order[i] * 3;
+                out[i * 3] = q[src];
+                out[i * 3 + 1] = q[src + 1];
+                out[i * 3 + 2] = q[src + 2];
+            }
+            return out;
         }
 
         public void bindAnimatedScriptTexture(String domain, String path, double tick, double fps) {
+            disableReplayCacheForFrame();
             boundTexture = MqoModelLoader.getScriptTextureByTick(domain, path, tick, fps);
         }
 
@@ -2790,6 +3540,29 @@ public class TrainScriptSystem {
 
         private static String readTextureComponent(Object texture, String methodName, String... fieldNames) {
             try {
+                java.lang.reflect.Method hasMember = texture.getClass().getMethod("hasMember", String.class);
+                java.lang.reflect.Method getMember = texture.getClass().getMethod("getMember", String.class);
+                if (Boolean.TRUE.equals(hasMember.invoke(texture, methodName))) {
+                    Object fn = getMember.invoke(texture, methodName);
+                    if (fn != null) {
+                        try {
+                            Object value = fn.getClass().getMethod("execute", Object[].class).invoke(fn, (Object) new Object[0]);
+                            if (value != null) return String.valueOf(value);
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                for (String fieldName : fieldNames) {
+                    if (Boolean.TRUE.equals(hasMember.invoke(texture, fieldName))) {
+                        Object value = getMember.invoke(texture, fieldName);
+                        if (value != null) {
+                            return String.valueOf(value);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+            try {
                 Object value = texture.getClass().getMethod(methodName).invoke(texture);
                 if (value != null) {
                     return String.valueOf(value);
@@ -2820,6 +3593,8 @@ public class TrainScriptSystem {
          */
         public void enableLighting() {
             this.packedLight = basePackedLight;
+            this.lightmapMaxForced = false;
+            recordOp(OP_ENABLE_LIGHTING, 0, 0, 0, 0, 0, null, ' ');
         }
 
         /**
@@ -2828,8 +3603,12 @@ public class TrainScriptSystem {
         public void setBrightness(Object value) {
             if (value instanceof Number number) {
                 this.packedLight = number.intValue();
+                this.lightmapMaxForced = false;
+                recordOp(OP_SET_BRIGHTNESS, this.packedLight, 0, 0, 0, 0, null, ' ');
             } else {
                 this.packedLight = basePackedLight;
+                this.lightmapMaxForced = false;
+                recordOp(OP_SET_BRIGHTNESS, this.packedLight, 0, 0, 0, 0, null, ' ');
             }
         }
 
@@ -2838,28 +3617,19 @@ public class TrainScriptSystem {
          */
         public void setLightmapMaxBrightness() {
             this.packedLight = 0x00F000F0;
+            this.lightmapMaxForced = true;
             recordOp(OP_SET_LIGHTMAP_MAX, 0, 0, 0, 0, 0, null, ' ');
         }
 
         @SuppressWarnings("unchecked")
         public void renderParts(Object groups) {
             if (mqoModel == null || poseStack == null || buffer == null) {
-                if (renderPartsCalls < 50) {
-                    RealTrainModUnofficial.LOGGER.info(
-                        "[renderParts:SKIP] mqoModel={} poseStack={} buffer={} groups={}",
-                        mqoModel != null, poseStack != null, buffer != null,
-                        groups == null ? "null" : groups.toString().substring(0, Math.min(60, groups.toString().length())));
-                }
                 return;
             }
             renderPartsCalls++;
-            if (renderPartsCalls <= 3) {
-                String gs = groups == null ? "null" : groups.toString();
-                RealTrainModUnofficial.LOGGER.info(
-                    "[renderParts:CALL#{}] groups={}",
-                    renderPartsCalls, gs.substring(0, Math.min(80, gs.length())));
-            }
             int baseDepth = matrixDepth;
+            int savedPackedLight = packedLight;
+            boolean savedLightmapMaxForced = lightmapMaxForced;
             try {
                 // 文字列入力時はキャッシュ参照。SL の動軸スクリプト等で
                 // 毎フレーム同じ groupsStr が来るため、解析処理を 1 回に削減。
@@ -2868,7 +3638,8 @@ public class TrainScriptSystem {
                 Set<String> presentGroupNames;
                 boolean legacyDisplaySelection;
                 if (groups instanceof String s) {
-                    ParsedGroupSet cached = renderPartsParseCache.get(s);
+                    String parseCacheKey = currentPass + "\u0000" + s;
+                    ParsedGroupSet cached = renderPartsParseCache.get(parseCacheKey);
                     if (cached == null) {
                         List<String> raw = expandSerializedGroupNames(s);
                         raw = stripLegacyPlaceholderGroups(raw);
@@ -2877,6 +3648,8 @@ public class TrainScriptSystem {
                             String n = normalizeLegacyGroupName(g);
                             if (n.equals("shadow") || n.startsWith("shadow_") || n.endsWith("_shadow")) continue;
                             if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) continue;
+                            if (currentPass >= 2 && isLightOffGroup(n)) continue;
+                            if (shouldSuppressOerMseScriptHoodGroup(n)) continue;
                             filtered.add(g);
                         }
                         boolean legacy = isLegacyDisplaySelection(filtered);
@@ -2892,7 +3665,7 @@ public class TrainScriptSystem {
                         boolean hasEmissive = false;
                         for (String g : filtered) { if (isEmissiveGroup(g)) { hasEmissive = true; break; } }
                         cached = new ParsedGroupSet(filtered, norm, present, legacy, hasEmissive);
-                        renderPartsParseCache.put(s, cached);
+                        renderPartsParseCache.put(parseCacheKey, cached);
                     }
                     if (cached.empty) {
                         return;
@@ -2928,6 +3701,8 @@ public class TrainScriptSystem {
                             String n = normalizeLegacyGroupName(g);
                             if (n.equals("shadow") || n.startsWith("shadow_") || n.endsWith("_shadow")) return false;
                             if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) return false;
+                            if (currentPass >= 2 && isLightOffGroup(n)) return false;
+                            if (shouldSuppressOerMseScriptHoodGroup(n)) return false;
                             return true;
                         })
                         .collect(Collectors.toList());
@@ -2951,19 +3726,29 @@ public class TrainScriptSystem {
                         .filter(mqoModel::hasGroupNamed)
                         .collect(Collectors.toCollection(LinkedHashSet::new));
                 }
+                if (currentPass >= 2) {
+                    normalizedNames = filterLegacyScriptEmissiveGroups(normalizedNames);
+                    presentGroupNames = normalizedNames.stream()
+                        .filter(mqoModel::hasGroupNamed)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                    if (normalizedNames.isEmpty() || presentGroupNames.isEmpty()) {
+                        return;
+                    }
+                }
                 if (currentPass == 1) {
                     scriptedTranslucentGroups.addAll(presentGroupNames);
-                } else {
+                } else if (currentPass < 2) {
                     scriptedOpaqueGroups.addAll(presentGroupNames);
                 }
+                int renderPackedLight = effectivePackedLightForScriptParts(presentGroupNames);
                 currentMatId = 0;
                 if (legacyDisplaySelection) {
-                    boolean boundRollsign = bindLegacyRollsignTextureIfPresent(groupNames);
+                    boolean boundRollsign = false;
                     try {
                         mqoModel.renderNamedGroups(
                             poseStack,
                             buffer,
-                            packedLight,
+                            renderPackedLight,
                             overlay,
                             false,
                             normalizedNames,
@@ -2979,16 +3764,16 @@ public class TrainScriptSystem {
                     if (currentPass >= 2) {
                         // Emissive pass: RTM light groups (lightF, lightB etc.) may be either
                         // opaque or translucent batches. Render both so nothing is skipped.
-                        mqoModel.renderNamedGroups(poseStack, buffer, packedLight, overlay, false, normalizedNames, this);
-                        mqoModel.renderNamedGroups(poseStack, buffer, packedLight, overlay, true, normalizedNames, this);
+                        mqoModel.renderNamedGroups(poseStack, buffer, renderPackedLight, overlay, false, normalizedNames, this);
+                        mqoModel.renderNamedGroups(poseStack, buffer, renderPackedLight, overlay, true, normalizedNames, this);
                     } else {
                         if (currentPass <= 0) {
-                            mqoModel.renderNamedGroups(poseStack, buffer, packedLight, overlay, false, normalizedNames, this);
+                            mqoModel.renderNamedGroups(poseStack, buffer, renderPackedLight, overlay, false, normalizedNames, this);
                         } else {
                             mqoModel.renderNamedGroups(
                                 poseStack,
                                 buffer,
-                                packedLight,
+                                renderPackedLight,
                                 overlay,
                                 true,
                                 normalizedNames,
@@ -2998,6 +3783,8 @@ public class TrainScriptSystem {
                     }
                 }
             } finally {
+                packedLight = savedPackedLight;
+                lightmapMaxForced = savedLightmapMaxForced;
                 // このrenderParts呼び出し内で増えた分だけ戻す
                 while (matrixDepth > baseDepth) {
                     poseStack.popPose();
@@ -3006,8 +3793,89 @@ public class TrainScriptSystem {
             }
         }
 
+        private int effectivePackedLightForScriptParts(Set<String> presentGroupNames) {
+            if (!(currentEntity instanceof TrainEntity train)) {
+                return packedLight;
+            }
+            if (lightmapMaxForced) {
+                return packedLight;
+            }
+            if (packedLight == basePackedLight) {
+                return packedLight;
+            }
+            if (presentGroupNames == null || presentGroupNames.isEmpty()) {
+                return basePackedLight;
+            }
+            for (String name : presentGroupNames) {
+                String lower = name == null ? "" : name.toLowerCase(Locale.ROOT);
+                if (!isInteriorEmissionGroup(lower) && !isLegacyDisplayGroup(lower)) {
+                    return basePackedLight;
+                }
+            }
+            if (!train.isInteriorLightOn()) {
+                for (String name : presentGroupNames) {
+                    String lower = name == null ? "" : name.toLowerCase(Locale.ROOT);
+                    if (isInteriorEmissionGroup(lower)) {
+                        return basePackedLight;
+                    }
+                }
+            }
+            return packedLight;
+        }
+
         private static String normalizeLegacyGroupName(String groupName) {
             return groupName == null ? "" : groupName.trim().toLowerCase(Locale.ROOT);
+        }
+
+        private static boolean isLightOffGroup(String lowerGroupName) {
+            if (lowerGroupName == null || lowerGroupName.isBlank()) {
+                return false;
+            }
+            boolean lightLike = lowerGroupName.contains("light") || lowerGroupName.contains("lamp");
+            if (!lightLike) {
+                return false;
+            }
+            return lowerGroupName.endsWith("_off")
+                || lowerGroupName.endsWith("-off")
+                || lowerGroupName.endsWith("off")
+                || lowerGroupName.contains("_off_")
+                || lowerGroupName.contains("-off-");
+        }
+
+        private boolean shouldSuppressOerMseScriptHoodGroup(String lowerGroupName) {
+            return false;
+        }
+
+        private TrainEntity resolveCurrentTrainEntity() {
+            if (currentEntity instanceof TrainEntity train) {
+                return train;
+            }
+            if (currentEntity instanceof LegacyScriptExecutor exec) {
+                return exec.getTrain();
+            }
+            if (currentEntity != null) {
+                try {
+                    Object train = currentEntity.getClass().getMethod("getTrain").invoke(currentEntity);
+                    if (train instanceof TrainEntity resolved) {
+                        return resolved;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            return null;
+        }
+
+        private boolean isFormationMiddle(TrainEntity train) {
+            if (train == null) {
+                return false;
+            }
+            try {
+                java.util.List<TrainEntity> trains = train.getFormationTrainsForDisplay();
+                int index = trains.indexOf(train);
+                return trains.size() > 1 && index > 0 && index < trains.size() - 1;
+            } catch (Exception ignored) {
+                return false;
+            }
         }
 
         private List<String> stripLegacyPlaceholderGroups(List<String> groupNames) {
@@ -3113,6 +3981,55 @@ public class TrainScriptSystem {
             return true;
         }
 
+        private Set<String> filterLegacyScriptEmissiveGroups(Set<String> groupNames) {
+            if (groupNames == null || groupNames.isEmpty()) {
+                return groupNames;
+            }
+            TrainEntity train = currentEntity instanceof TrainEntity t ? t : null;
+            boolean interiorOn = train != null && train.isInteriorLightOn();
+            return groupNames.stream()
+                .filter(name -> shouldRenderLegacyScriptEmissiveGroup(train, name, interiorOn))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        }
+
+        private boolean shouldRenderLegacyScriptEmissiveGroup(TrainEntity train, String groupName, boolean interiorOn) {
+            if (groupName == null || groupName.isBlank()) {
+                return false;
+            }
+            String lower = groupName.toLowerCase(Locale.ROOT);
+            if (train != null) {
+                // For train vehicles, legacy pass > 1 must not turn exterior body/light
+                // meshes into daylight/fullbright flashes. Interior light is the only
+                // train-wide emissive surface here; headlights and destination signs are
+                // rendered normally in pass 0/1 and should not brighten the shell.
+                return interiorOn && isInteriorEmissionGroup(lower);
+            }
+            if (isLegacyDisplayGroup(lower)) {
+                return true;
+            }
+            if (isInteriorEmissionGroup(lower)) {
+                return interiorOn;
+            }
+            if (lower.matches("lamp_\\d+")) {
+                return false;
+            }
+            if (lower.contains("doorlamp")) {
+                return false;
+            }
+            if (lower.contains("light") || lower.contains("lamp") || lower.contains("marker")) {
+                return shouldRenderLightGroup(train, lower) && !isLightOffGroup(lower);
+            }
+            return false;
+        }
+
+        private boolean isInteriorEmissionGroup(String lowerGroupName) {
+            return lowerGroupName.contains("light")
+                || lowerGroupName.contains("lamp")
+                || lowerGroupName.contains("_ceil")
+                || lowerGroupName.contains("led_box")
+                || lowerGroupName.contains("led");
+        }
+
         private boolean bindLegacyRollsignTextureIfPresent(List<String> groupNames) {
             if (!(currentEntity instanceof TrainEntity train)) {
                 return false;
@@ -3161,12 +4078,12 @@ public class TrainScriptSystem {
         }
 
         public boolean hasScriptRenderedGroups() {
-            // フレーム内でスクリプトが実際に描画したグループがあるときのみ baked から除外する。
-            // 旧戻し版。スクリプトが動いていないと body が完全に消えるため。
-            if (scriptedOpaqueGroups.isEmpty() && scriptedTranslucentGroups.isEmpty()) {
-                return false;
-            }
-            return true;
+            // RTM scripts own every group registered via registerParts().
+            // Even when a script intentionally skips a registered group this frame,
+            // baked rendering must not draw it back in (MSE hood/end parts, car-type variants).
+            return !scriptRegisteredGroups.isEmpty()
+                || !scriptedOpaqueGroups.isEmpty()
+                || !scriptedTranslucentGroups.isEmpty();
         }
 
         /**
@@ -3190,6 +4107,9 @@ public class TrainScriptSystem {
             if (normalized.equalsIgnoreCase("shadow")) {
                 return false;
             }
+            if (shouldSuppressOerMseScriptHoodGroup(normalized)) {
+                return false;
+            }
             // 角度曲げ変種 (body-30 / body-180(mx) / bogie1-90 / bogie2-60 等、角度数字付き) は
             // RTM の連結曲げ用代替メッシュ。移植版には曲げ処理が無く、原点姿勢で描くと翼状/斜めに
             // 散乱する。直線の単行列車では一切描かない (台車ルールより前に判定。bogie2-60 もここで除外)。
@@ -3201,18 +4121,23 @@ public class TrainScriptSystem {
             // サイレント失敗・座標バグ・getWheelRotationR 未実装等で見えなくなる事例が
             // 多発するため、スクリプト描画と併せて baked からも必ず描く。
             // (二重描画になるが、車輪が消えるよりは重なって見える方を優先 — ユーザー要望)
-            boolean isBogieLike = normalized.contains("bogie")
-                || normalized.contains("wheel")
-                || normalized.contains("truck")
-                || normalized.startsWith("daisya")
-                || normalized.startsWith("台車");
+            boolean isBogieLike = isBogieLikeGroup(normalized);
             if (isBogieLike) {
-                return true;
+                return !scriptedOpaqueGroups.contains(normalized)
+                    && !scriptedTranslucentGroups.contains(normalized);
             }
             // Groups registered by the script in init() are fully managed by it —
             // skip them in baked render even if they weren't rendered this frame
             // (e.g. body02 when CarType="01": script skips it, baked must too).
             if (scriptRegisteredGroups.contains(normalized)) {
+                return false;
+            }
+            // RTM script は on/off、号車別、表示種別の片方だけを render() で選ぶ。
+            // 直接 registerParts されていない兄弟 group を baked が描くと、
+            // MSE の幌、スペーシアの急行灯、床下板や表示器の別状態が復活する。
+            // そのため script が同じ「切替ファミリー」を 1 つでも登録している場合、
+            // 未登録の兄弟も script 管理として baked から落とす。
+            if (scriptRegisteredAnyInSelectorFamily(normalized)) {
                 return false;
             }
             // "type" セレクタ変種 (type_1 / type_180 / type0 等) は RTM が車種設定で 1 つだけ
@@ -3237,6 +4162,83 @@ public class TrainScriptSystem {
             return false;
         }
 
+        private boolean currentTrainHasSeparateBogieModel() {
+            if (!(currentEntity instanceof TrainEntity train)) {
+                return false;
+            }
+            VehicleDefinition def = VehicleRegistry.getById(train.getVehicleId());
+            return def != null && def.getBogies().stream()
+                .anyMatch(b -> b.modelFile() != null && !b.modelFile().isBlank());
+        }
+
+        private static boolean isBogieLikeGroup(String normalized) {
+            if (normalized == null || normalized.isBlank()) {
+                return false;
+            }
+            return normalized.contains("bogie")
+                || normalized.contains("wheel")
+                || normalized.contains("truck")
+                || normalized.contains("daisya")
+                || normalized.contains("daisha")
+                || normalized.contains("sharin")
+                || normalized.startsWith("台車");
+        }
+
+        private boolean scriptRegisteredAnyInSelectorFamily(String normalizedGroupName) {
+            if (scriptRegisteredGroups.isEmpty()) {
+                return false;
+            }
+            String family = selectorFamilyKey(normalizedGroupName);
+            if (family == null || family.length() < 3) {
+                return false;
+            }
+            for (String registered : scriptRegisteredGroups) {
+                String registeredFamily = selectorFamilyKey(registered);
+                if (family.equals(registeredFamily)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static String selectorFamilyKey(String groupName) {
+            if (groupName == null || groupName.isBlank()) {
+                return null;
+            }
+            String lower = groupName.trim().toLowerCase(Locale.ROOT);
+
+            // Pack-specific but stable RTM selector families.
+            if (lower.startsWith("cp6_hood")) return "cp6_hood";
+            if (lower.startsWith("cp7_hood")) return "cp7_hood";
+            if (lower.startsWith("ex16_light_f_")) return "ex16_light_f";
+            if (lower.startsWith("ex16_light_r_")) return "ex16_light_r";
+            if (lower.startsWith("doorlamp_")) return stripStateSuffix(lower);
+            if (lower.startsWith("mark_number")) return "mark_number";
+            if (lower.startsWith("mark_old")) return "mark_old";
+            if (lower.startsWith("mark_new")) return "mark_new";
+            if (lower.startsWith("under_panel")) return "under_panel";
+            if (lower.matches("under\\d+.*")) return "under";
+            if (lower.matches("notch\\d+.*")) return "notch";
+            if (lower.matches("brake\\d+.*")) return "brake";
+            if (lower.matches("lv[_-]?[fnb]")) return "lv";
+
+            // Generic state meshes used by many RTM scripts.
+            if (lower.contains("light") || lower.contains("lamp") || lower.contains("marker")) {
+                String stripped = stripStateSuffix(lower);
+                stripped = stripped.replaceAll("[_-]?\\d+$", "");
+                return stripped.length() >= 3 ? stripped : null;
+            }
+            return null;
+        }
+
+        private static String stripStateSuffix(String lowerGroupName) {
+            String stripped = lowerGroupName
+                .replaceAll("(?i)([_-]?(on|off))\\d*$", "")
+                .replaceAll("(?i)([_-]?(on|off))([_-].*)$", "$2")
+                .replaceAll("[_-]+$", "");
+            return stripped.isEmpty() ? lowerGroupName : stripped;
+        }
+
         public int getMatrixDepth() {
             return matrixDepth;
         }
@@ -3259,13 +4261,10 @@ public class TrainScriptSystem {
          */
         public float getWheelRotationR(Object entity) {
             if (entity instanceof TrainEntity train) {
-                float speedBlocksPerTick = train.getSpeed();
-                // Standard bogie wheel radius ~0.43m = ~0.43/0.3 ≈ 1.43 blocks in MQO scale
-                // Approximate: use accumulated tickCount * speed for smooth rotation
-                float wheelRadiusBlocks = 0.43F;
-                float circumference = (float) (2.0 * Math.PI * wheelRadiusBlocks);
-                float distPerTick = Math.abs(speedBlocksPerTick);
-                return (float) (((train.tickCount * distPerTick) / circumference) * 360.0);
+                // 走行距離ベースの累積回転角(TrainEntity.tick で毎tick加算)を使う。
+                // 旧実装(tickCount × 現在速度)は速度変化のたびに巨大な回転ジャンプを起こし
+                // 「速度10でも空転しまくる」原因だった。
+                return train.getWheelRotationDegrees();
             }
             if (entity instanceof LegacyScriptExecutor exec && exec.getTrain() != null) {
                 return getWheelRotationR(exec.getTrain());
@@ -3309,9 +4308,17 @@ public class TrainScriptSystem {
             scriptData.put(key, value == null ? 0 : value);
         }
 
+        public int getMCTime(Object entity) {
+            return (int) (getWorldDayTime(entity) % 24000L);
+        }
+
+        public int getMCTime() {
+            return getMCTime(currentEntity);
+        }
+
         public int getMCHour(Object entity) {
-            long dayTime = getWorldDayTime(entity);
-            return (int) ((dayTime / 20 / 60) % 24);
+            int time = getMCTime(entity);
+            return (time / 1000 + 6) % 24;
         }
 
         /**
@@ -3322,8 +4329,8 @@ public class TrainScriptSystem {
         }
 
         public int getMCMinute(Object entity) {
-            long dayTime = getWorldDayTime(entity);
-            return (int) ((dayTime / 20) % 60);
+            int time = getMCTime(entity);
+            return (int) ((time % 1000) * 0.06F);
         }
 
         /**
@@ -3342,9 +4349,19 @@ public class TrainScriptSystem {
 
         public int getLightState(Object entity) {
             if (entity instanceof InstalledObjectBlockEntity blockEntity) {
+                // 本家 MachinePartsRenderer.getLightState 準拠:
+                //   照明(LIGHT) → レッドストーン電力で 1(点灯) / -1(消灯)。
+                //     ※ TileEntityLight.isGettingPower と同じ。スクリプトは pass==2 で
+                //       state==1 のとき発光(_lightN)テクスチャを描く。
+                //   踏切(CROSSING) → 点滅カウンタ(0/1)、信号(SIGNAL) → 現示状態。
+                //     (どちらも getLightCount() が従来通り返す。)
+                if (blockEntity.getCategory()
+                        == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.LIGHT) {
+                    return blockEntity.isPowered() ? 1 : -1;
+                }
                 return blockEntity.getLightCount();
             }
-            return 0;
+            return -1;
         }
 
         private long getWorldDayTime(Object entity) {
@@ -3355,14 +4372,25 @@ public class TrainScriptSystem {
                 if (entity instanceof net.minecraft.world.level.block.entity.BlockEntity be) {
                     return be.getLevel() == null ? 0 : be.getLevel().dayTime();
                 }
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                if (mc.level != null) {
+                    return mc.level.dayTime();
+                }
             } catch (Exception ignored) {
             }
             return 0;
         }
 
         public float sigmoid(double x) {
-            float clamped = (float) Math.max(0.0D, Math.min(1.0D, x));
-            return clamped * clamped * (3.0F - 2.0F * clamped);
+            if (x <= 0.0D) {
+                return 0.0F;
+            }
+            if (x >= 1.0D) {
+                return 1.0F;
+            }
+            double centered = (x - 0.5D) * 5.0D;
+            double curved = centered / Math.sqrt(1.0D + centered * centered);
+            return (float) ((curved + 1.0D) * 0.5D);
         }
 
         public boolean isRenderingTrain() {
@@ -3410,6 +4438,7 @@ public class TrainScriptSystem {
                 poseStack.pushPose();
                 matrixDepth++;
             }
+            scriptLocalStack.push(scriptLocalOrigin);
             recordOp(OP_PUSH, 0, 0, 0, 0, 0, null, ' ');
         }
 
@@ -3418,16 +4447,52 @@ public class TrainScriptSystem {
                 poseStack.popPose();
                 matrixDepth--;
             }
+            scriptLocalOrigin = scriptLocalStack.isEmpty() ? Vec3.ZERO : scriptLocalStack.pop();
             recordOp(OP_POP, 0, 0, 0, 0, 0, null, ' ');
         }
 
         public void translate(float x, float y, float z) {
             // NaN/Infinite ガード: スクリプトが undefined を渡すと NaN になり poseStack 全体が破壊される。
             if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z)) return;
+            Vec3 applied = adjustLegacyScriptBogieTranslate(x, y, z);
             if (poseStack != null) {
-                poseStack.translate(x, y, z);
+                poseStack.translate(applied.x, applied.y, applied.z);
             }
+            scriptLocalOrigin = scriptLocalOrigin.add(applied);
             recordOp(OP_TRANSLATE, x, y, z, 0, 0, null, ' ');
+        }
+
+        private Vec3 adjustLegacyScriptBogieTranslate(float x, float y, float z) {
+            Vec3 requested = new Vec3(x, y, z);
+            if (!(currentEntity instanceof TrainEntity train)) {
+                return requested;
+            }
+            VehicleDefinition def = VehicleRegistry.getById(train.getVehicleId());
+            if (def == null || def.getBogies().isEmpty()) {
+                return requested;
+            }
+
+            Vec3 targetLocal = scriptLocalOrigin.add(requested);
+            int bestIndex = -1;
+            double bestDistance = Double.POSITIVE_INFINITY;
+            for (int i = 0; i < def.getBogies().size(); i++) {
+                Vec3 bogiePos = def.getBogies().get(i).position();
+                double dx = bogiePos.x - targetLocal.x;
+                double dy = bogiePos.y - targetLocal.y;
+                double dz = bogiePos.z - targetLocal.z;
+                double distance = dx * dx + dy * dy + dz * dz;
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+            }
+            if (bestIndex < 0 || bestDistance > 0.35D * 0.35D) {
+                return requested;
+            }
+
+            VehicleDefinition.BogieDefinition bogie = def.getBogies().get(bestIndex);
+            Vec3 corrected = train.getBogieRenderOffset(bestIndex, bogie, train.getYRot(), 1.0F);
+            return corrected.subtract(scriptLocalOrigin);
         }
 
         public void rotate(float angle, float x, float y, float z) {
@@ -3439,16 +4504,12 @@ public class TrainScriptSystem {
             }
             // 角度 0 はノーオペ - SL の rod 計算が 0 度になるフレームが多い
             if (angle == 0.0f) return;
-            // JOML の rotate{X,Y,Z} を直接呼んで Quaternionf 確保を回避。
-            // フルブライト描画なので normal 行列は未使用 → poseStack の normal 更新も不要。
-            float rad = angle * 0.017453292f; // PI/180
-            org.joml.Matrix4f pose = poseStack.last().pose();
             if (x == 1.0f && y == 0.0f && z == 0.0f) {
-                pose.rotateX(rad);
+                poseStack.mulPose(Axis.XP.rotationDegrees(angle));
             } else if (x == 0.0f && y == 1.0f && z == 0.0f) {
-                pose.rotateY(rad);
+                poseStack.mulPose(Axis.YP.rotationDegrees(angle));
             } else if (x == 0.0f && y == 0.0f && z == 1.0f) {
-                pose.rotateZ(rad);
+                poseStack.mulPose(Axis.ZP.rotationDegrees(angle));
             }
             // 任意軸は未サポート (RTM スクリプトでは使われない)
         }
@@ -4050,6 +5111,7 @@ public class TrainScriptSystem {
     /** RTM 原作の jp.ngt.ngtlib.util.NGTUtil スタブ。 */
     public static final class NGTUtilCompat {
         public long getCurrentTime() { return System.currentTimeMillis(); }
+        public long getUniqueId() { return System.nanoTime(); }
         public boolean isClient() { return true; }
         public Object getCurrentWorld() { return null; }
         public Object getCurrentPlayer() {

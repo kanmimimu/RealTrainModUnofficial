@@ -67,18 +67,6 @@ public final class ClientHooks {
         invokeClient("openScriptBlockScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
-    public static void openAtsaGroundUnitScreen(BlockPos pos) {
-        invokeClient("openAtsaGroundUnitScreen", new Class<?>[]{BlockPos.class}, pos);
-    }
-
-    public static void openAtsaSimpleBlockScreen(BlockPos pos, String title) {
-        invokeClient("openAtsaSimpleBlockScreen", new Class<?>[]{BlockPos.class, String.class}, pos, title);
-    }
-
-    public static void openAtsaTrainToolScreen(String mode) {
-        invokeClient("openAtsaTrainToolScreen", new Class<?>[]{String.class}, mode);
-    }
-
     public static void stopCrossingGateSound(Level level, BlockPos pos) {
         invokeClient("stopCrossingGateSound", new Class<?>[]{Level.class, BlockPos.class}, level, pos);
     }

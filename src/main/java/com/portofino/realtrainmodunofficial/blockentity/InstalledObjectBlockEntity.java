@@ -21,9 +21,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class InstalledObjectBlockEntity extends BlockEntity {
+    private static final int TICKET_GATE_OPEN_TICKS = 60;
+    private static final int TICKET_GATE_MOVE_TICKS = 12;
     private String definitionId = "";
     private String category = InstalledObjectCategory.LIGHT.name();
     private float yaw;
+    // 壁(横面)挿し時に碍子を横倒しにするためのピッチ(度)。0=通常(縦置き)。
+    private float mountPitch;
     private BlockPos wireStart;
     private BlockPos wireEnd;
     private boolean powered;
@@ -49,6 +53,7 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         tag.putString("DefinitionId", definitionId);
         tag.putString("Category", category);
         tag.putFloat("Yaw", yaw);
+        tag.putFloat("MountPitch", mountPitch);
         if (wireStart != null) {
             tag.putInt("WireStartX", wireStart.getX());
             tag.putInt("WireStartY", wireStart.getY());
@@ -82,6 +87,7 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         definitionId = tag.getString("DefinitionId");
         category = tag.contains("Category") ? tag.getString("Category") : InstalledObjectCategory.LIGHT.name();
         yaw = tag.getFloat("Yaw");
+        mountPitch = tag.getFloat("MountPitch");
         wireStart = tag.contains("WireStartX") ? new BlockPos(tag.getInt("WireStartX"), tag.getInt("WireStartY"), tag.getInt("WireStartZ")) : null;
         wireEnd = tag.contains("WireEndX") ? new BlockPos(tag.getInt("WireEndX"), tag.getInt("WireEndY"), tag.getInt("WireEndZ")) : null;
         powered = tag.getBoolean("Powered");
@@ -139,6 +145,15 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         return yaw;
     }
 
+    public float getMountPitch() {
+        return mountPitch;
+    }
+
+    public void setMountPitch(float mountPitch) {
+        this.mountPitch = mountPitch;
+        setChanged();
+    }
+
     public void setRenderOffset(double offsetX, double offsetY, double offsetZ) {
         this.offsetX = offsetX;
         this.offsetY = offsetY;
@@ -181,6 +196,22 @@ public class InstalledObjectBlockEntity extends BlockEntity {
 
     public int getBarMoveCount() {
         return barMoveCount;
+    }
+
+    public boolean isTicketGateOpen() {
+        return getCategory() == InstalledObjectCategory.TICKET_GATE && powered;
+    }
+
+    public void activateTicketGate() {
+        if (getCategory() != InstalledObjectCategory.TICKET_GATE) {
+            return;
+        }
+        powered = true;
+        tickCountOnActive = 0;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
     }
 
     public int getLightCount() {
@@ -318,14 +349,45 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, InstalledObjectBlockEntity be) {
-        if (!be.shouldHandleCrossingLogic()) {
-            if (level.isClientSide) {
+        if (level.isClientSide) {
+            // sound_Running を持つ設置オブジェクト(スピーカー/サイレン/踏切など)は種別を問わず、
+            // powered の間ループ再生する。実際の再生可否(powered・音名)は CrossingGateSoundManager 側で判定。
+            InstalledObjectDefinition definition = be.getDefinition();
+            String running = definition == null ? null : definition.getRunningSound();
+            if (running != null && !running.isBlank()) {
+                ClientHooks.tickCrossingGateSound(be);
+            } else {
                 ClientHooks.stopCrossingGateSound(level, pos);
             }
             return;
         }
-        if (level.isClientSide) {
-            ClientHooks.tickCrossingGateSound(be);
+        if (be.getCategory() == InstalledObjectCategory.TICKET_GATE) {
+            boolean changed = false;
+            if (be.powered) {
+                if (be.barMoveCount < 90) {
+                    be.barMoveCount = Math.min(90, be.barMoveCount + Math.max(1, 90 / TICKET_GATE_MOVE_TICKS));
+                    changed = true;
+                }
+                be.tickCountOnActive++;
+                if (be.tickCountOnActive >= TICKET_GATE_OPEN_TICKS) {
+                    be.powered = false;
+                    be.tickCountOnActive = 0;
+                    changed = true;
+                }
+            } else {
+                if (be.barMoveCount > 0) {
+                    be.barMoveCount = Math.max(0, be.barMoveCount - Math.max(1, 90 / TICKET_GATE_MOVE_TICKS));
+                    changed = true;
+                }
+            }
+            if (changed) {
+                be.setChanged();
+                level.sendBlockUpdated(pos, state, state, 3);
+            }
+            return;
+        }
+        // サーバー側: 遮断桿アニメ等は踏切ロジック対象のみ
+        if (!be.shouldHandleCrossingLogic()) {
             return;
         }
         boolean changed = false;

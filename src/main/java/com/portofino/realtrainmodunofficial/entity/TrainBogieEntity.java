@@ -222,6 +222,9 @@ public final class TrainBogieEntity extends Entity {
 
     @Override
     public @NotNull InteractionResult interact(@NotNull Player player, @NotNull InteractionHand hand) {
+        if (isHoldingTrainPlacementItem(player)) {
+            return InteractionResult.PASS;
+        }
         TrainEntity train = resolveTrain();
         if (train == null) {
             return InteractionResult.PASS;
@@ -229,6 +232,13 @@ public final class TrainBogieEntity extends Entity {
         boolean holdingCrowbar = player.getMainHandItem().is(RealTrainModUnofficialItems.CROWBAR_ITEM.get())
             || player.getOffhandItem().is(RealTrainModUnofficialItems.CROWBAR_ITEM.get());
         return train.interactWithBogie(player, getBogieIndex(), hand, holdingCrowbar);
+    }
+
+    private static boolean isHoldingTrainPlacementItem(Player player) {
+        return player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
+            || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
+            || player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get())
+            || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get());
     }
 
     @Override

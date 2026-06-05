@@ -8,7 +8,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -123,26 +122,14 @@ public class SpeakerScreen extends Screen {
             final String chosen = idStr;
             Button b = Button.builder(Component.literal(idStr), btn -> {
                     soundBox.setValue(chosen);
-                    preview(chosen); // クリックで試聴
+                    // クリックで音名を割り当てるだけ。自動試聴はしない
+                    // (ユーザー報告「割り当てた瞬間に音が流れる」対策。再生はレッドストーン信号で行う)。
                 })
                 .bounds(leftX, listTop + shown * ROW_H, BOX_W, ROW_H - 1)
                 .build();
             addRenderableWidget(b);
             candidateButtons.add(b);
             shown++;
-        }
-    }
-
-    /** その場でクライアント試聴（プレイヤー位置・非減衰）。 */
-    private void preview(String soundIdStr) {
-        ResourceLocation id = ResourceLocation.tryParse(soundIdStr.trim().toLowerCase(Locale.ROOT));
-        if (id == null) {
-            return;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.getSoundManager() != null) {
-            mc.getSoundManager().play(SimpleSoundInstance.forUI(
-                net.minecraft.sounds.SoundEvent.createVariableRangeEvent(id), 1.0F, 1.0F));
         }
     }
 
@@ -169,9 +156,7 @@ public class SpeakerScreen extends Screen {
             toast(sound.isEmpty()
                 ? ("信号強度 " + slot + " の割り当てを解除しました")
                 : ("信号強度 " + slot + " → " + sound + " を割り当てました"));
-            if (!sound.isEmpty()) {
-                preview(sound);
-            }
+            // 割当時の自動試聴は廃止(「割り当てた瞬間に音が流れる」対策)。再生はレッドストーン信号で行う。
         } catch (NumberFormatException ignored) {
             notifyNumber();
         }

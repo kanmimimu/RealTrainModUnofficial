@@ -3,7 +3,7 @@ package com.portofino.realtrainmodunofficial.item;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.ClientHooks;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
+import com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
@@ -35,6 +35,7 @@ import java.util.Locale;
 public class TrainVehicleItem extends Item {
     private static final int SPAWN_COOLDOWN_TICKS = 4;
     private static final double RAYCAST_DISTANCE = 5.0;
+    private static final double PLACEMENT_OCCUPANCY_HALF_WIDTH = 0.45D;
 
     public TrainVehicleItem() {
         super(new Properties().stacksTo(1));
@@ -44,8 +45,7 @@ public class TrainVehicleItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (level.isClientSide) {
-            // スニーク時は常に選択画面を開く。通常時はレールを見ていなければ開く。
-            if (player.isShiftKeyDown() || !isLookingAtRail(level, player)) {
+            if (!isLookingAtBlock(level, player)) {
                 ClientHooks.openTrainSelectScreen(player, stack);
             }
             return InteractionResultHolder.success(stack);
@@ -75,7 +75,12 @@ public class TrainVehicleItem extends Item {
             return InteractionResult.PASS;
         }
         if (level.isClientSide()) {
-            return InteractionResult.SUCCESS;
+            return findNearestRailSpawn(level, context.getClickedPos(), context.getClickLocation(), player.getYRot()) != null
+                ? InteractionResult.SUCCESS
+                : InteractionResult.PASS;
+        }
+        if (player.isShiftKeyDown()) {
+            return InteractionResult.PASS;
         }
         if (player.getCooldowns().isOnCooldown(this)) {
             return InteractionResult.PASS;
@@ -87,15 +92,11 @@ public class TrainVehicleItem extends Item {
         return InteractionResult.PASS;
     }
 
-    private boolean isLookingAtRail(Level level, Player player) {
+    private boolean isLookingAtBlock(Level level, Player player) {
         Vec3 start = player.getEyePosition(1.0f);
         Vec3 end = start.add(player.getViewVector(1.0f).scale(RAYCAST_DISTANCE));
         HitResult hit = level.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
-        if (hit.getType() != HitResult.Type.BLOCK) {
-            return false;
-        }
-        BlockPos pos = ((BlockHitResult) hit).getBlockPos();
-        return isRailBlock(level, pos);
+        return hit.getType() == HitResult.Type.BLOCK;
     }
 
     private boolean trySpawnTrain(Level level, Player player, ItemStack stack) {
@@ -165,7 +166,7 @@ public class TrainVehicleItem extends Item {
 
     private boolean isOccupiedSpawnArea(Level level, double x, double y, double z, float yaw, VehicleDefinition def) {
         double halfLength = Math.max(2.5, getSpawnHalfLength(def));
-        double halfWidth = getSpawnHalfWidth(def);
+        double halfWidth = PLACEMENT_OCCUPANCY_HALF_WIDTH;
         double radius = Math.max(halfLength, halfWidth) + 1.0D;
         var bounds = new net.minecraft.world.phys.AABB(
             x - radius,
@@ -183,7 +184,7 @@ public class TrainVehicleItem extends Item {
             .filter(entity -> rectanglesOverlap(
                 x, z, yaw, halfWidth, halfLength,
                 entity.getX(), entity.getZ(), entity.getYRot(),
-                entity.getBodyHalfWidthForPlacement() * 0.8D,
+                PLACEMENT_OCCUPANCY_HALF_WIDTH,
                 entity.getBodyHalfLengthForPlacement() * 0.9D
             ))
             .toList();
@@ -271,7 +272,7 @@ public class TrainVehicleItem extends Item {
         if (def == null) {
             return 2.25D;
         }
-        double halfLength = Math.max(1.75D, def.getTrainDistance() * 0.5D);
+        double halfLength = Math.max(1.75D, def.getTrainDistance());
         for (VehicleDefinition.BogieDefinition bogie : def.getBogies()) {
             halfLength = Math.max(halfLength, Math.abs(bogie.position().z) + 0.95D);
         }
@@ -309,14 +310,7 @@ public class TrainVehicleItem extends Item {
     }
 
     private boolean isRailBlock(Level level, BlockPos pos) {
-        var state = level.getBlockState(pos);
-        if (state.getBlock() instanceof LargeRailCoreBlock) {
-            return true;
-        }
-        if (level.getBlockEntity(pos) instanceof RailCollisionBlockEntity) {
-            return true;
-        }
-        return false;
+        return getRailMapAt(level, pos, Vec3.atCenterOf(pos)) != null;
     }
 
     private static RailSpawnData findNearestRailSpawn(Level level, BlockPos clickedPos, Vec3 clickedPoint, float preferredYaw) {
@@ -353,7 +347,56 @@ public class TrainVehicleItem extends Item {
                 }
             }
         }
-        return bestDistSq <= 64.0 ? best : null;
+        if (bestDistSq <= 4.0 && best != null) {
+            return best;
+        }
+        // フォールバック: 検出ブロック(当たり判定/道床)が無いレール(ballastWidth=0 や本修正前に
+        // 敷設した既存レール)は上のブロック走査ではコア(=端)から16ブロック以内しか見つからず
+        // 「レール端しか列車が置けない」状態になる。周辺チャンクの BlockEntity からレールコアを
+        // 直接拾い、コア位置・レール長・敷設時期に依らずレール全長のどこでも設置可能にする。
+        return scanNearbyCoresForSpawn(level, clickedPos, clickedPoint, preferredYaw);
+    }
+
+    /** クリック位置周辺チャンクのレールコアを直接走査し、クリック近傍(約2ブロック)のレール点を返す。 */
+    private static RailSpawnData scanNearbyCoresForSpawn(Level level, BlockPos clickedPos, Vec3 clickedPoint, float preferredYaw) {
+        final int chunkRadius = 3;
+        int baseChunkX = clickedPos.getX() >> 4;
+        int baseChunkZ = clickedPos.getZ() >> 4;
+        RailSpawnData best = null;
+        double bestDistSq = 4.0;
+        java.util.Set<BlockPos> visitedCores = new java.util.HashSet<>();
+        for (int cx = baseChunkX - chunkRadius; cx <= baseChunkX + chunkRadius; cx++) {
+            for (int cz = baseChunkZ - chunkRadius; cz <= baseChunkZ + chunkRadius; cz++) {
+                net.minecraft.world.level.chunk.ChunkAccess chunk = level.getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false);
+                if (!(chunk instanceof net.minecraft.world.level.chunk.LevelChunk levelChunk)) {
+                    continue;
+                }
+                for (net.minecraft.world.level.block.entity.BlockEntity be : levelChunk.getBlockEntities().values()) {
+                    if (!(be instanceof LargeRailCoreBlockEntity core) || !core.isLoaded()) {
+                        continue;
+                    }
+                    if (!visitedCores.add(core.getBlockPos())) {
+                        continue;
+                    }
+                    for (RailMap map : core.getAllRailMaps()) {
+                        if (map == null) continue;
+                        int max = getSpawnSplit(map);
+                        for (int i = 0; i <= max; i++) {
+                            double[] pos = map.getRailPos(max, i);
+                            double dx = pos[1] - clickedPoint.x;
+                            double dy = map.getRailHeight(max, i) - clickedPoint.y;
+                            double dz = pos[0] - clickedPoint.z;
+                            double d2 = dx * dx + dy * dy + dz * dz;
+                            if (d2 < bestDistSq) {
+                                bestDistSq = d2;
+                                best = createSpawnData(map, max, i, preferredYaw);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return best;
     }
 
     private static RailMap getRailMapAt(Level level, BlockPos pos) {
@@ -366,6 +409,12 @@ public class TrainVehicleItem extends Item {
         }
         if (level.getBlockEntity(pos) instanceof RailCollisionBlockEntity collision) {
             BlockPos corePos = collision.getCorePos();
+            if (corePos != null && level.getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
+                return getNearestRailMap(core, targetPoint);
+            }
+        }
+        if (level.getBlockEntity(pos) instanceof BallastBlockEntity ballast) {
+            BlockPos corePos = ballast.getCorePos();
             if (corePos != null && level.getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
                 return getNearestRailMap(core, targetPoint);
             }

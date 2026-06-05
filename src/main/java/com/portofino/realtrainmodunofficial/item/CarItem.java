@@ -1,7 +1,6 @@
 package com.portofino.realtrainmodunofficial.item;
 
 import com.portofino.realtrainmodunofficial.ClientHooks;
-import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.entity.CarEntity;
 import com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
@@ -31,7 +30,7 @@ public class CarItem extends Item {
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
         ItemStack stack = context.getItemInHand();
-        String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         // モデル未選択時は spawn せずに直接選択画面を開く。
         // useOn で PASS しても use() は自動では呼ばれないため、ここで client 側に
         // フックして選択画面を開かないと UI が出ないまま。
@@ -43,7 +42,10 @@ public class CarItem extends Item {
         }
         VehicleDefinition def = VehicleRegistry.getById(selectedId);
         if (def == null || !def.isCarType()) {
-            return InteractionResult.PASS;
+            if (level.isClientSide() && context.getPlayer() != null) {
+                ClientHooks.openCarSelectScreen(context.getPlayer(), stack);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide());
         }
         if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
@@ -71,7 +73,7 @@ public class CarItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         if (selectedId != null && !selectedId.isBlank()) {
             VehicleDefinition def = VehicleRegistry.getById(selectedId);
             String name = def != null ? def.getDisplayName() : selectedId;

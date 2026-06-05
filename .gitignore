@@ -32,3 +32,8 @@ backups
 dist
 
 vehicle_packs
+
+# 個人ローカルパスを含む変換ツール(GitHubへ出さない)
+tools/convert_bbmodel_to_rtmu_pack.py
+__pycache__
+*.pyc

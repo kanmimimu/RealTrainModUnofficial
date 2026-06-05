@@ -30,8 +30,8 @@ import java.util.List;
  */
 public class WrenchItem extends Item {
     /** Radius for finding a second marker when entering WrenchMode (reduced from 50 to avoid watchdog). */
-    private static final int WRENCH_SEARCH_DISTANCE = 12;
-    private static final int WRENCH_SEARCH_HEIGHT    = 6;
+    private static final int WRENCH_SEARCH_DISTANCE = 64;
+    private static final int WRENCH_SEARCH_HEIGHT    = 32;
 
     public WrenchItem() {
         super(new Properties().stacksTo(1));
@@ -49,12 +49,42 @@ public class WrenchItem extends Item {
     private static long editStartTime;
     public static float liveYaw, livePitch, liveLenH = -1.0F, liveLenV, liveCantCenter, liveCantEdge, liveCantRandom;
 
+    /** 設置物オフセット微調整の1ステップ(ブロック単位 = 1/16)。KaizPatchX 風の微調整。 */
+    private static final double OFFSET_STEP = 1.0D / 16.0D;
+    /** オフセットの上限(各軸 ±2ブロック)。 */
+    private static final double OFFSET_LIMIT = 2.0D;
+
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Player player = context.getPlayer();
         if (player == null) return InteractionResult.PASS;
         Level level = context.getLevel();
         BlockPos clickedPos = context.getClickedPos();
+
+        // ── KaizPatchX 風: 設置物をレンチで微調整 ──
+        // クリックした面の法線方向へ 1/16 ずつ押し出す。スニーク併用で逆方向(引き込む)。
+        // 位置はBlockEntityのレンダーオフセットに保存され、レンダラが反映する。
+        if (level.getBlockEntity(clickedPos)
+                instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity io) {
+            if (level.isClientSide()) {
+                return InteractionResult.SUCCESS; // クライアントは腕振りのみ。実処理はサーバ。
+            }
+            net.minecraft.core.Direction face = context.getClickedFace();
+            double sign = player.isShiftKeyDown() ? -1.0D : 1.0D;
+            Vec3 cur = io.getRenderOffset();
+            double nx = cur.x + face.getStepX() * OFFSET_STEP * sign;
+            double ny = cur.y + face.getStepY() * OFFSET_STEP * sign;
+            double nz = cur.z + face.getStepZ() * OFFSET_STEP * sign;
+            nx = net.minecraft.util.Mth.clamp(nx, -OFFSET_LIMIT, OFFSET_LIMIT);
+            ny = net.minecraft.util.Mth.clamp(ny, -OFFSET_LIMIT, OFFSET_LIMIT);
+            nz = net.minecraft.util.Mth.clamp(nz, -OFFSET_LIMIT, OFFSET_LIMIT);
+            io.setRenderOffset(nx, ny, nz);
+            level.sendBlockUpdated(clickedPos, level.getBlockState(clickedPos), level.getBlockState(clickedPos), 3);
+            player.displayClientMessage(Component.literal(String.format(
+                "オフセット: X=%.3f Y=%.3f Z=%.3f (スニークで逆方向)", nx, ny, nz)), true);
+            return InteractionResult.CONSUME;
+        }
+
         boolean clickedMarker = level.getBlockState(clickedPos).getBlock() instanceof MarkerBlock;
 
         if (level.isClientSide()) {

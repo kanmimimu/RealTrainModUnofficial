@@ -10,8 +10,6 @@ import com.portofino.realtrainmodunofficial.block.ScriptBlock;
 import com.portofino.realtrainmodunofficial.block.SignalRemoteBlock;
 import com.portofino.realtrainmodunofficial.block.SignalStateBlock;
 import com.portofino.realtrainmodunofficial.block.TrainDetectorBlock;
-import com.portofino.realtrainmodunofficial.compat.atsassist.block.AtsaGroundUnitBlock;
-import com.portofino.realtrainmodunofficial.compat.atsassist.block.AtsaSimpleBlock;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -57,13 +55,4 @@ public class RealTrainModUnofficialBlocks {
 
     public static final DeferredBlock<ScriptBlock> SCRIPT_BLOCK
         = BLOCKS.register("script_block", () -> new ScriptBlock());
-
-    public static final DeferredBlock<AtsaGroundUnitBlock> ATSA_GROUND_UNIT
-        = BLOCKS.register("atsa_ground_unit", () -> new AtsaGroundUnitBlock());
-
-    public static final DeferredBlock<AtsaSimpleBlock> ATSA_IFTTT
-        = BLOCKS.register("atsa_ifttt", () -> new AtsaSimpleBlock("IFTTT"));
-
-    public static final DeferredBlock<AtsaSimpleBlock> ATSA_STATION_ANNOUNCE
-        = BLOCKS.register("atsa_station_announce", () -> new AtsaSimpleBlock("Station Announce"));
 }

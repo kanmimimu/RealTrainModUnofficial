@@ -41,10 +41,35 @@ public class VehiclePackLoader {
     }
 
     private static void loadFromModJar() {
-        // ユーザー要望により、 mod jar 内蔵の RTM 公式移植車両 (223 / konoe / 貨物 / cc 等) を
-        // ロードしない。 列車は外部の pack zip からのみ読み込まれるようにする。
-        // 信号 (ModelSignal_*) / レール (ModelRail_*) は RailPackLoader / InstalledObjectPackLoader が
-        // 別経路で読むため影響しない。
+        // 列車 (ModelTrain_*) は外部 pack zip のみから読み込む (デフォルト列車 223/c-toki 等を出さない
+        // ユーザー要望)。ただし自動車 (ModelVehicle_*) は RTM 標準車 (CV33 等) をデフォルトとして
+        // 同梱から読み込む (ユーザー要望「自動車のデフォルトモデルがあるはず」)。
+        try {
+            var modFileEntry = ModList.get().getModFileById(RealTrainModUnofficial.MODID);
+            if (modFileEntry == null) return;
+            var modFile = modFileEntry.getFile();
+            Path jsonDir = modFile.findResource("assets", "minecraft", "models", "json");
+            if (jsonDir == null || !Files.isDirectory(jsonDir)) return;
+            int[] count = {0};
+            try (var stream = Files.list(jsonDir)) {
+                stream.filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
+                        return n.startsWith("modelvehicle_") && n.endsWith(".json");
+                    })
+                    .forEach(p -> {
+                        try {
+                            parseTrainJson(Files.readAllBytes(p), RealTrainModUnofficial.MODID, p.getFileName().toString());
+                            count[0]++;
+                        } catch (Exception e) {
+                            RealTrainModUnofficial.LOGGER.warn("Failed to load bundled vehicle {}", p, e);
+                        }
+                    });
+            }
+            RealTrainModUnofficial.LOGGER.info("Loaded {} bundled car (ModelVehicle_) definition(s)", count[0]);
+        } catch (Exception e) {
+            RealTrainModUnofficial.LOGGER.warn("Could not load bundled car definitions", e);
+        }
     }
 
     private static void loadFromExternalDirectories() {
@@ -205,8 +230,13 @@ public class VehiclePackLoader {
     }
 
     private static void loadVehiclePack(InputStream zipInput, String packName) throws IOException {
+        loadVehiclePack(zipInput, packName, 0);
+    }
+
+    private static void loadVehiclePack(InputStream zipInput, String packName, int depth) throws IOException {
         List<byte[]> jsonBytes = new ArrayList<>();
         List<String> jsonPaths = new ArrayList<>();
+        List<NestedArchive> nestedArchives = new ArrayList<>();
         try (ZipInputStream zip = new ZipInputStream(zipInput)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
@@ -215,6 +245,8 @@ public class VehiclePackLoader {
                     if (isTrainJson(name)) {
                         jsonBytes.add(zip.readAllBytes());
                         jsonPaths.add(name);
+                    } else if (depth < 2 && isArchiveName(name)) {
+                        nestedArchives.add(new NestedArchive(name, zip.readAllBytes()));
                     }
                 }
                 zip.closeEntry();
@@ -222,6 +254,12 @@ public class VehiclePackLoader {
         }
         for (int i = 0; i < jsonBytes.size(); i++) {
             parseTrainJson(jsonBytes.get(i), packName, jsonPaths.get(i));
+        }
+        for (NestedArchive nested : nestedArchives) {
+            Path materialized = RailPackLoader.materializeNestedPack(nested.name(), nested.bytes());
+            try (InputStream input = Files.newInputStream(materialized)) {
+                loadVehiclePack(input, nested.name(), depth + 1);
+            }
         }
     }
 
@@ -232,8 +270,20 @@ public class VehiclePackLoader {
         }
         String leaf = normalized.substring(normalized.lastIndexOf('/') + 1);
         boolean rtmStyleName = leaf.startsWith("modeltrain_") || leaf.startsWith("train_");
+        boolean rtmVehicleStyleName = leaf.startsWith("modelvehicle_") || leaf.startsWith("vehicle_");
         boolean rtmStyleDir = normalized.contains("/json/") || normalized.contains("/models/json/");
-        return rtmStyleName || rtmStyleDir;
+        return rtmStyleName || rtmVehicleStyleName || rtmStyleDir;
+    }
+
+    private static boolean isVehicleJsonPath(String path) {
+        String normalized = normalize(path).toLowerCase(Locale.ROOT);
+        String leaf = normalized.substring(normalized.lastIndexOf('/') + 1);
+        return leaf.startsWith("modelvehicle_") || leaf.startsWith("vehicle_");
+    }
+
+    private static boolean isArchiveName(String path) {
+        String lower = normalize(path).toLowerCase(Locale.ROOT);
+        return lower.endsWith(".zip") || lower.endsWith(".jar");
     }
 
     private static String normalize(String raw) {
@@ -280,12 +330,13 @@ public class VehiclePackLoader {
                 getString(obj, "soundScript"),
                 getString(obj, "soundScriptName")
             );
+            boolean sourceLooksLikeVehicle = isVehicleJsonPath(sourcePath);
             String vehicleType = firstNonBlank(
                 getString(trainModel, "vehicleType"),
                 getString(obj, "vehicleType"),
                 getString(trainModel, "trainType"),
                 getString(obj, "trainType"),
-                "Train"
+                sourceLooksLikeVehicle ? "Car" : "Train"
             );
 
             String doorType = getString(trainModel, "doorType");
@@ -305,21 +356,23 @@ public class VehiclePackLoader {
                     JsonObject bogieModel = element.getAsJsonObject();
                     String bogieFile = getString(bogieModel, "modelFile");
                     if (bogieFile == null || bogieFile.isBlank()) continue;
+                    String bogieScript = getString(bogieModel, "rendererPath");
                     Map<String, String> bogieTex = parseTextures(bogieModel);
                     Vec3 position = i < bogiePositions.size() ? bogiePositions.get(i) : Vec3.ZERO;
-                    bogies.add(new VehicleDefinition.BogieDefinition(bogieFile, bogieTex, position));
+                    bogies.add(new VehicleDefinition.BogieDefinition(bogieFile, bogieTex, position, bogieScript));
                 }
             } else {
                 JsonObject bogieModel = getObject(obj, "bogieModel2");
                 if (bogieModel == null) bogieModel = getObject(obj, "bogieModel");
                 Map<String, String> bogieTex = bogieModel != null ? parseTextures(bogieModel) : Map.of();
                 String bogieFile = bogieModel != null ? getString(bogieModel, "modelFile") : null;
+                String bogieScript = bogieModel != null ? getString(bogieModel, "rendererPath") : "";
                 if (bogieFile != null && !bogieFile.isBlank()) {
                     if (bogiePositions.isEmpty()) {
                         bogiePositions.add(new Vec3(0.0, 0.0, 0.0));
                     }
                     for (Vec3 p : bogiePositions) {
-                        bogies.add(new VehicleDefinition.BogieDefinition(bogieFile, bogieTex, p));
+                        bogies.add(new VehicleDefinition.BogieDefinition(bogieFile, bogieTex, p, bogieScript));
                     }
                 }
             }
@@ -371,6 +424,11 @@ public class VehiclePackLoader {
             List<VehicleDefinition.LightDefinition> tailLights = parseLights(obj, trainModel, "tailLights");
             List<VehicleDefinition.LightDefinition> interiorLights = parseLights(obj, trainModel, "interiorLights");
             String hornSound = firstNonBlank(getString(trainModel, "sound_Horn"), getString(obj, "sound_Horn"));
+            String soundStop = firstNonBlank(getString(trainModel, "sound_Stop"), getString(obj, "sound_Stop"));
+            String soundStartAcceleration = firstNonBlank(getString(trainModel, "sound_S_A"), getString(obj, "sound_S_A"));
+            String soundAcceleration = firstNonBlank(getString(trainModel, "sound_Acceleration"), getString(obj, "sound_Acceleration"));
+            String soundDeceleration = firstNonBlank(getString(trainModel, "sound_Deceleration"), getString(obj, "sound_Deceleration"));
+            String soundDecelerationStop = firstNonBlank(getString(trainModel, "sound_D_S"), getString(obj, "sound_D_S"));
             List<String> announcementSounds = parseAnnouncementSounds(obj, trainModel);
             float acceleration = parseFloat(trainModel, "acceleration",
                 parseFloat(trainModel, "accelerateion", parseFloat(obj, "acceleration", parseFloat(obj, "accelerateion", 0.00243F))));
@@ -428,6 +486,13 @@ public class VehiclePackLoader {
                 singleTrain
             );
             definition.setServerScriptPath(serverScriptPath);
+            definition.setJsonRunningSounds(
+                soundStop,
+                soundStartAcceleration,
+                soundAcceleration,
+                soundDeceleration,
+                soundDecelerationStop
+            );
             LOADED.add(definition);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse train json {} in {}: {}", sourcePath, packName, e.getMessage());
@@ -1111,5 +1176,8 @@ public class VehiclePackLoader {
             }
         }
         return null;
+    }
+
+    private record NestedArchive(String name, byte[] bytes) {
     }
 }

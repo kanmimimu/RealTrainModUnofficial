@@ -44,10 +44,12 @@
   "message.realtrainmodunofficial.train.already_exists": "その場所には既に列車があります",
 
   "screen.realtrainmodunofficial.select_train": "列車モデル選択",
-  "screen.realtrainmodunofficial.select_rail": "レールモデル選択",
+  "screen.realtrainmodunofficial.select_rail": "レール選択",
+  "screen.realtrainmodunofficial.select_car": "自動車選択",
   "screen.realtrainmodunofficial.select_light": "照明モデル選択",
   "screen.realtrainmodunofficial.select_signboard": "看板モデル選択",
   "screen.realtrainmodunofficial.select_insulator": "碍子モデル選択",
+  "screen.realtrainmodunofficial.select_overhead_line_pole": "架線柱モデル選択",
   "screen.realtrainmodunofficial.select_wire": "ワイヤーモデル選択",
   "screen.realtrainmodunofficial.select_signal": "信号モデル選択",
   "screen.realtrainmodunofficial.select_crossing": "踏切モデル選択",
@@ -86,10 +88,5 @@
   "realtrainmodunofficial.configuration.items": "Item List",
   "realtrainmodunofficial.configuration.logDirtBlock": "Log Dirt Block",
   "realtrainmodunofficial.configuration.magicNumberIntroduction": "Magic Number Text",
-  "realtrainmodunofficial.configuration.magicNumber": "Magic Number",
-  "block.realtrainmodunofficial.atsa_ground_unit": "ATS Assist 地上子",
-  "block.realtrainmodunofficial.atsa_ifttt": "ATS Assist IFTTT",
-  "block.realtrainmodunofficial.atsa_station_announce": "ATS Assist 駅放送",
-  "item.realtrainmodunofficial.atsa_train_protection_selector": "ATS Assist 保安装置セレクター",
-  "item.realtrainmodunofficial.atsa_data_map_editor": "ATS Assist データマップエディター"
+  "realtrainmodunofficial.configuration.magicNumber": "Magic Number"
 }

@@ -1,0 +1,70 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.gradle.userdev' version '7.0.192'
+}
+
+version = '1.8.0'
+group = 'com.atsassist'
+
+repositories {
+    mavenCentral()
+}
+
+base {
+    archivesName = 'atsassistmod'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+runs {
+    configureEach {
+        systemProperty 'forge.logging.markers', 'REGISTRIES'
+        systemProperty 'forge.logging.console.level', 'debug'
+        modSource project.sourceSets.main
+        // RTMU 本体も同時に読み込む(ATSA は RTMU 前提)。
+        modSource rootProject.sourceSets.main
+    }
+    client {}
+    server { argument '--nogui' }
+}
+
+dependencies {
+    implementation "net.neoforged:neoforge:${neo_version}"
+    // ATSA は RTMU の公開クラス(TrainEntity 等)を参照する。コンパイル時のみ依存し、
+    // jar には含めない(実行時は RTMU 本体 jar が提供)。
+    compileOnly project(':')
+    // IFTTT ルールのシリアライズに Jackson を使用。
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.15.2"
+}
+
+def modrinthModsDir = file("${System.properties['user.home']}/Library/Application Support/ModrinthApp/profiles/Server test/mods")
+
+tasks.register('copyJarToModrinthMods', Copy) {
+    dependsOn tasks.named('jar')
+    onlyIf { modrinthModsDir.isDirectory() }
+    from(tasks.named('jar').flatMap { it.archiveFile })
+    into(modrinthModsDir)
+}
+
+tasks.named('jar').configure {
+    finalizedBy(tasks.named('copyJarToModrinthMods'))
+}
+tasks.named('build').configure {
+    finalizedBy(tasks.named('copyJarToModrinthMods'))
+}
+
+tasks.withType(ProcessResources).configureEach {
+    var replaceProperties = [
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            loader_version_range   : loader_version_range,
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

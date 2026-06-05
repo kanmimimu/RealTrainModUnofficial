@@ -24,17 +24,11 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(ConfigureMarkerPayload.TYPE, ConfigureMarkerPayload.STREAM_CODEC, ConfigureMarkerPayload::handleOnServer);
         registrar.playToServer(UpdateScriptBlockPayload.TYPE, UpdateScriptBlockPayload.STREAM_CODEC, UpdateScriptBlockPayload::handleOnServer);
         registrar.playToClient(TrainScriptDataPayload.TYPE, TrainScriptDataPayload.STREAM_CODEC, TrainScriptDataPayload::handleOnClient);
+        registrar.playToServer(CarScriptDataPayload.TYPE, CarScriptDataPayload.STREAM_CODEC, CarScriptDataPayload::handleOnServer);
+        registrar.playToClient(CarScriptDataSyncPayload.TYPE, CarScriptDataSyncPayload.STREAM_CODEC, CarScriptDataSyncPayload::handleOnClient);
         registrar.playToClient(SpeakerPlayPayload.TYPE, SpeakerPlayPayload.STREAM_CODEC, SpeakerPlayPayload::handleOnClient);
+        registrar.playToClient(SpeakerStopPayload.TYPE, SpeakerStopPayload.STREAM_CODEC, SpeakerStopPayload::handleOnClient);
         registrar.playToServer(ConfigureSpeakerPayload.TYPE, ConfigureSpeakerPayload.STREAM_CODEC, ConfigureSpeakerPayload::handleOnServer);
         registrar.playToClient(SyncSpeakerSoundsPayload.TYPE, SyncSpeakerSoundsPayload.STREAM_CODEC, SyncSpeakerSoundsPayload::handleOnClient);
-        registrar.playToServer(com.portofino.realtrainmodunofficial.compat.atsassist.network.ConfigureAtsaGroundUnitPayload.TYPE,
-            com.portofino.realtrainmodunofficial.compat.atsassist.network.ConfigureAtsaGroundUnitPayload.STREAM_CODEC,
-            com.portofino.realtrainmodunofficial.compat.atsassist.network.ConfigureAtsaGroundUnitPayload::handleOnServer);
-        registrar.playToServer(com.portofino.realtrainmodunofficial.compat.atsassist.network.ConfigureAtsaSimpleBlockPayload.TYPE,
-            com.portofino.realtrainmodunofficial.compat.atsassist.network.ConfigureAtsaSimpleBlockPayload.STREAM_CODEC,
-            com.portofino.realtrainmodunofficial.compat.atsassist.network.ConfigureAtsaSimpleBlockPayload::handleOnServer);
-        registrar.playToServer(com.portofino.realtrainmodunofficial.compat.atsassist.network.AtsaTrainToolPayload.TYPE,
-            com.portofino.realtrainmodunofficial.compat.atsassist.network.AtsaTrainToolPayload.STREAM_CODEC,
-            com.portofino.realtrainmodunofficial.compat.atsassist.network.AtsaTrainToolPayload::handleOnServer);
     }
 }

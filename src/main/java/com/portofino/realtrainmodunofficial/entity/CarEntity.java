@@ -36,6 +36,7 @@ public final class CarEntity extends Entity {
     private ScriptEngine serverScriptEngine;
     private boolean attemptedServerScriptLoad;
     private final java.util.Map<String, String> scriptData = new java.util.HashMap<>();
+    private boolean scriptDataDirty;
 
     // === RTM 1.7.10/1.12 互換フィールド (SRB3 等のスクリプトが直接読み書きする) ===
     /** RTM の yaw 名 (entity.field_70177_z) */
@@ -46,6 +47,10 @@ public final class CarEntity extends Entity {
     public int field_70173_aa;
     /** RTM の world 参照 (entity.field_70170_p)。WorldCompat 経由でアクセス。 */
     public final CarWorldCompat field_70170_p = new CarWorldCompat(this);
+    /** RTM の motionX/Y/Z 名 (SRB3 の doFollowing が 0 を書いて漂流を止める)。 */
+    public double field_70159_w;
+    public double field_70181_x;
+    public double field_70179_y;
 
     /// 車輪のX座標オフセット
     public static final float WHEEL_X_COORD = cm2m(72.47766876220703f);
@@ -167,7 +172,17 @@ public final class CarEntity extends Entity {
 
     public void setScriptDataValue(String key, String value) {
         if (key == null || key.isBlank()) return;
-        scriptData.put(key, value == null ? "" : value);
+        String v = value == null ? "" : value;
+        String prev = scriptData.put(key, v);
+        if (!v.equals(prev)) {
+            scriptDataDirty = true;
+        }
+    }
+
+    /** サーバ→クライアント同期で受け取った scriptData を適用する(クライアント側)。 */
+    public void applyScriptDataSync(java.util.Map<String, String> data) {
+        if (data == null) return;
+        scriptData.putAll(data);
     }
 
     public java.util.Map<String, String> scriptDataMap() {
@@ -212,6 +227,38 @@ public final class CarEntity extends Entity {
         public net.minecraft.world.level.Level getLevel() {
             return car != null ? car.level() : null;
         }
+
+        /** func_175625_s = getBlockEntity(BlockPos) (SRB3 の getTileEntity が呼ぶ) */
+        public net.minecraft.world.level.block.entity.BlockEntity func_175625_s(net.minecraft.core.BlockPos pos) {
+            return (car != null && pos != null) ? car.level().getBlockEntity(pos) : null;
+        }
+
+        /** 座標直接版。スクリプトが 1.12.2 の net.minecraft.util.math.BlockPos を new せずに済むよう用意。 */
+        public net.minecraft.world.level.block.entity.BlockEntity func_175625_s(double x, double y, double z) {
+            if (car == null) {
+                return null;
+            }
+            return car.level().getBlockEntity(new net.minecraft.core.BlockPos(
+                (int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z)));
+        }
+
+        /** func_73045_a = getEntity(id) (SRB3 が hostPlayerEntityId からプレイヤーを引く) */
+        public net.minecraft.world.entity.Entity func_73045_a(Object id) {
+            if (car == null || id == null) {
+                return null;
+            }
+            try {
+                int i = (id instanceof Number) ? ((Number) id).intValue() : Integer.parseInt(id.toString());
+                return car.level().getEntity(i);
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        /** func_180495_p = getBlockState(BlockPos) */
+        public net.minecraft.world.level.block.state.BlockState func_180495_p(net.minecraft.core.BlockPos pos) {
+            return (car != null && pos != null) ? car.level().getBlockState(pos) : null;
+        }
     }
 
     /** RTM 互換: スクリプトから entity.getResourceState() で呼ばれる。 */
@@ -241,17 +288,62 @@ public final class CarEntity extends Entity {
             try { return Double.parseDouble(getString(key)); } catch (Exception e) { return 0.0; }
         }
         public void setString(String key, String value, int syncType) {
-            if (car != null) car.setScriptDataValue(key, value == null ? "" : value);
+            apply(key, value == null ? "" : value, syncType);
         }
         public void setBoolean(String key, boolean value, int syncType) {
-            if (car != null) car.setScriptDataValue(key, Boolean.toString(value));
+            apply(key, Boolean.toString(value), syncType);
         }
         public void setInt(String key, int value, int syncType) {
-            if (car != null) car.setScriptDataValue(key, Integer.toString(value));
+            apply(key, Integer.toString(value), syncType);
         }
         public void setDouble(String key, double value, int syncType) {
-            if (car != null) car.setScriptDataValue(key, Double.toString(value));
+            apply(key, Double.toString(value), syncType);
         }
+        /**
+         * ローカルへ書き込みつつ、クライアント側で syncType!=0 の値はサーバへ送る。
+         * render(クライアント)スクリプトが書いた設置点/ビルドフラグをサーバ onUpdate へ届け、
+         * 実際の敷設をサーバで行えるようにする。
+         */
+        private void apply(String key, String value, int syncType) {
+            if (car == null) {
+                return;
+            }
+            car.setScriptDataValue(key, value);
+            if (syncType != 0 && car.level().isClientSide()) {
+                try {
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new com.portofino.realtrainmodunofficial.network.CarScriptDataPayload(car.getId(), key, value));
+                } catch (Throwable ignored) {
+                    // サーバ未接続/送信失敗時は無視(ローカルには書けている)。
+                }
+            }
+        }
+    }
+
+    // ===== RTM 1.12.2 MCP 名の互換メソッド (SRB3 等のサーバスクリプトが直接呼ぶ) =====
+    /** func_184188_bt = getPassengers() */
+    public java.util.List<Entity> func_184188_bt() {
+        return this.getPassengers();
+    }
+    /** func_184187_bx = getVehicle() (乗っている対象) */
+    public Entity func_184187_bx() {
+        return this.getVehicle();
+    }
+    /** func_184210_p = stopRiding() (降車/乗り物から降りる) */
+    public void func_184210_p() {
+        this.stopRiding();
+    }
+    /** func_145782_y = getId() (エンティティID) */
+    public int func_145782_y() {
+        return this.getId();
+    }
+    /** func_70106_y = discard() (エンティティ除去) */
+    public void func_70106_y() {
+        this.discard();
+    }
+    /** func_70107_b = setPos(x,y,z) */
+    public void func_70107_b(double x, double y, double z) {
+        this.setPos(x, y, z);
     }
 
     /// 右クリックされた時の処理
@@ -387,6 +479,50 @@ public final class CarEntity extends Entity {
             if (serverScriptEngine != null) {
                 com.portofino.realtrainmodunofficial.script.TrainScriptSystem
                     .invokeServerScriptOnUpdate(serverScriptEngine, this);
+                // サーバスクリプトが entity.field_70177_z=0 等で向きを制御する(SRB3はyawを0固定
+                // してマーカーをワールド座標で描く)。シムのフィールドを実際の向きへ反映する。
+                // 反映しないと車の実yawが残り、render が回転してマーカーが散らばる。
+                this.setYRot(this.field_70177_z);
+                this.setXRot(this.field_70125_A);
+                this.yRotO = this.field_70177_z;
+                this.xRotO = this.field_70125_A;
+            }
+            // サーバ→クライアント scriptData 同期。SRB3 の render(クライアント)は
+            // hostPlayerEntityId 等のサーバ設定値を読んで GUI を起動するため必須。
+            if (scriptDataDirty && !scriptData.isEmpty()) {
+                scriptDataDirty = false;
+                net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+                    this, new com.portofino.realtrainmodunofficial.network.CarScriptDataSyncPayload(
+                        this.getId(), new java.util.HashMap<>(scriptData)));
+            }
+        }
+
+        // クライアント: SRB の追従車はホストプレイヤーの位置・旧位置を完全ミラー(+2Y)する。
+        // サーバ同期＋補間だとプレイヤーに遅れて、マーカー(車基準)とカーソル(プレイヤー基準)が
+        // ズレて荒ぶる。旧位置までコピーすることで car の描画補間位置 = player の描画補間位置 となり、
+        // マーカーとカーソルがフレーム単位で完全一致する。
+        if (this.level().isClientSide()) {
+            String hostId = getScriptDataValue("hostPlayerEntityId");
+            if (hostId != null && !hostId.isEmpty()) {
+                try {
+                    Entity host = this.level().getEntity(Integer.parseInt(hostId));
+                    if (host != null) {
+                        this.setPos(host.getX(), host.getY() + 2.0D, host.getZ());
+                        this.xOld = host.xOld;
+                        this.yOld = host.yOld + 2.0D;
+                        this.zOld = host.zOld;
+                        this.xo = host.xo;
+                        this.yo = host.yo + 2.0D;
+                        this.zo = host.zo;
+                        // SRB はマーカーをワールド座標で描くため車の yaw は 0 固定。クライアントでも
+                        // 0 に固定し、補間で車が回転してマーカーが回って見える(荒ぶる)のを防ぐ。
+                        this.setYRot(0.0F);
+                        this.setXRot(0.0F);
+                        this.yRotO = 0.0F;
+                        this.xRotO = 0.0F;
+                    }
+                } catch (Exception ignored) {
+                }
             }
         }
 

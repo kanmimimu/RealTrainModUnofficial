@@ -6,9 +6,6 @@ import com.portofino.realtrainmodunofficial.client.screen.SignalChangerScreen;
 import com.portofino.realtrainmodunofficial.client.screen.SignalReceiverScreen;
 import com.portofino.realtrainmodunofficial.client.screen.SignalValueScreen;
 import com.portofino.realtrainmodunofficial.client.screen.TrainDetectorScreen;
-import com.portofino.realtrainmodunofficial.compat.atsassist.client.AtsaGroundUnitScreen;
-import com.portofino.realtrainmodunofficial.compat.atsassist.client.AtsaSimpleBlockScreen;
-import com.portofino.realtrainmodunofficial.compat.atsassist.client.AtsaTrainToolScreen;
 import com.portofino.realtrainmodunofficial.client.sound.CrossingGateSoundManager;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import com.portofino.realtrainmodunofficial.item.TrainItem;
@@ -78,18 +75,6 @@ public final class ClientHooksClient {
 
     public static void openScriptBlockScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(new ScriptBlockScreen(pos));
-    }
-
-    public static void openAtsaGroundUnitScreen(BlockPos pos) {
-        Minecraft.getInstance().setScreen(new AtsaGroundUnitScreen(pos));
-    }
-
-    public static void openAtsaSimpleBlockScreen(BlockPos pos, String title) {
-        Minecraft.getInstance().setScreen(new AtsaSimpleBlockScreen(pos, Component.literal(title)));
-    }
-
-    public static void openAtsaTrainToolScreen(String mode) {
-        Minecraft.getInstance().setScreen(new AtsaTrainToolScreen(mode));
     }
 
     public static void stopCrossingGateSound(Level level, BlockPos pos) {

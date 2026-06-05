@@ -176,7 +176,12 @@ public final class InstalledObjectPackLoader {
     }
 
     private static void loadPack(InputStream zipInput, String packName) throws IOException {
+        loadPack(zipInput, packName, 0);
+    }
+
+    private static void loadPack(InputStream zipInput, String packName, int depth) throws IOException {
         List<EntryData> entries = new ArrayList<>();
+        List<NestedArchive> nestedArchives = new ArrayList<>();
         try (ZipInputStream zip = new ZipInputStream(zipInput)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
@@ -184,6 +189,8 @@ public final class InstalledObjectPackLoader {
                     String normalized = normalize(entry.getName());
                     if (isSupportedJson(normalized)) {
                         entries.add(new EntryData(normalized, zip.readAllBytes()));
+                    } else if (depth < 2 && isArchiveName(normalized)) {
+                        nestedArchives.add(new NestedArchive(normalized, zip.readAllBytes()));
                     }
                 }
                 zip.closeEntry();
@@ -191,6 +198,12 @@ public final class InstalledObjectPackLoader {
         }
         for (EntryData entry : entries) {
             parse(entry.path(), entry.bytes(), packName);
+        }
+        for (NestedArchive nested : nestedArchives) {
+            Path materialized = RailPackLoader.materializeNestedPack(nested.name(), nested.bytes());
+            try (InputStream input = Files.newInputStream(materialized)) {
+                loadPack(input, nested.name(), depth + 1);
+            }
         }
     }
 
@@ -218,6 +231,11 @@ public final class InstalledObjectPackLoader {
             || file.startsWith("modelcrossing_")
             || file.startsWith("signboard_")
         );
+    }
+
+    private static boolean isArchiveName(String path) {
+        String lower = normalize(path).toLowerCase(Locale.ROOT);
+        return lower.endsWith(".zip") || lower.endsWith(".jar");
     }
 
     private static void parse(String path, byte[] bytes, String packName) {
@@ -260,7 +278,7 @@ public final class InstalledObjectPackLoader {
                     textures.putIfAbsent("default", signalTexture);
                 }
             }
-            LOADED.add(new InstalledObjectDefinition(
+            InstalledObjectDefinition def = new InstalledObjectDefinition(
                 id,
                 name,
                 packName,
@@ -276,11 +294,26 @@ public final class InstalledObjectPackLoader {
                 1.0F,
                 0.125F,
                 "",
-                category == InstalledObjectCategory.SIGNAL ? firstNonBlank(getString(obj, "lightTexture"), getString(obj, "buttonTexture")) : "",
+                (category == InstalledObjectCategory.SIGNAL || category == InstalledObjectCategory.LIGHT)
+                    ? firstNonBlank(getString(obj, "lightTexture"), getString(obj, "emissiveTexture"), getString(obj, "buttonTexture"))
+                    : "",
                 runningSound,
-                category == InstalledObjectCategory.SIGNAL ? parseSignalLights(obj) : Map.of(),
-                parseVec3(modelPartsBody, "pos", 1.0)
-            ));
+                // 照明(LIGHT)も信号と同じ "lights": ["S(1) P(部品名)"] 形式で発光パーツを定義できる。
+                (category == InstalledObjectCategory.SIGNAL || category == InstalledObjectCategory.LIGHT)
+                    ? parseSignalLights(obj) : Map.of(),
+                parseRenderObjects(model, modelPartsBody),
+                parseVec3(modelPartsBody, "pos", 1.0),
+                1,
+                1
+            );
+            if (category == InstalledObjectCategory.WIRE) {
+                // ワイヤーは sectionLength(モデル1個分の長さ)と deflectionCoefficient(たるみ)を持つ。
+                float sectionLength = parseFloat(obj, "sectionLength", 0.5F);
+                float deflection = parseFloat(obj, "deflectionCoefficient", 0.0F);
+                def.setWireParams(sectionLength, deflection);
+            }
+            def.setWireAttachPos(parseVec3(obj, "wirePos", 1.0));
+            LOADED.add(def);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse installed object json {} in {}: {}", path, packName, e.getMessage());
         }
@@ -344,35 +377,78 @@ public final class InstalledObjectPackLoader {
             getObject(obj, "model") == null ? null : getString(getObject(obj, "model"), "sound_Running"),
             getObject(obj, "model") == null ? null : getString(getObject(obj, "model"), "soundRunning")
         ).toLowerCase(Locale.ROOT);
+        // モデル/レンダラのパスも分類材料に含める。masa 踏切パックの遮断機は
+        // name/file が "MasaGate*"(=crossing を含まない)だが rendererPath が "MasaCrossingGate*.js"
+        // なので、これを見ないと踏切でなく照明カテゴリに落ちて選択に出なくなる。
+        JsonObject modelObjForCat = getObject(obj, "model");
+        // getString はキーが無いと null を返すので null 安全に(以前は null.toLowerCase で NPE→分類失敗→
+        // rendererPath/modelFile を持たない踏切がレッドストーンに反応しなくなっていた)。
+        String rendererPathRaw = modelObjForCat == null ? null : getString(modelObjForCat, "rendererPath");
+        String modelFileRaw = modelObjForCat == null ? null : getString(modelObjForCat, "modelFile");
+        String rendererPath = rendererPathRaw == null ? "" : rendererPathRaw.toLowerCase(Locale.ROOT);
+        String modelFile = modelFileRaw == null ? "" : modelFileRaw.toLowerCase(Locale.ROOT);
         boolean looksLikeCrossing = lowerFile.contains("crossing")
             || lowerFile.contains("fumikiri")
             || name.contains("crossing")
             || name.contains("fumikiri")
             || runningSound.contains("crossing")
             || runningSound.contains("fumikiri")
-            || runningSound.contains("toryanse");
+            || runningSound.contains("toryanse")
+            || rendererPath.contains("crossing")
+            || rendererPath.contains("fumikiri")
+            || modelFile.contains("crossing")
+            || modelFile.contains("fumikiri");
         boolean looksLikeSpeaker = lowerFile.contains("speaker")
             || name.contains("speaker")
             || machineType.contains("speaker");
-        if (lowerFile.startsWith("modelmachine_")) {
-            if (looksLikeCrossing) {
-                return InstalledObjectCategory.CROSSING;
-            }
-            if (looksLikeSpeaker) {
-                return InstalledObjectCategory.SPEAKER;
-            }
-            return InstalledObjectCategory.LIGHT;
-        }
+        // 分類対象文字列(ファイル名+name+machineType)。RTM は設置物の大半が ModelMachine_ なので
+        // プレフィックスでなくキーワードで種類を判定する。
+        String hay = lowerFile + " " + name + " " + machineType;
+
+        // 明示プレフィックスを最優先。
         if (lowerFile.startsWith("modelsignal_")) {
             return InstalledObjectCategory.SIGNAL;
-        }
-        if (lowerFile.startsWith("modelcrossing_") || looksLikeCrossing) {
-            return InstalledObjectCategory.CROSSING;
         }
         if (lowerFile.startsWith("modelwire_")) {
             return InstalledObjectCategory.WIRE;
         }
+        // 踏切は改札より先に判定する(CrossingGate を "gate" で改札に誤分類しないため)。
+        if (lowerFile.startsWith("modelcrossing_") || looksLikeCrossing
+                || containsAny(hay, "crossing", "fumikiri", "踏切", "toryanse")) {
+            return InstalledObjectCategory.CROSSING;
+        }
+        // 改札(Turnstile / TicketGate / 改札)。"gate" 単独では拾わない。
+        if (containsAny(hay, "turnstile", "ticketgate", "ticket_gate", "ticketmachine",
+                "kaisatsu", "改札", "automaticgate", "iccard")) {
+            return InstalledObjectCategory.TICKET_GATE;
+        }
+        if (looksLikeSpeaker || containsAny(hay, "speaker", "スピーカ")) {
+            return InstalledObjectCategory.SPEAKER;
+        }
+        if (containsAny(hay, "linepole", "line_pole", "catenarypole", "catenary_pole",
+                "poleglay", "架線柱", "架線")) {
+            return InstalledObjectCategory.OVERHEAD_LINE_POLE;
+        }
+        if (containsAny(hay, "signboard", "sign_board", "billboard", "看板")) {
+            return InstalledObjectCategory.SIGNBOARD;
+        }
+        // 照明系(明確なキーワードを持つものだけ)。これで照明カテゴリが何でも箱にならない。
+        if (containsAny(hay, "light", "lamp", "lantern", "照明", "ライト", "beacon")) {
+            return InstalledObjectCategory.LIGHT;
+        }
+        // それ以外の汎用 ModelMachine_(鳥居/モニタ/自販機等)は照明に置く(従来の落とし先)。
+        if (lowerFile.startsWith("modelmachine_")) {
+            return InstalledObjectCategory.LIGHT;
+        }
         return InstalledObjectCategory.INSULATOR;
+    }
+
+    private static boolean containsAny(String hay, String... needles) {
+        if (hay == null) return false;
+        for (String n : needles) {
+            if (hay.contains(n)) return true;
+        }
+        return false;
     }
 
     private static String normalize(String value) {
@@ -477,6 +553,26 @@ public final class InstalledObjectPackLoader {
         return textures;
     }
 
+    private static List<String> parseRenderObjects(JsonObject... objects) {
+        List<String> result = new ArrayList<>();
+        for (JsonObject object : objects) {
+            if (object == null || !object.has("objects") || !object.get("objects").isJsonArray()) {
+                continue;
+            }
+            JsonArray array = object.getAsJsonArray("objects");
+            for (JsonElement element : array) {
+                if (!element.isJsonPrimitive()) {
+                    continue;
+                }
+                String value = element.getAsString();
+                if (value != null && !value.isBlank() && result.stream().noneMatch(value::equalsIgnoreCase)) {
+                    result.add(value.trim());
+                }
+            }
+        }
+        return List.copyOf(result);
+    }
+
     private static String encodeTextureDescriptor(JsonArray pair) {
         String texture = pair.get(1).getAsString();
         if (pair.size() < 3) {
@@ -535,5 +631,8 @@ public final class InstalledObjectPackLoader {
     }
 
     private record EntryData(String path, byte[] bytes) {
+    }
+
+    private record NestedArchive(String name, byte[] bytes) {
     }
 }

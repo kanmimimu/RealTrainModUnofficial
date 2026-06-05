@@ -9,7 +9,10 @@ public class VehicleDefinition {
     public static final int SEAT_TYPE_DISABLED = 0;
     public static final int SEAT_TYPE_DRIVER_CAB = -1;
 
-    public record BogieDefinition(String modelFile, Map<String, String> textureOverrides, Vec3 position) {
+    public record BogieDefinition(String modelFile, Map<String, String> textureOverrides, Vec3 position, String scriptPath) {
+        public BogieDefinition(String modelFile, Map<String, String> textureOverrides, Vec3 position) {
+            this(modelFile, textureOverrides, position, "");
+        }
     }
 
     public record SeatMarker(Vec3 position, int type, boolean driverCab) {
@@ -65,6 +68,11 @@ public class VehicleDefinition {
     private final List<LightDefinition> interiorLights;
     private final String hornSound;
     private final List<String> announcementSounds;
+    private String soundStop = "";
+    private String soundStartAcceleration = "";
+    private String soundAcceleration = "";
+    private String soundDeceleration = "";
+    private String soundDecelerationStop = "";
     private final boolean doCulling;
     private final boolean renderLight;
     private final boolean notDisplayCab;
@@ -440,6 +448,44 @@ public class VehicleDefinition {
 
     public List<String> getAnnouncementSounds() {
         return announcementSounds;
+    }
+
+    public String getSoundStop() {
+        return soundStop;
+    }
+
+    public String getSoundStartAcceleration() {
+        return soundStartAcceleration;
+    }
+
+    public String getSoundAcceleration() {
+        return soundAcceleration;
+    }
+
+    public String getSoundDeceleration() {
+        return soundDeceleration;
+    }
+
+    public String getSoundDecelerationStop() {
+        return soundDecelerationStop;
+    }
+
+    public boolean hasJsonRunningSounds() {
+        return !soundStop.isBlank()
+            || !soundStartAcceleration.isBlank()
+            || !soundAcceleration.isBlank()
+            || !soundDeceleration.isBlank()
+            || !soundDecelerationStop.isBlank();
+    }
+
+    public void setJsonRunningSounds(String soundStop, String soundStartAcceleration,
+                                     String soundAcceleration, String soundDeceleration,
+                                     String soundDecelerationStop) {
+        this.soundStop = soundStop == null ? "" : soundStop;
+        this.soundStartAcceleration = soundStartAcceleration == null ? "" : soundStartAcceleration;
+        this.soundAcceleration = soundAcceleration == null ? "" : soundAcceleration;
+        this.soundDeceleration = soundDeceleration == null ? "" : soundDeceleration;
+        this.soundDecelerationStop = soundDecelerationStop == null ? "" : soundDecelerationStop;
     }
 
     public boolean isDoCulling() {

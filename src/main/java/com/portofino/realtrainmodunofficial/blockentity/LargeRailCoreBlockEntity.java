@@ -141,7 +141,11 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         this.previousSegmentIndex = tag.getInt("PreviousSegmentIndex");
         this.switchProgress = tag.contains("SwitchProgress") ? tag.getFloat("SwitchProgress") : 1.0F;
         this.lastSignalStrength = tag.contains("LastSignalStrength") ? tag.getInt("LastSignalStrength") : -1;
-        this.switchStateDirty = !tag.contains("SwitchStateDirty") || tag.getBoolean("SwitchStateDirty");
+        // ロード時は switchType を再構築する(loadAdditwith で null 化)が、再構築直後は既定(直進)状態。
+        // 保存時の switchStateDirty=false をそのまま使うと再評価されず、レッドストーンブロックが
+        // 隣接していても直進へ「リセット」されてしまう。ロード時は必ず再評価して周囲の信号から
+        // 分岐状態を復元する(信号が無ければ自然に直進へ戻る)。
+        this.switchStateDirty = true;
         clampActiveSegment();
     }
 
@@ -229,6 +233,21 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
 
     public RailMap getRailMap() {
         return railMap;
+    }
+
+    /** SRB3 互換(tile.getRailMap(null))。 */
+    public RailMap getRailMap(Object ignored) {
+        return getRailMap();
+    }
+
+    /** SRB3 互換(tile.getRailCore())。RTMU ではコア自身が tile。 */
+    public LargeRailCoreBlockEntity getRailCore() {
+        return this;
+    }
+
+    /** 本家RTM準拠の分岐レンダリング用: 分岐の Point 配列(分岐でなければ null)。 */
+    public com.portofino.realtrainmodunofficial.rail.util.Point[] getSwitchPoints() {
+        return switchType != null ? switchType.getPoints() : null;
     }
 
     public RailMap[] getAllRailMaps() {

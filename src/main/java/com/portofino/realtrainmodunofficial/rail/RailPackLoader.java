@@ -14,22 +14,25 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class RailPackLoader {
     private static final List<RailDefinition> LOADED = new ArrayList<>();
+    private static final Map<String, Path> VIRTUAL_PACKS = new ConcurrentHashMap<>();
     private static boolean loaded = false;
 
     public static synchronized void load() {
         if (loaded) return;
         loaded = true;
         LOADED.clear();
-        loadFromModJar();
         loadFromExternalDirectories();
         loadFromGameDirectories();
         RailRegistry.setDefinitions(LOADED);
@@ -83,7 +86,12 @@ public class RailPackLoader {
             stream.filter(RailPackLoader::isSupportedArchive)
                 .forEach(zipPath -> {
                     try (InputStream is = Files.newInputStream(zipPath)) {
+                        int before = LOADED.size();
                         loadRailPack(is, zipPath.getFileName().toString());
+                        int added = LOADED.size() - before;
+                        if (added > 0) {
+                            RealTrainModUnofficial.LOGGER.info("Loaded {} rail definition(s) from {}", added, zipPath.getFileName());
+                        }
                     } catch (Exception e) {
                         RealTrainModUnofficial.LOGGER.warn("Failed to load rail pack {}", zipPath.getFileName(), e);
                     }
@@ -92,8 +100,13 @@ public class RailPackLoader {
     }
 
     private static boolean isSupportedArchive(Path path) {
-        String fileName = path.getFileName().toString().toLowerCase();
-        return fileName.endsWith(".zip") || fileName.endsWith(".jar");
+        String fileName = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (!fileName.endsWith(".zip") && !fileName.endsWith(".jar")) {
+            return false;
+        }
+        return !fileName.contains("realtrainmodunofficial")
+            && !fileName.contains("rtm-official-assets")
+            && !fileName.contains("kaizpatchx");
     }
 
     public static synchronized void reload() {
@@ -102,7 +115,12 @@ public class RailPackLoader {
     }
 
     private static void loadRailPack(InputStream zipInput, String packName) throws IOException {
+        loadRailPack(zipInput, packName, 0);
+    }
+
+    private static void loadRailPack(InputStream zipInput, String packName, int depth) throws IOException {
         List<byte[]> jsonBytes = new ArrayList<>();
+        List<NestedArchive> nestedArchives = new ArrayList<>();
         try (ZipInputStream zip = new ZipInputStream(zipInput)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
@@ -110,6 +128,8 @@ public class RailPackLoader {
                     String name = normalize(entry.getName());
                     if (isRailJson(name)) {
                         jsonBytes.add(zip.readAllBytes());
+                    } else if (depth < 2 && isArchiveName(name)) {
+                        nestedArchives.add(new NestedArchive(name, zip.readAllBytes()));
                     }
                 }
                 zip.closeEntry();
@@ -118,6 +138,37 @@ public class RailPackLoader {
         for (byte[] bytes : jsonBytes) {
             parseRailJson(bytes, packName);
         }
+        for (NestedArchive nested : nestedArchives) {
+            Path materialized = materializeNestedPack(nested.name(), nested.bytes());
+            try (InputStream input = Files.newInputStream(materialized)) {
+                int before = LOADED.size();
+                loadRailPack(input, nested.name(), depth + 1);
+                int added = LOADED.size() - before;
+                if (added > 0) {
+                    RealTrainModUnofficial.LOGGER.info("Loaded {} rail definition(s) from nested pack {} in {}", added, nested.name(), packName);
+                }
+            }
+        }
+    }
+
+    public static Path materializeNestedPack(String nestedName, byte[] bytes) throws IOException {
+        String leaf = nestedName == null || nestedName.isBlank() ? "nested_pack.zip"
+            : normalize(nestedName).substring(normalize(nestedName).lastIndexOf('/') + 1);
+        String safeName = leaf.replaceAll("[^A-Za-z0-9._-]", "_");
+        String hash = Integer.toHexString(Arrays.hashCode(bytes));
+        Path cacheDir = FMLPaths.GAMEDIR.get()
+            .resolve("config")
+            .resolve("realtrainmodunofficial")
+            .resolve("nested_pack_cache");
+        Files.createDirectories(cacheDir);
+        Path cached = cacheDir.resolve(hash + "_" + safeName);
+        if (!Files.exists(cached) || Files.size(cached) != bytes.length) {
+            Files.write(cached, bytes);
+        }
+        VIRTUAL_PACKS.put(leaf, cached);
+        VIRTUAL_PACKS.put(nestedName, cached);
+        VIRTUAL_PACKS.put(cached.getFileName().toString(), cached);
+        return cached;
     }
 
     private static void parseRailJson(byte[] bytes, String packName) {
@@ -225,6 +276,11 @@ public class RailPackLoader {
         return n.startsWith("modelrail_");
     }
 
+    private static boolean isArchiveName(String path) {
+        String lower = path.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".zip") || lower.endsWith(".jar");
+    }
+
     private static String normalize(String raw) {
         return raw.replace('\\', '/');
     }
@@ -285,6 +341,14 @@ public class RailPackLoader {
 
     public static Path resolvePackPath(String packName) {
         if (packName == null || packName.isBlank()) return null;
+        Path virtual = VIRTUAL_PACKS.get(packName);
+        if (virtual != null && Files.exists(virtual)) return virtual;
+        String normalizedPackName = normalize(packName);
+        String leafPackName = normalizedPackName.contains("/")
+            ? normalizedPackName.substring(normalizedPackName.lastIndexOf('/') + 1)
+            : normalizedPackName;
+        virtual = VIRTUAL_PACKS.get(leafPackName);
+        if (virtual != null && Files.exists(virtual)) return virtual;
         try {
             Path direct = Path.of(packName);
             if (direct.isAbsolute() && Files.exists(direct)) return direct;
@@ -305,6 +369,20 @@ public class RailPackLoader {
         if (Files.exists(modsDir)) return modsDir;
         Path contentDir = gameDir.resolve("content").resolve(packName);
         if (Files.exists(contentDir)) return contentDir;
+        Path nestedCacheDir = gameDir.resolve("config").resolve("realtrainmodunofficial").resolve("nested_pack_cache");
+        if (Files.isDirectory(nestedCacheDir)) {
+            try (var stream = java.nio.file.Files.list(nestedCacheDir)) {
+                java.util.Optional<Path> hit = stream
+                    .filter(java.nio.file.Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().endsWith("_" + leafPackName))
+                    .findFirst();
+                if (hit.isPresent()) {
+                    VIRTUAL_PACKS.put(packName, hit.get());
+                    VIRTUAL_PACKS.put(leafPackName, hit.get());
+                    return hit.get();
+                }
+            } catch (Exception ignored) {}
+        }
         Path materialized = BundledPackStore.materializeBundledPack(packName);
         if (materialized != null) return materialized;
         if (BundledPackStore.isBundledPackName(packName)) {
@@ -364,5 +442,8 @@ public class RailPackLoader {
             RealTrainModUnofficial.LOGGER.warn("Failed to read script {} from pack {}", definition.getScriptPath(), definition.getPackName(), e);
         }
         return null;
+    }
+
+    private record NestedArchive(String name, byte[] bytes) {
     }
 }

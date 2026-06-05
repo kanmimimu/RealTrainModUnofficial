@@ -12,10 +12,12 @@ import com.portofino.realtrainmodunofficial.script.TrainScriptSystem;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.util.Mth;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -67,6 +69,18 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     public TrainEntityRenderer(EntityRendererProvider.Context context) {
         super(context);
         this.shadowRadius = 0.0F;
+    }
+
+    private static int resolveTrainPackedLight(TrainEntity entity, int fallbackPackedLight) {
+        if (entity == null || entity.level() == null) {
+            return fallbackPackedLight;
+        }
+        try {
+            BlockPos bodyPos = BlockPos.containing(entity.getX(), entity.getY() + 1.5D, entity.getZ());
+            return LevelRenderer.getLightColor(entity.level(), bodyPos);
+        } catch (Throwable ignored) {
+            return fallbackPackedLight;
+        }
     }
 
     @Override
@@ -165,6 +179,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             boolean aggressiveDistanceCulling = !ridingThisTrain && cameraDistanceSq > aggressiveThreshold * aggressiveThreshold;
             boolean renderRollsigns = ridingThisTrain || cameraDistanceSq < rollsignThreshold * rollsignThreshold;
             boolean renderLights = ridingThisTrain || cameraDistanceSq < lightThreshold * lightThreshold;
+            int trainPackedLight = resolveTrainPackedLight(entity, packedLight);
 
             boolean modelScriptRunning = model.hasRenderScript();
             // def.hasScript() covers cases where the JS engine failed to load (e.g. unsupported JS runtime)
@@ -175,6 +190,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 groupName -> shouldRenderTrainGroup(groupName, renderInterior, aggressiveDistanceCulling, compatibilityHeavy, def, modelHasScript, modelScriptRunning);
             MqoModelLoader.GroupTransform doorTransform = new MqoModelLoader.GroupTransform() {
                 @Override public void apply(PoseStack stack, String groupName) {
+                    applyRunningGearTransform(stack, entity, def, model, groupName, renderYaw, partialTicks);
                     applyDoorTransform(stack, def.getLeftDoors(), groupName, entity.doorMoveL, true);
                     applyDoorTransform(stack, def.getRightDoors(), groupName, entity.doorMoveR, false);
                 }
@@ -182,6 +198,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                     // door 系グループ以外は pushPose 不要 ⇒ Pose (Matrix4f+Matrix3f) 確保を回避。
                     // SL のような扉なし車両では全 batch でスキップされる。
                     if (groupName == null || groupName.length() < 4) return false;
+                    if (isRunningGearGroup(groupName)) return true;
                     // i + 3 が最後の有効インデックスになるよう n = length - 4。
                     // 旧コードは n = length - 3 で i = n のとき charAt(i+3) = charAt(length) で IOOB。
                     for (int i = 0, n = groupName.length() - 4; i <= n; i++) {
@@ -216,20 +233,19 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                     "[Render] all groups: {}", allGroups
                 );
             }
-            // 実際の packedLight を使用し、室内灯がないときは夜間に暗くなるようにする。
-            // emissive pass (pass>=2) は MqoModelLoader 内の setRenderContext で
-            // 自動的に FULL_BRIGHT に切り替わるため、室内灯ONのみ発光する挙動になる。
-            MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, groupFilter, doorTransform, entity);
+            // 列車の実座標から取り直した lightmap を使用し、室内灯OFFの外装が夜に白く浮かないようにする。
+            // 発光 pass は MqoModelLoader/TrainScriptSystem 側で室内灯ONの内装だけに制限する。
+            MqoModelLoader.renderModel(model, poseStack, buffer, trainPackedLight, groupFilter, doorTransform, entity);
             // 台車は車体と同じ変換内で描画し、各台車ごとにレール高へ補正する。
             try {
-                renderBogiesInline(entity, def, model, poseStack, buffer, packedLight, partialTicks);
+                renderBogiesInline(entity, def, model, poseStack, buffer, trainPackedLight, partialTicks);
             } catch (Throwable t) {
                 com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER
                     .debug("Inline bogie render failed for {}: {}", entity.getVehicleId(), t.toString());
             }
             // 台車の当たり判定は TrainBogieEntity、見た目は車体レンダー内で描画する。
-            if (renderRollsigns) {
-                renderConfiguredRollsigns(entity, def, poseStack, buffer, packedLight);
+            if (renderRollsigns && !modelHasScript) {
+                renderConfiguredRollsigns(entity, def, poseStack, buffer, trainPackedLight);
             }
             if (renderLights) {
                 renderConfiguredLights(entity, def, model, poseStack, buffer, renderYaw, ridingThisTrain);
@@ -244,6 +260,57 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         ClientRenderProfiler.endTrain(profilerStart);
     }
 
+    private static void applyRunningGearTransform(PoseStack poseStack, TrainEntity entity, VehicleDefinition def,
+                                                  MqoModelLoader.MqoModel model, String groupName,
+                                                  float renderYaw, float partialTicks) {
+        if (poseStack == null || entity == null || def == null || model == null || !isRunningGearGroup(groupName)) {
+            return;
+        }
+        if (def.getBogies().isEmpty()) {
+            return;
+        }
+        net.minecraft.world.phys.Vec3 center = model.getGroupCenter(groupName);
+        if (center == null) {
+            return;
+        }
+        int bestIndex = -1;
+        double bestDistance = Double.POSITIVE_INFINITY;
+        for (int i = 0; i < def.getBogies().size(); i++) {
+            net.minecraft.world.phys.Vec3 bogiePos = def.getBogies().get(i).position();
+            double dz = center.z - bogiePos.z;
+            double dx = center.x - bogiePos.x;
+            double distance = dz * dz + dx * dx * 0.25D;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+        if (bestIndex < 0) {
+            return;
+        }
+        VehicleDefinition.BogieDefinition bogie = def.getBogies().get(bestIndex);
+        net.minecraft.world.phys.Vec3 corrected = entity.getBogieRenderOffset(bestIndex, bogie, renderYaw, partialTicks);
+        net.minecraft.world.phys.Vec3 delta = corrected.subtract(bogie.position());
+        if (delta.lengthSqr() > 1.0E-8D) {
+            poseStack.translate(delta.x, delta.y, delta.z);
+        }
+    }
+
+    private static boolean isRunningGearGroup(String groupName) {
+        if (groupName == null || groupName.isBlank()) {
+            return false;
+        }
+        String lower = groupName.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("bogie")
+            || lower.contains("wheel")
+            || lower.contains("truck")
+            || lower.contains("daisya")
+            || lower.contains("daisha")
+            || lower.contains("sharin")
+            || lower.contains("車輪")
+            || lower.contains("台車");
+    }
+
     private static void applyDoorTransform(PoseStack poseStack, java.util.List<VehicleDefinition.DoorAnimationDefinition> doors,
                                            String groupName, float progressTicks, boolean leftSide) {
         if (groupName == null) {
@@ -254,7 +321,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         // 列車 1 台あたり ~100 batch × 2 (L/R) = 200 回呼ばれる hot path。
         if (groupName.indexOf('d') < 0 && groupName.indexOf('D') < 0) return;
         boolean mayBeDoor = false;
-        for (int i = 0, n = groupName.length() - 3; i <= n; i++) {
+        for (int i = 0, n = groupName.length() - 4; i <= n; i++) {
             char c0 = groupName.charAt(i);
             if (c0 != 'd' && c0 != 'D') continue;
             char c1 = groupName.charAt(i + 1);
@@ -443,7 +510,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         if (isBogieOrWheel) {
             boolean hasSeparateBogieModel = def != null && def.getBogies().stream()
                 .anyMatch(b -> b.modelFile() != null && !b.modelFile().isBlank());
-            if (hasSeparateBogieModel) return false;
+            if (hasSeparateBogieModel && !scriptActuallyRunning) return false;
         }
         // RTMパックには非表示にすべきヘルパーグループが含まれている:
         //   shadow    - 地面に張り付いたシャドウポリゴン(レールを隠す)
@@ -547,8 +614,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         float baseYaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
         for (int i = 0; i < def.getBogies().size(); i++) {
             VehicleDefinition.BogieDefinition bogieDef = def.getBogies().get(i);
-            if (selfDrawsRunningGear && bogieDef != null && bogieDef.modelFile() != null
-                    && bogieDef.modelFile().toLowerCase(java.util.Locale.ROOT).endsWith(".class")) {
+            if (shouldSkipInlineBogie(selfDrawsRunningGear, bogieDef)) {
                 continue;
             }
             try {
@@ -557,6 +623,16 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 // 1台の台車失敗で他を巻き込まない
             }
         }
+    }
+
+    private static boolean shouldSkipInlineBogie(boolean selfDrawsRunningGear, VehicleDefinition.BogieDefinition bogieDef) {
+        if (bogieDef == null || bogieDef.modelFile() == null || bogieDef.modelFile().isBlank()) {
+            return true;
+        }
+        if (BogieRenderer.isDummyBogieModel(bogieDef.modelFile())) {
+            return true;
+        }
+        return selfDrawsRunningGear && bogieDef.modelFile().toLowerCase(java.util.Locale.ROOT).endsWith(".class");
     }
 
     private static boolean shouldUseCompatibilityRendering(VehicleDefinition def, MqoModelLoader.MqoModel model) {
@@ -582,6 +658,9 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                                                com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model,
                                                PoseStack poseStack, MultiBufferSource buffer, float renderYaw,
                                                boolean ridingThisTrain) {
+        // 「臨場感ライト」(放射状グローのビルボード)はユーザー要望で無効化。
+        // 実際のランプ部品(モデルの発光テクスチャ)はスクリプト/モデル側で描画されるので残る。
+        if (true) return;
         if (def == null) return;
         int mode = entity.getLightMode();
         boolean interiorOn = entity.isInteriorLightOn();

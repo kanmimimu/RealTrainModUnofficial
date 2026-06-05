@@ -42,10 +42,12 @@
   "message.realtrainmodunofficial.train.already_exists": "A train already exists at that location",
 
   "screen.realtrainmodunofficial.select_train": "Select Train Model",
-  "screen.realtrainmodunofficial.select_rail": "Select Rail Model",
+  "screen.realtrainmodunofficial.select_rail": "Select Rail",
+  "screen.realtrainmodunofficial.select_car": "Select Car",
   "screen.realtrainmodunofficial.select_light": "Select Light Model",
   "screen.realtrainmodunofficial.select_signboard": "Select Signboard Model",
   "screen.realtrainmodunofficial.select_insulator": "Select Insulator Model",
+  "screen.realtrainmodunofficial.select_overhead_line_pole": "Select Catenary Pole Model",
   "screen.realtrainmodunofficial.select_wire": "Select Wire Model",
   "screen.realtrainmodunofficial.select_signal": "Select Signal Model",
   "screen.realtrainmodunofficial.select_crossing": "Select Crossing Model",
@@ -84,10 +86,5 @@
   "realtrainmodunofficial.configuration.items": "Item List",
   "realtrainmodunofficial.configuration.logDirtBlock": "Log Dirt Block",
   "realtrainmodunofficial.configuration.magicNumberIntroduction": "Magic Number Text",
-  "realtrainmodunofficial.configuration.magicNumber": "Magic Number",
-  "block.realtrainmodunofficial.atsa_ground_unit": "ATS Assist Ground Unit",
-  "block.realtrainmodunofficial.atsa_ifttt": "ATS Assist IFTTT",
-  "block.realtrainmodunofficial.atsa_station_announce": "ATS Assist Station Announce",
-  "item.realtrainmodunofficial.atsa_train_protection_selector": "ATS Assist Train Protection Selector",
-  "item.realtrainmodunofficial.atsa_data_map_editor": "ATS Assist DataMap Editor"
+  "realtrainmodunofficial.configuration.magicNumber": "Magic Number"
 }

@@ -31,7 +31,17 @@ import org.jetbrains.annotations.Nullable;
  */
 public class RailCollisionBlock extends BaseEntityBlock {
     public static final MapCodec<RailCollisionBlock> CODEC = simpleCodec(RailCollisionBlock::new);
-    private static final VoxelShape SHAPE = box(0, 0, 0, 16, 1, 16); // very thin, just above the rail surface
+    // 本家RTM準拠: ブロック底からレール面の高さまでのスラブ box(0,0,0,16,railTop,16)。
+    // 平坦レールは surfaceY=0 → 1px の薄いスラブ(=カーペット)。坂はレール面まで床から詰めるので
+    // 「ブロック全体」にも「浮いた薄板」にもならず、レール形状に沿って当たる/狙える/壊せる。
+    private static VoxelShape railShape(BlockGetter level, BlockPos pos) {
+        float s = 0.0f;
+        if (level.getBlockEntity(pos) instanceof RailCollisionBlockEntity rbe) {
+            s = rbe.getSurfaceY();
+        }
+        double top = Math.max(1.0D, Math.min(16.0D, s * 16.0D)); // 最低 1px(本家の 0.0625 相当)
+        return box(0.0D, 0.0D, 0.0D, 16.0D, top, 16.0D);
+    }
 
     public RailCollisionBlock(BlockBehaviour.Properties props) {
         super(props);
@@ -58,17 +68,17 @@ public class RailCollisionBlock extends BaseEntityBlock {
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return SHAPE;
+        return railShape(level, pos);
     }
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return SHAPE;
+        return railShape(level, pos);
     }
 
     @Override
     public VoxelShape getInteractionShape(BlockState state, BlockGetter level, BlockPos pos) {
-        return SHAPE;
+        return railShape(level, pos);
     }
 
     @Override

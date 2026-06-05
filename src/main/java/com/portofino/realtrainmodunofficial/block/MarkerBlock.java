@@ -457,6 +457,40 @@ public class MarkerBlock extends BaseEntityBlock {
     }
 
     /**
+     * SuperRailBuilder3 等のスクリプトブリッジ用。modelId のレール定義で RailProperties を作り、
+     * rps(2個=通常 / 3個以上=分岐)から RTMU ネイティブのレールを敷設する。
+     */
+    public static boolean buildRailForScript(Level level, List<RailPosition> rps, String modelId) {
+        if (level == null || rps == null || rps.size() < 2) {
+            return false;
+        }
+        // SRB の手持ちレールIDが RTMU の RailRegistry に存在しないことがある(別パックの命名)。
+        // その場合は選択中レール→先頭レールへフォールバックし、必ず有効な定義で敷設する。
+        com.portofino.realtrainmodunofficial.rail.RailDefinition def =
+            com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(modelId);
+        if (def == null) {
+            def = com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
+        }
+        if (def == null) {
+            java.util.List<com.portofino.realtrainmodunofficial.rail.RailDefinition> all =
+                com.portofino.realtrainmodunofficial.rail.RailRegistry.getAll();
+            if (!all.isEmpty()) {
+                def = all.get(0);
+            }
+        }
+        String resolvedId = def != null ? def.getId() : modelId;
+        RailProperties prop = createRailProperties(null, resolvedId);
+        // 当たり判定(RailCollisionBlock)は ballastWidth>0 のときだけ置かれる。SRB敷設では
+        // 必ず判定が出るよう、0以下なら既定幅にする(本家でも床面に判定が出る)。
+        if (prop.ballastWidth <= 0) {
+            prop.ballastWidth = 3;
+        }
+        RailPosition origin = rps.get(0);
+        BlockPos originPos = new BlockPos(origin.blockX, origin.blockY, origin.blockZ);
+        return createRail(level, originPos, rps, prop, true, true, resolvedId);
+    }
+
+    /**
      * legacy BlockMarker.createRail に相当。
      *  2個 → createNormalRail
      *  3個以上 → createSwitchRail（分岐: 最初のマーカーを起点に各ペアへ通常レールを生成）
@@ -493,6 +527,10 @@ public class MarkerBlock extends BaseEntityBlock {
         Block coreBlock = RealTrainModUnofficialBlocks.LARGE_RAIL_CORE.get();
         level.setBlock(corePos, coreBlock.defaultBlockState(), Block.UPDATE_ALL);
 
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+            "[RTM-DBG] BUILD normalRail start(blk={},{},{} h={} yaw={} posY={}) end(blk={},{},{} h={} yaw={} posY={})",
+            start.blockX, start.blockY, start.blockZ, start.height, start.anchorYaw, (float) start.posY,
+            end.blockX, end.blockY, end.blockZ, end.height, end.anchorYaw, (float) end.posY);
         BlockEntity coreBe = level.getBlockEntity(corePos);
         if (coreBe instanceof LargeRailCoreBlockEntity core) {
             core.setRailPositions(new RailPosition[]{start, end});

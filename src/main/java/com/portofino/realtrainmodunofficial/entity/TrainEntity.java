@@ -31,6 +31,7 @@ import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -116,6 +117,10 @@ public class TrainEntity extends Entity {
     private static final double BOGIE_SPAN_TOLERANCE = 1.75D;
     private static final double RAIL_CONNECTION_MAX_DISTANCE_SQ = 0.25D;
     private static final float RAIL_CONNECTION_MAX_YAW_DIFF = 20.0F;
+    // 1tickの本体中心移動の許容上限(=移動距離 + この余裕)。これを超えるジャンプは
+    // 逆向き継ぎ目等でのレール選択不安定によるワープとみなし棄却する。MAX_SPEED(2.0)に
+    // カーブ補間の揺れ余裕を足した値。通常走行・カーブでは到達しない。
+    private static final double RAIL_TELEPORT_TOLERANCE = 3.0D;
     // 0.74 → +0.1 = 0.84。
     private static final double EXTRA_TRAIN_BODY_LIFT = 0.84D;
     private static final double EXTRA_BOGIE_LIFT = 0.02D;
@@ -164,6 +169,11 @@ public class TrainEntity extends Entity {
     private final int[] bogiePrevSampleIndex = new int[]{-1, -1};
     private final float[] bogieYawMemory = new float[2];
     private final float[] bogiePitchMemory = new float[2];
+    // クライアント描画で台車をレール追従させる際の RailMap キャッシュ(全探索を避ける)。
+    // bogieIndex を 0/1 の extreme side に正規化したインデックスで保持。
+    private final RailMap[] clientBogieRailMap = new RailMap[2];
+    // 台車レール追従の水平オフセット(本体ローカル)を平滑化して保持。探索が一瞬失敗しても
+    // 直前値を維持し、台車が一瞬剛体位置へ戻って「外れて見える」のを防ぐ。
     private UUID activeDriverUuid;
     private int activeDriverTicks;
     private int clientLerpSteps;
@@ -173,6 +183,8 @@ public class TrainEntity extends Entity {
     private double clientLerpYRot;
     private double clientLerpXRot;
     private int interactionHitboxRefreshCooldown;
+    /** 診断用: STALL ログのスパム防止クールダウン(tick)。 */
+    private int stallLogCooldown;
     private float rotationRoll;
     private float prevRotationRoll;
     public float doorMoveL;
@@ -201,10 +213,19 @@ public class TrainEntity extends Entity {
         e.setLightMode(0);
         // スポーン位置をレール基準で少し上げる（埋まり防止）
         e.moveTo(x, y + RAIL_HEIGHT_OFFSET, z, yRot, 0f);
+        // 前tick位置(xo/yo/zo)を現在位置に揃える。これをしないとスポーン直後の
+        // 描画補間が原点(0,0,0)から行われ、台車のワールド位置計算が大きくズレる
+        // (=「列車を出した瞬間だけ台車がズレる/動かすと直る」の原因)。
+        e.setOldPosAndRot();
         e.refreshDimensions();
 
         // スクリプトはMqoModelLoaderでロードされるため、ここではロードしない
         return e;
+    }
+
+    /** The rail this train currently sits on (used by placement to allow side-by-side trains on separate rails). */
+    public RailMap getActiveRailMap() {
+        return activeRailMap;
     }
 
     public void initializeOnRail(RailMap map, int split, int index) {
@@ -234,6 +255,9 @@ public class TrainEntity extends Entity {
         setDeltaMovement(Vec3.ZERO);
         setSpeed(0.0F);
         setNotch(0);
+        // レール整列後の本体位置を前tick位置にも反映し、初回フレームの補間ズレ
+        // (台車が一瞬ズレて見える)を防ぐ。
+        setOldPosAndRot();
     }
 
     @Override
@@ -265,6 +289,9 @@ public class TrainEntity extends Entity {
     public void setVehicleId(String id) { entityData.set(VEHICLE_ID, id != null ? id : ""); }
     public float getSpeed() { return entityData.get(SPEED); }
     public void setSpeed(float speed) { entityData.set(SPEED, speed); }
+    /** 動輪/ロッドの累積回転角(度, 0-360)。毎tickの移動距離で加算。スクリプトの getWheelRotationR が参照。 */
+    private float wheelRotationDegrees = 0.0F;
+    public float getWheelRotationDegrees() { return wheelRotationDegrees; }
     public float getTrainDistance() { return entityData.get(TRAIN_DISTANCE); }
     public void setTrainDistance(float distance) { entityData.set(TRAIN_DISTANCE, Math.max(2.5f, distance)); }
     public int getNotch() { return entityData.get(NOTCH); }
@@ -409,9 +436,29 @@ public class TrainEntity extends Entity {
         return scriptData.getOrDefault(key, "");
     }
 
+    public void setScriptDataValue(String key, String value) {
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        scriptData.put(key, value == null ? "" : value);
+        scriptDataDirty = true;
+    }
+
     public void applyScriptDataSync(java.util.Map<String, String> data) {
         if (data == null || data.isEmpty()) return;
         scriptData.putAll(data);
+        for (Map.Entry<String, String> entry : data.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || !key.startsWith("Button")) continue;
+            try {
+                int index = Integer.parseInt(key.substring("Button".length()));
+                if (index >= 0 && index < 16) {
+                    if (customButtonValues == null) customButtonValues = new int[16];
+                    customButtonValues[index] = Integer.parseInt(entry.getValue());
+                }
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     public ScriptEngine getScriptEngine() { return this.scriptEngine; }
@@ -526,6 +573,16 @@ public class TrainEntity extends Entity {
         prevRotationRoll = rotationRoll;
         rotationRoll = entityData.get(BODY_ROLL);
 
+        // 動輪/ロッドの回転角を「毎tickの移動距離」で累積する。
+        // 旧実装(tickCount × 現在速度)は速度が少しでも変わるたびに全履歴が再スケールされ、
+        // tickCount が大きいほど巨大な回転ジャンプ→「空転しまくり」になっていた。
+        // 正しくは各tickに進んだ距離分だけ回す(= 速度/円周 × 360)。
+        {
+            float distThisTick = Math.abs(getSpeed());
+            final float wheelCircumference = (float) (2.0 * Math.PI * 0.43);
+            wheelRotationDegrees = (wheelRotationDegrees + (distThisTick / wheelCircumference) * 360.0F) % 360.0F;
+        }
+
         // スクリプトのtick関数を呼び出す
         updateTrainAnimationState();
         if (level().isClientSide() && soundScriptEngine == null && !attemptedSoundScriptLoad) {
@@ -537,10 +594,15 @@ public class TrainEntity extends Entity {
         }
         boolean runScriptTick = !level().isClientSide() || shouldRunClientVisualScriptThisTick();
         if (level().isClientSide() && soundScriptEngine != null) {
+            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAutoRunningSound(this);
             TrainScriptSystem.invokeScriptTick(soundScriptEngine, this);
             TrainScriptSystem.invokeScriptUpdate(soundScriptEngine, this, 1.0F);
-        } else if (runScriptTick) {
-            if (scriptEngine != null) {
+        } else {
+            if (level().isClientSide()) {
+                com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
+            }
+            // 音は毎tick更新するが、重い描画スクリプトは既存の間引き設定を尊重する。
+            if (runScriptTick && scriptEngine != null) {
                 TrainScriptSystem.invokeScriptTick(scriptEngine, this);
             }
         }
@@ -606,9 +668,8 @@ public class TrainEntity extends Entity {
 
             float speed = getSpeed();
             int notch = getNotch();
-
-            com.portofino.realtrainmodunofficial.compat.atsassist.AtsaTrainController.tick(this);
-            notch = getNotch();
+            // ATSA(別mod)は NeoForge の EntityTickEvent 経由で notch を制御するため、
+            // ここでの直接呼び出しは行わない。ATSA未導入時は何も起きない。
 
             FormationDriver formationDriver = getFormationDriver();
             Entity controller = formationDriver != null ? formationDriver.controller() : null;
@@ -631,11 +692,11 @@ public class TrainEntity extends Entity {
 
             setSpeed(speed);
 
-            boolean onRail = travelAlongRail(speed, controller, cabTrain);
-            // 真下にレール (RailMap) が存在しない or ブロックがない場合は脱線扱い。
-            // travelAlongRail がキャッシュされたアンカーで成功を返してしまっても、
-            // 物理的に真下に何もなければ重力を適用する。
+            // 先に支え(レール)の有無を判定する。レールが壊れて支えが無い時に travelAlongRail を
+            // 走らせると、キャッシュ済みアンカー(壊れたレール位置)へスナップし続けて空中に浮くため、
+            // 支え無しならレール追従をスキップして重力に任せる。
             boolean unsupported = isUnsupportedInAir();
+            boolean onRail = !unsupported && travelAlongRail(speed, controller, cabTrain);
             if (!onRail || unsupported) {
                 setSpeed(0.0F);
                 setNotch(0);
@@ -725,13 +786,16 @@ public class TrainEntity extends Entity {
 
     private float applyNotchPhysics(float speed, int notch) {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
-        float maxSpeed = getConfiguredMaxSpeed(def, notch);
         float accelBase = getConfiguredAcceleration(def);
-        float absSpeed = Math.abs(speed);
-        float speedRatio = Mth.clamp(absSpeed / maxSpeed, 0.0F, 1.0F);
 
         if (notch > 0) {
             if (getReverser() == 0) {
+                return speed;
+            }
+            float maxSpeed = getConfiguredMaxSpeed(def, notch);
+            float absSpeed = Math.abs(speed);
+            float speedRatio = Mth.clamp(absSpeed / maxSpeed, 0.0F, 1.0F);
+            if (absSpeed >= maxSpeed) {
                 return speed;
             }
             // 力行: 実車らしく「発車はゆっくり → 徐々にぐんぐん速くなる → 最高速で頭打ち」。
@@ -743,7 +807,8 @@ public class TrainEntity extends Entity {
             // 最高速付近でだけ頭打ちにする(実車の定出力域→特性域に近い)。
             float tractionCurve = (0.30F + launchRamp * 0.70F) * (1.0F - (float) Math.pow(speedRatio, 3.0));
             float accelCurve = accelBase * (0.55F + notchFactor * 0.70F) * tractionCurve;
-            return Mth.clamp(speed + Math.max(0.00008F, accelCurve), -maxSpeed, maxSpeed);
+            float next = speed + Math.max(0.00008F, accelCurve);
+            return Math.abs(next) > maxSpeed ? Math.copySign(maxSpeed, next) : next;
         }
 
         if (notch < 0) {
@@ -866,8 +931,9 @@ public class TrainEntity extends Entity {
             double yawRad = Math.toRadians(-getYRot());
             forward = new Vec3(-Math.sin(yawRad), 0.0D, Math.cos(yawRad));
         }
-        double thisHalf = getTrainHalfLength();
-        double followerHalf = follower.getTrainHalfLength();
+        // 連結間隔は当たり判定用の膨張長ではなく実車体端(連結面)で配置する(短車両の間隔過大対策)。
+        double thisHalf = getCouplingHalfLength();
+        double followerHalf = follower.getCouplingHalfLength();
         int followerDirection = -currentSide * otherSide;
         Vec3 coupler = position().add(forward.scale(currentSide * (thisHalf + COUPLED_CLEARANCE)));
         Vec3 center = coupler.subtract(forward.scale(followerDirection * otherSide * followerHalf));
@@ -989,10 +1055,20 @@ public class TrainEntity extends Entity {
         return true;
     }
 
+    /**
+     * 連結間隔に使う「中心→連結面(車体端)」距離。trainDistance が center-to-end。
+     * getTrainHalfLength は台車/座席位置で膨張した当たり判定用の長さで、短い車体だと
+     * 実車体より長くなり連結間隔が伸びすぎる。連結にはこの実車体端を使う。
+     */
+    private double getCouplingHalfLength() {
+        return Math.max(1.0D, getTrainDistance());
+    }
+
     private static double getCoupledGap(TrainEntity front, TrainEntity rear) {
-        double frontHalf = front == null ? 4.5D : front.getTrainHalfLength();
-        double rearHalf = rear == null ? frontHalf : rear.getTrainHalfLength();
-        return Math.max(4.0D, frontHalf + rearHalf + COUPLED_CLEARANCE);
+        double frontHalf = front == null ? 4.5D : front.getCouplingHalfLength();
+        double rearHalf = rear == null ? frontHalf : rear.getCouplingHalfLength();
+        // 車体端どうし + 余裕。固定の最小値(旧:4.0)で底上げしないので短い車両は詰まる。
+        return Math.max(2.0D, frontHalf + rearHalf + COUPLED_CLEARANCE);
     }
 
     private static int normalizeCouplerSide(int side) {
@@ -1145,13 +1221,21 @@ public class TrainEntity extends Entity {
      */
     private boolean isUnsupportedInAir() {
         if (level() == null) return false;
+        // 列車を支えるのは「地面の任意ブロック」ではなく「レール」。台車面付近(おおよそ trainY-1)に
+        // レール系ブロック(当たり判定/コア/道床)が無ければ脱線=支え無しとみなし重力で落下させる。
+        // 以前は真下の任意ブロックを支えとしていたため、レールを壊しても地面で浮いたままだった。
         net.minecraft.core.BlockPos base = blockPosition();
-        // RAIL_HEIGHT_OFFSET 分上に居るので、足元は (y - 2) 付近にある想定
-        int floorY = base.getY() - 1;
-        for (int dy = 0; dy <= 3; dy++) {
-            net.minecraft.core.BlockPos p = new net.minecraft.core.BlockPos(base.getX(), floorY - dy, base.getZ());
-            if (!level().getBlockState(p).isAir()) {
-                return false;
+        for (int dy = -2; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    net.minecraft.world.level.block.Block b =
+                        level().getBlockState(base.offset(dx, dy, dz)).getBlock();
+                    if (b instanceof com.portofino.realtrainmodunofficial.block.RailCollisionBlock
+                        || b instanceof com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock
+                        || b instanceof com.portofino.realtrainmodunofficial.block.BallastBlock) {
+                        return false;
+                    }
+                }
             }
         }
         return true;
@@ -1197,6 +1281,13 @@ public class TrainEntity extends Entity {
         }
 
         if (distance > 0.0D) {
+            // ワープ検出用に、前進前のアンカー・方向・本体位置を保存しておく。
+            RailAnchor preFrontAnchor = frontRailAnchor;
+            RailAnchor preRearAnchor = rearRailAnchor;
+            int preBodyDirection = activeRailBodyDirection;
+            double preX = getX();
+            double preY = getY();
+            double preZ = getZ();
             if (advanceBogiePairAlongPath(distance, controllerDirection)) {
                 RailSample front = sampleBogieRail(frontRailAnchor.map(), frontRailAnchor.split(), frontRailAnchor.index());
                 RailSample rear = sampleBogieRail(rearRailAnchor.map(), rearRailAnchor.split(), rearRailAnchor.index());
@@ -1208,6 +1299,67 @@ public class TrainEntity extends Entity {
                     }
                     front = sampleBogieRail(frontRailAnchor.map(), frontRailAnchor.split(), frontRailAnchor.index());
                     rear = sampleBogieRail(rearRailAnchor.map(), rearRailAnchor.split(), rearRailAnchor.index());
+                }
+                // ワープ・ガード: 逆向きに繋がったレール継ぎ目等で本体中心が1tickに
+                // 物理的にあり得ない距離(速度×tickを大きく超える)ジャンプする不具合がある
+                // (bodyDir が毎tick反転→前進方向が反転→2レール間を往復ワープ→速度0/1・めり込み)。
+                // この場合は更新を棄却し、直前のアンカー・方向・位置を維持して振動を止める。
+                // 通常走行・カーブは移動量が小さくしきい値に達しないため一切影響しない。
+                RailSample candidateCenter = resolveBodyCenterSample(front, rear);
+                double jumpDx = candidateCenter.x() - preX;
+                double jumpDz = candidateCenter.z() - preZ;
+                double jumpSq = jumpDx * jumpDx + jumpDz * jumpDz;
+                double allowed = distance + RAIL_TELEPORT_TOLERANCE;
+                if (jumpSq > allowed * allowed && (preX != 0.0D || preZ != 0.0D)) {
+                    // 復帰試行: スパン逆算が膨らみレール等で遠点を拾った場合でも永久停止しないよう、
+                    // 前台車は素直に前進、後台車は「前回後台車位置の近傍」で前台車からスパン直線距離の
+                    // 点に補正する(連続性優先=膨らみの遠点を拾わない)。結果がしきい値内なら採用して進む。
+                    boolean recovered = false;
+                    {
+                        // 前台車は advanceBogiePairAlongPath が選んだ進行先(分岐切替時は分岐先)をそのまま維持し、
+                        // 後台車だけ「前回後台車位置の近傍」で前台車から台車間隔の点に補正する。これで
+                        // 分岐ルートを維持したまま、後台車がレールの膨らみの遠点を拾うのを防ぐ。
+                        double[] bz = getBogieRailOffsets();
+                        double span = Math.abs(bz[1] - bz[0]);
+                        RailAnchor recRear = refineAnchorByStraightDistance(preRearAnchor, front, span);
+                        if (isRailAnchorUsable(recRear)) {
+                            RailSample rr = sampleBogieRail(recRear.map(), recRear.split(), recRear.index());
+                            if (rr != null) {
+                                RailSample rc = resolveBodyCenterSample(front, rr);
+                                double rjx = rc.x() - preX;
+                                double rjz = rc.z() - preZ;
+                                if (rjx * rjx + rjz * rjz <= allowed * allowed) {
+                                    rearRailAnchor = recRear;
+                                    rear = rr;
+                                    recovered = true;
+                                }
+                            }
+                        }
+                    }
+                    if (!recovered) {
+                    // ワープを棄却: 元のアンカー/方向に戻し、本体は動かさない(速度は維持)。
+                    frontRailAnchor = preFrontAnchor;
+                    rearRailAnchor = preRearAnchor;
+                    activeRailBodyDirection = preBodyDirection;
+                    syncActiveRailStateFromAnchors(preBodyDirection == 0 ? 1 : preBodyDirection);
+                    setDeltaMovement(Vec3.ZERO);
+                    if (stallLogCooldown <= 0) {
+                        stallLogCooldown = 20;
+                        com.portofino.realtrainmodunofficial.rail.util.RailMap fm = frontRailAnchor.map();
+                        com.portofino.realtrainmodunofficial.rail.util.RailMap rm = rearRailAnchor.map();
+                        RealTrainModUnofficial.LOGGER.warn(
+                            "[RTM-DBG] TELEPORT-REJECT veh={} jump={} allowed={} from=({},{}) to=({},{})",
+                            getVehicleId(), (float) Math.sqrt(jumpSq), (float) allowed,
+                            (float) preX, (float) preZ, (float) candidateCenter.x(), (float) candidateCenter.z());
+                        RealTrainModUnofficial.LOGGER.warn(
+                            "[RTM-DBG]   front: pos=({},{}) idx={}/{} dir={} map={} | rear: pos=({},{}) idx={}/{} dir={} map={}",
+                            (float) front.x(), (float) front.z(), (float) frontRailAnchor.index(), frontRailAnchor.split(), frontRailAnchor.travelDirection(),
+                            fm == null ? "null" : (fm.getClass().getSimpleName() + railEndpoints(fm)),
+                            (float) rear.x(), (float) rear.z(), (float) rearRailAnchor.index(), rearRailAnchor.split(), rearRailAnchor.travelDirection(),
+                            rm == null ? "null" : (rm.getClass().getSimpleName() + railEndpoints(rm)));
+                    }
+                    return true;
+                    }
                 }
                 float appliedYaw = applyPoseFromBogieSamples(front, rear, getYRot(), getXRot(), true);
                 syncBogieOrientationMemory(front, rear, appliedYaw, getXRot());
@@ -1262,6 +1414,79 @@ public class TrainEntity extends Entity {
         return true;
     }
 
+    /**
+     * 本家RTM EntityBogie.updateBogiePos 準拠: refSample からの直線距離が targetDist に最も近い
+     * レール点を baseAnchor の map 上で探して返す。2台車の弦長を台車間隔に保ち、カーブでも
+     * 台車が実レール点(±bogiePos)へ乗る(アーク配置による弦-弧オーバーシュートを解消)。
+     */
+    /**
+     * 本家RTM準拠の後続台車の決め方。先頭台車(leadingSample)から台車間隔(span)の弦距離になる点を、
+     * まず「前回の後続台車位置(prevTrailing)の近傍」で探す(連続性優先=レールの膨らみ等で遠点へ飛ばない)。
+     * 近傍に妥当な点が無い(レール端を越える等)場合だけ、先頭からアーク逆算した点に補正してフォールバックする。
+     */
+    private RailAnchor deriveTrailingAnchor(RailAnchor prevTrailing, RailSample leadingSample, double span, RailAnchor leading) {
+        RailAnchor cont = refineAnchorByStraightDistance(prevTrailing, leadingSample, span);
+        if (chordWithinTolerance(cont, leadingSample, span)) {
+            return cont;
+        }
+        RailAnchor arc = advanceAnchorAlongPath(leading, -Math.abs(span));
+        if (isRailAnchorUsable(arc)) {
+            RailAnchor refined = refineAnchorByStraightDistance(arc, leadingSample, span);
+            if (isRailAnchorUsable(refined)) {
+                return refined;
+            }
+        }
+        return cont;
+    }
+
+    /** baseAnchor の位置が leadingSample から span 弦距離(±1m)になっているか。 */
+    private boolean chordWithinTolerance(RailAnchor a, RailSample leadingSample, double span) {
+        if (!isRailAnchorUsable(a) || leadingSample == null) {
+            return false;
+        }
+        RailSample s = sampleBogieRail(a.map(), a.split(), a.index());
+        if (s == null) {
+            return false;
+        }
+        double dx = s.x() - leadingSample.x();
+        double dz = s.z() - leadingSample.z();
+        double d = Math.sqrt(dx * dx + dz * dz);
+        return Math.abs(d - Math.abs(span)) <= 1.0D;
+    }
+
+    private RailAnchor refineAnchorByStraightDistance(RailAnchor baseAnchor, RailSample refSample, double targetDist) {
+        if (!isRailAnchorUsable(baseAnchor) || refSample == null) {
+            return baseAnchor;
+        }
+        RailMap map = baseAnchor.map();
+        int split = baseAnchor.split();
+        // 探索窓は弦-弧差(数十cm〜数m)を吸収できる小さめに固定する。台車間隔(targetDist)でスケール
+        // させると窓が非常に広くなり、端点を大きくはみ出す不正レールで遠い張り出し点を拾ってしまい、
+        // 本体中心が1tickで瞬間移動→ワープ棄却で列車が停止する(ユーザー報告: 分岐で止まる)。
+        int searchInc = Math.max(8, (int) (3.0D * (double) BOGIE_SPLITS_PER_METER));
+        int center = Mth.clamp((int) Math.round(baseAnchor.index()), 0, split);
+        int min = Math.max(0, center - searchInc);
+        int max = Math.min(split, center + searchInc);
+        double targetSq = targetDist * targetDist;
+        int bestIndex = -1;
+        double bestDiff = Double.MAX_VALUE;
+        for (int i = min; i <= max; i++) {
+            double[] p = map.getRailPos(split, i); // p[1]=x, p[0]=z
+            double ddx = p[1] - refSample.x;
+            double ddz = p[0] - refSample.z;
+            double dsq = ddx * ddx + ddz * ddz;
+            double diff = Math.abs(dsq - targetSq);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestIndex = i;
+            }
+        }
+        if (bestIndex < 0) {
+            return baseAnchor;
+        }
+        return new RailAnchor(map, split, bestIndex, baseAnchor.travelDirection());
+    }
+
     private boolean advanceBogiePairAlongPath(double distanceMeters, int controllerDirection) {
         if (!isRailAnchorUsable(frontRailAnchor) || !isRailAnchorUsable(rearRailAnchor) || controllerDirection == 0) {
             return false;
@@ -1291,10 +1516,12 @@ public class TrainEntity extends Entity {
                 RealTrainModUnofficial.LOGGER.warn("[RTM-DBG] PAIR-FAIL movedFront unusable");
                 return false;
             }
-            RailAnchor bestRear = advanceAnchorAlongPath(movedFront, -Math.abs(span));
+            RailSample movedFrontSample = sampleBogieRail(movedFront.map(), movedFront.split(), movedFront.index());
+            // 本家RTM式: 後台車は「前回位置の近傍」で前台車から台車間隔の弦距離になる点を探す(連続性優先・
+            // 遠点回避)。前回位置近傍に無い(レール端越え等)場合だけアーク逆算にフォールバックする。
+            RailAnchor bestRear = deriveTrailingAnchor(rearRailAnchor, movedFrontSample, Math.abs(span), movedFront);
             if (!isRailAnchorUsable(bestRear)) {
-                RealTrainModUnofficial.LOGGER.warn("[RTM-DBG] PAIR-FAIL bestRear: frontIdx={}/{} rearNull={}",
-                    (float) movedFront.index(), movedFront.split(), bestRear == null);
+                RealTrainModUnofficial.LOGGER.warn("[RTM-DBG] PAIR-FAIL bestRear");
                 return false;
             }
             frontRailAnchor = movedFront;
@@ -1309,10 +1536,11 @@ public class TrainEntity extends Entity {
             RealTrainModUnofficial.LOGGER.warn("[RTM-DBG] PAIR-FAIL movedRear unusable");
             return false;
         }
-        RailAnchor bestFront = advanceAnchorAlongPath(movedRear, -Math.abs(span));
+        RailSample movedRearSample = sampleBogieRail(movedRear.map(), movedRear.split(), movedRear.index());
+        // 本家RTM式: 前台車は「前回位置の近傍」で後台車から台車間隔の弦距離になる点を探す(連続性優先)。
+        RailAnchor bestFront = deriveTrailingAnchor(frontRailAnchor, movedRearSample, Math.abs(span), movedRear);
         if (!isRailAnchorUsable(bestFront)) {
-            RealTrainModUnofficial.LOGGER.warn("[RTM-DBG] PAIR-FAIL bestFront: rearIdx={}/{} frontNull={}",
-                (float) movedRear.index(), movedRear.split(), bestFront == null);
+            RealTrainModUnofficial.LOGGER.warn("[RTM-DBG] PAIR-FAIL bestFront");
             return false;
         }
         rearRailAnchor = movedRear;
@@ -1356,7 +1584,9 @@ public class TrainEntity extends Entity {
             RailSample requestedCenter = sampleRail(map, split, centerIndex);
             return findBestAnchorPairForCenter(map, split, centerIndex, requestedCenter, dir);
         }
+        // 後台車を前台車からの直線距離=台車間隔に補正(本家RTM準拠・弦-弧ズレ解消)。
         RailSample frontSample = sampleBogieRail(frontAnchor.map(), frontAnchor.split(), frontAnchor.index());
+        rearAnchor = refineAnchorByStraightDistance(rearAnchor, frontSample, Math.abs(bogieZ[1] - bogieZ[0]));
         RailSample rearSample = sampleBogieRail(rearAnchor.map(), rearAnchor.split(), rearAnchor.index());
         return new RailAnchorPair(
             frontAnchor,
@@ -1427,9 +1657,20 @@ public class TrainEntity extends Entity {
         float yaw = horizontal > 1.0E-4D
             ? (float) Math.toDegrees(Math.atan2(dx, dz))
             : fallbackYaw;
+        // 前後台車の微小なY差(分岐マップの縦ベジェのわずかな膨らみ等)で小さなピッチが付き、本体が
+        // 跳ねて見える。Y差が小さいうち(0.15ブロック未満)はピッチに反映しない(デッドゾーン)。実際の
+        // 勾配はこれより大きなY差になるので従来通り正確に追従する。
+        double pitchDy = Math.abs(dy) < 0.15D ? 0.0D : dy;
         float pitch = horizontal > 1.0E-4D
-            ? (float) Math.toDegrees(Math.atan2(dy, horizontal))
+            ? (float) Math.toDegrees(Math.atan2(pitchDy, horizontal))
             : fallbackPitch;
+        // 分岐境界などで前後台車のY差が急変したとき、本体ピッチが瞬間的に振れて跳ねるのを抑える。
+        // 1tickのピッチ変化量を制限し急なジョルトだけ平滑化する(通常走行・カーブ・坂は無影響)。
+        if (move) {
+            float prevPitch = getXRot();
+            float maxPitchDelta = 6.0F;
+            pitch = Mth.clamp(pitch, prevPitch - maxPitchDelta, prevPitch + maxPitchDelta);
+        }
         yaw = keepNearestYaw(yaw, getYRot());
         RailSample centerSample = resolveBodyCenterSample(front, rear);
         Vec3 center = new Vec3(centerSample.x, centerSample.y + TRAIN_BODY_HEIGHT_OFFSET, centerSample.z);
@@ -1540,6 +1781,8 @@ public class TrainEntity extends Entity {
                 continue;
             }
             RailSample front = sampleBogieRail(frontAnchor.map(), frontAnchor.split(), frontAnchor.index());
+            // 後台車を前台車からの直線距離=台車間隔に補正(本家RTM準拠・弦-弧ズレ解消)。
+            rearAnchor = refineAnchorByStraightDistance(rearAnchor, front, Math.abs(bogieZ[1] - bogieZ[0]));
             RailSample rear = sampleBogieRail(rearAnchor.map(), rearAnchor.split(), rearAnchor.index());
             double centerX = (front.x + rear.x) * 0.5D;
             double centerY = (front.y + rear.y) * 0.5D;
@@ -1580,6 +1823,17 @@ public class TrainEntity extends Entity {
         }
         int normalized = bodyDirection == 0 ? 1 : bodyDirection;
         return new RailAnchor(anchor.map(), anchor.split(), anchor.index(), normalized);
+    }
+
+    /** [RTM-DBG] レールマップの始点/終点ブロック座標を文字列化(分岐遷移の診断用)。 */
+    private static String railEndpoints(com.portofino.realtrainmodunofficial.rail.util.RailMap m) {
+        try {
+            com.portofino.realtrainmodunofficial.rail.util.RailPosition s = m.getStartRP();
+            com.portofino.realtrainmodunofficial.rail.util.RailPosition e = m.getEndRP();
+            return "[" + s.blockX + "," + s.blockY + "," + s.blockZ + "->" + e.blockX + "," + e.blockY + "," + e.blockZ + "]";
+        } catch (Throwable t) {
+            return "[?]";
+        }
     }
 
     private RailAnchor advanceAnchorAlongPath(RailAnchor anchor, double offsetMeters) {
@@ -1847,25 +2101,33 @@ public class TrainEntity extends Entity {
             boundaryIndex <= 0 ? currentMap.getStartRP() : currentMap.getEndRP();
 
         BlockPos center = BlockPos.containing(boundary.x, boundary.y, boundary.z);
-        RailConnection best = null;
         int radius = 24;
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -4; dy <= 4; dy++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    RailMap[] maps = getConnectionCandidateMapsAt(center.offset(dx, dy, dz), currentMap);
-                    if (maps.length == 0) continue;
+        // 1st pass: アクティブ分岐のみ(トラフ側でスイッチ通り正しい分岐を選ぶ)。
+        // 2nd pass: 見つからなければ全分岐へフォールバック。これにより「非アクティブな分岐の
+        // 終端から突入」「走行中にスイッチが切替わって現在の分岐が非アクティブ化」した場合でも
+        // 物理的に存在するレールへ接続でき、弾かれて前に進めなくなるのを防ぐ。
+        RailConnection best = null;
+        for (int pass = 0; pass < 2 && best == null; pass++) {
+            railLookupIncludeAllSegments = pass == 1;
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -4; dy <= 4; dy++) {
+                    for (int dz = -radius; dz <= radius; dz++) {
+                        RailMap[] maps = getConnectionCandidateMapsAt(center.offset(dx, dy, dz), currentMap);
+                        if (maps.length == 0) continue;
 
-                    for (RailMap map : maps) {
-                        if (map == null || map == currentMap || map.equals(currentMap)) {
-                            continue;
+                        for (RailMap map : maps) {
+                            if (map == null || map == currentMap || map.equals(currentMap)) {
+                                continue;
+                            }
+                            int split = getMovementSplitForMap(map);
+                            best = betterConnection(best, evaluateRailEndpointConnection(map, split, 0, endpoint, boundaryPos, outgoingYaw));
+                            best = betterConnection(best, evaluateRailEndpointConnection(map, split, split, endpoint, boundaryPos, outgoingYaw));
                         }
-                        int split = getMovementSplitForMap(map);
-                        best = betterConnection(best, evaluateRailEndpointConnection(map, split, 0, endpoint, boundaryPos, outgoingYaw));
-                        best = betterConnection(best, evaluateRailEndpointConnection(map, split, split, endpoint, boundaryPos, outgoingYaw));
                     }
                 }
             }
         }
+        railLookupIncludeAllSegments = false;
         if (best == null) {
             RealTrainModUnofficial.LOGGER.warn("[RTM-DBG] findConn FAIL: bpos=({},{},{}) outYaw={}",
                 (float) boundary.x, (float) boundary.y, (float) boundary.z, (float) outgoingYaw);
@@ -1918,15 +2180,25 @@ public class TrainEntity extends Entity {
         return current;
     }
 
+    /** true の間はスイッチの全分岐をレール探索候補にする(アクティブ分岐で見つからない時のフォールバック)。 */
+    private boolean railLookupIncludeAllSegments = false;
+
+    private RailMap[] switchCandidateMaps(LargeRailCoreBlockEntity core, RailMap currentMap) {
+        if (railLookupIncludeAllSegments || shouldInspectAllSegments(core, currentMap)) {
+            return core.getAllRailMaps();
+        }
+        return core.getActiveRailMaps();
+    }
+
     private RailMap[] getConnectionCandidateMapsAt(BlockPos pos, RailMap currentMap) {
         BlockEntity blockEntity = level().getBlockEntity(pos);
         if (blockEntity instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-            return shouldInspectAllSegments(core, currentMap) ? core.getAllRailMaps() : core.getActiveRailMaps();
+            return switchCandidateMaps(core, currentMap);
         }
         if (blockEntity instanceof RailCollisionBlockEntity collision) {
             BlockPos corePos = collision.getCorePos();
             if (corePos != null && level().getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                return shouldInspectAllSegments(core, currentMap) ? core.getAllRailMaps() : core.getActiveRailMaps();
+                return switchCandidateMaps(core, currentMap);
             }
         }
         return new RailMap[0];
@@ -2113,7 +2385,29 @@ public class TrainEntity extends Entity {
             double distance = Math.max(2.0D, getTrainDistance() * 0.7D);
             return new double[]{-distance, distance};
         }
+        double midpoint = (front + rear) * 0.5D;
+        double halfSpan = Math.abs(front - rear) * 0.5D;
+        if (Math.abs(midpoint) > Math.max(0.75D, halfSpan * 0.35D) && shouldCenterAsymmetricBogieAnchors(def)) {
+            return new double[]{-halfSpan, halfSpan};
+        }
         return new double[]{rear, front};
+    }
+
+    private static boolean shouldCenterAsymmetricBogieAnchors(VehicleDefinition def) {
+        if (def == null) {
+            return false;
+        }
+        String id = def.getId() == null ? "" : def.getId().toLowerCase(java.util.Locale.ROOT);
+        String model = def.getModelFile() == null ? "" : def.getModelFile().toLowerCase(java.util.Locale.ROOT);
+        boolean classBogie = false;
+        for (VehicleDefinition.BogieDefinition bogie : def.getBogies()) {
+            String bogieModel = bogie.modelFile() == null ? "" : bogie.modelFile().toLowerCase(java.util.Locale.ROOT);
+            if (bogieModel.endsWith(".class")) {
+                classBogie = true;
+                break;
+            }
+        }
+        return classBogie && (id.contains("tkmtp") || id.contains("c56") || model.contains("tkmtp") || model.contains("c56"));
     }
 
     private int[] getExtremeBogieIndices(VehicleDefinition def) {
@@ -2146,6 +2440,11 @@ public class TrainEntity extends Entity {
         RailAnchor anchor = resolveRenderAnchorForBogie(bogieIndex);
         if (isRailAnchorUsable(anchor)) {
             return relativeBogieYaw(getAnchorRailYaw(anchor, baseYaw), baseYaw);
+        }
+        // クライアント: 台車位置のレール接線を直接計算(ラグ無し)。スクリプト車両と同じ経路。
+        float railYaw = computeClientBogieRailYaw(bogieIndex);
+        if (!Float.isNaN(railYaw)) {
+            return relativeBogieYaw(railYaw, baseYaw);
         }
         return getBogieYawOffset(bogie, baseYaw);
     }
@@ -2192,14 +2491,24 @@ public class TrainEntity extends Entity {
         if (def == null) {
             return bogie.position();
         }
-        Vec3 visualWorld = getBogieVisualWorldPosition(bogieIndex, partialTicks);
-        Vec3 railWorld = getBogieWorldPosition(bogieIndex);
-        double scale = Math.max(0.001D, def.getModelScale());
-        double wheelContactBias = 0.18D / scale;
-        float trainPitch = Mth.lerp(partialTicks, this.xRotO, this.getXRot());
-        double slopePairCorrection = Math.sin(Math.toRadians(trainPitch)) * bogie.position().z;
-        double localYCorrection = Mth.clamp(((railWorld.y - visualWorld.y) / scale) + slopePairCorrection - wheelContactBias, -4.0D, 4.0D);
-        return bogie.position().add(0.0D, localYCorrection, 0.0D);
+        Vec3 railWorldY = getBogieWorldPosition(bogieIndex);
+        // 本家RTM準拠の台車高さ:
+        //   本家は車体・台車とも func_70033_W()=0 で、両者を「同じレール面基準」に置く。
+        //   台車の縦オフセットは JSON の bogiePos[i].y のみ(全実パックで 0.0 = 車体中心と同じ高さ)。
+        //   RTMU は車体に RAIL_HEIGHT_OFFSET(1.09)、台車に BOGIE_HITBOX_HEIGHT_OFFSET(0.27)と
+        //   別基準を当てていたため台車が車体より約0.82低く、視覚リフトで誤魔化していた。
+        //   ここで台車基準を車体と同一(RAIL_HEIGHT_OFFSET)へ揃え、bogiePos.y だけ足す。
+        //   これによりモデルパック本来の作り込み通り(=本家と同じ見た目)に車輪が接地する。
+        // カーブ上では車体中心線とレール中心線が一致しないため、X/Z はレールアンカーへ追従。
+        RailAnchor anchor = getAnchorForRenderedBogie(bogieIndex);
+        if (isRailAnchorUsable(anchor)) {
+            double bodyRefY = railWorldY.y + (RAIL_HEIGHT_OFFSET - BOGIE_HITBOX_HEIGHT_OFFSET) + bogie.position().y;
+            Vec3 railLocal = worldToLocalForRender(new Vec3(railWorldY.x, bodyRefY, railWorldY.z), baseYaw, partialTicks);
+            return new Vec3(railLocal.x, railLocal.y, railLocal.z);
+        }
+        // レール非追従時(浮いている等)は本家 updatePosAndRotationClient と同様、
+        // bogiePos をそのまま車体相対オフセットとして使う。
+        return bogie.position();
     }
 
     public Vec3 getBogieRenderOffset(VehicleDefinition.BogieDefinition bogie, float baseYaw) {
@@ -2259,10 +2568,82 @@ public class TrainEntity extends Entity {
         int side = resolveExtremeSideForBogieIndex(bogieIndex);
         RailAnchor anchor = side == 0 ? rearRailAnchor : frontRailAnchor;
         if (isRailAnchorUsable(anchor)) {
+            // サーバー: レールアンカーの接線。
             float reference = bogieYawMemory[side] == 0.0F ? getYRot() : bogieYawMemory[side];
             return sampleAnchorTangentYaw(anchor, reference);
         }
+        // クライアント: アンカー/bogieYawMemory が無いので、台車位置のレール接線を直接求める。
+        // これを返さないと getYRot()(車体ヨー)になり、スクリプトの台車相対角が 0 → 台車が
+        // 車体と一緒に回ってしまう(独立しない)。本家RTMは台車エンティティの接線ヨーを返す。
+        float railYaw = computeClientBogieRailYaw(bogieIndex);
+        if (!Float.isNaN(railYaw)) {
+            return railYaw;
+        }
         return bogieYawMemory[side] == 0.0F ? getYRot() : bogieYawMemory[side];
+    }
+
+    /**
+     * クライアントで台車のレール接線ワールドヨーを求める。サーバー同期された台車エンティティの
+     * 向きを最優先で使い、無ければ台車取付位置の近傍レールから接線を計算する。見つからなければ NaN。
+     */
+    private float computeClientBogieRailYaw(int bogieIndex) {
+        // 注意: 同期された台車エンティティの向き(clientBogieEntityYaw)はラグがあり、
+        // 走行中に台車が一瞬古い向きを指して横ずれして見える。そこでクライアントでは
+        // 台車取付位置のレール接線を毎フレーム直接計算する(ラグ無し・描画位置と一致)。
+        int side = resolveExtremeSideForBogieIndex(bogieIndex);
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def == null) {
+            return Float.NaN;
+        }
+        Vec3 mount = localToWorld(getBogieLocalPosition(bogieIndex, def));
+        RailMap map = clientBogieRailMap[side];
+        // キャッシュ済みレールが取付位置から遠ければ(別レールへ移った)再探索。
+        if (map == null || farFromRail(map, mount)) {
+            RailFollowContext ctx = findRailContextNearAny(mount, null);
+            if (ctx == null || ctx.map() == null) {
+                return Float.NaN;
+            }
+            map = ctx.map();
+            clientBogieRailMap[side] = map;
+        }
+        int split = getMovementSplitForMap(map);
+        if (split <= 0) {
+            return Float.NaN;
+        }
+        // サーバー(sampleAnchorTangentYaw)と同じ規約: 最近点の前後を少しずらしてサンプルし、
+        // atan2(dx,dz) で接線ヨーを求める。getRailYaw より滑らかで規約も一致する。
+        int nearest = Mth.clamp(map.getNearlestPoint(split, mount.x, mount.z), 0, split);
+        double delta = Math.max(1.0D, split * 0.0060D);
+        double beforeIndex = Mth.clamp(nearest - delta, 0.0D, split);
+        double afterIndex = Mth.clamp(nearest + delta, 0.0D, split);
+        RailSample before = sampleRail(map, split, beforeIndex);
+        RailSample after = sampleRail(map, split, afterIndex);
+        double dx = after.x - before.x;
+        double dz = after.z - before.z;
+        float tangentYaw = (dx * dx + dz * dz < 1.0E-6D)
+            ? sampleRailYaw(map, split, nearest)
+            : (float) Math.toDegrees(Math.atan2(dx, dz));
+        // 本家RTM EntityBogie.fixBogieYaw と同じ: 車体向きと 90°以上離れていれば 180°反転。
+        return fixBogieYaw(getYRot(), tangentYaw);
+    }
+
+    /** 本家RTM EntityBogie.fixBogieYaw 準拠: yaw2 を reference と同じ向き(90°以内)に整える。 */
+    private static float fixBogieYaw(float reference, float yaw2) {
+        float diff = Math.abs(Mth.wrapDegrees(reference - yaw2));
+        return Mth.wrapDegrees(diff > 90.0F ? yaw2 + 180.0F : yaw2);
+    }
+
+    /** map 上で worldPos の最近点が 4 ブロック超離れているか(=別レールへ移った)。 */
+    private boolean farFromRail(RailMap map, Vec3 worldPos) {
+        int split = getMovementSplitForMap(map);
+        if (split <= 0) {
+            return true;
+        }
+        int nearest = Mth.clamp(map.getNearlestPoint(split, worldPos.x, worldPos.z), 0, split);
+        double[] p = map.getRailPos(split, nearest);
+        double dx = p[1] - worldPos.x;
+        double dz = p[0] - worldPos.z;
+        return dx * dx + dz * dz > 4.0D * 4.0D;
     }
 
     public Vec3 getBogieWorldPosition(int bogieIndex) {
@@ -2295,19 +2676,29 @@ public class TrainEntity extends Entity {
         double py = modelOffset.y + local.y * scale;
         double pz = modelOffset.z + local.z * scale;
 
-        float trainPitch = Mth.lerp(partialTicks, this.xRotO, this.getXRot());
+        // スポーン直後はクライアント側エンティティの前tick位置(xo/yo/zo)が原点(0,0,0)の
+        // まま(最初のクライアントtickまで)。そのまま補間すると台車位置が原点側へ大きく
+        // ズレる(=「列車を置いた瞬間だけ台車がズレる/動かすと戻る」)。前tick位置が現在位置
+        // から物理的にあり得ない距離(列車は最大2/tick)離れていたら未初期化とみなし、補間
+        // せず現在値を使う。通常走行では xo は近接しているため一切影響しない。
+        double dxo = this.getX() - this.xo;
+        double dyo = this.getY() - this.yo;
+        double dzo = this.getZ() - this.zo;
+        boolean staleOldPos = (dxo * dxo + dyo * dyo + dzo * dzo) > 64.0D;
+
+        float trainPitch = staleOldPos ? this.getXRot() : Mth.lerp(partialTicks, this.xRotO, this.getXRot());
         double pitchRad = Math.toRadians(-trainPitch);
         double pitchedY = Math.cos(pitchRad) * py - Math.sin(pitchRad) * pz;
         double pitchedZ = Math.sin(pitchRad) * py + Math.cos(pitchRad) * pz;
 
-        float trainYaw = Mth.rotLerp(partialTicks, this.yRotO, this.getYRot());
+        float trainYaw = staleOldPos ? this.getYRot() : Mth.rotLerp(partialTicks, this.yRotO, this.getYRot());
         double yawRad = Math.toRadians(-trainYaw);
         double rotatedX = Math.cos(yawRad) * px - Math.sin(yawRad) * pitchedZ;
         double rotatedZ = Math.sin(yawRad) * px + Math.cos(yawRad) * pitchedZ;
 
-        double trainX = Mth.lerp(partialTicks, this.xo, this.getX());
-        double trainY = Mth.lerp(partialTicks, this.yo, this.getY());
-        double trainZ = Mth.lerp(partialTicks, this.zo, this.getZ());
+        double trainX = staleOldPos ? this.getX() : Mth.lerp(partialTicks, this.xo, this.getX());
+        double trainY = staleOldPos ? this.getY() : Mth.lerp(partialTicks, this.yo, this.getY());
+        double trainZ = staleOldPos ? this.getZ() : Mth.lerp(partialTicks, this.zo, this.getZ());
         return new Vec3(trainX + rotatedX, trainY + pitchedY, trainZ + rotatedZ);
     }
 
@@ -2393,10 +2784,7 @@ public class TrainEntity extends Entity {
         float flippedDiff = Mth.wrapDegrees(directDiff + 180.0F);
         float diff = Math.abs(directDiff) <= Math.abs(flippedDiff) ? directDiff : flippedDiff;
 
-        // Keep the bogie visually fixed to the carbody, but make the rail-facing
-        // angle read a little more clearly on legacy coarse curves like RTM does.
-        float gainedDiff = diff * 1.14F;
-        return Mth.clamp(gainedDiff, -85.0F, 85.0F);
+        return Mth.clamp(diff, -85.0F, 85.0F);
     }
 
     private void updateStoredBogieState() {
@@ -2485,38 +2873,44 @@ public class TrainEntity extends Entity {
         int radius = 20;
         float referenceYaw = getYRot();
 
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -4; dy <= 4; dy++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    BlockPos pos = center.offset(dx, dy, dz);
-                    RailMap[] maps = getRailMapsAt(pos);
-                    if (maps.length == 0) continue;
+        // 1st pass: アクティブ分岐のみ。見つからなければ 2nd pass で全分岐へフォールバック
+        // (非アクティブ分岐の終端突入やスイッチ切替で現在分岐が非アクティブ化した際に弾かれないように)。
+        for (int pass = 0; pass < 2 && best == null; pass++) {
+            railLookupIncludeAllSegments = pass == 1;
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -4; dy <= 4; dy++) {
+                    for (int dz = -radius; dz <= radius; dz++) {
+                        BlockPos pos = center.offset(dx, dy, dz);
+                        RailMap[] maps = getRailMapsAt(pos);
+                        if (maps.length == 0) continue;
 
-                    for (RailMap map : maps) {
-                        if (map == null || map == exclude) continue;
-                        int split = getMovementSplitForMap(map);
-                        // RailMap#getNearlestPoint expects world X/Z in that order.
-                        int nearest = map.getNearlestPoint(split, worldPos.x, worldPos.z);
-                        nearest = Mth.clamp(nearest, 0, split);
-                        double[] p = map.getRailPos(split, nearest);
-                        double py = map.getRailHeight(split, nearest) + RAIL_HEIGHT_OFFSET;
-                        double distSq = new Vec3(p[1], py, p[0]).distanceToSqr(worldPos);
-                        boolean nearEndpoint = nearest <= Math.max(6, split / 6) || nearest >= split - Math.max(6, split / 6);
-                        double maxDistSq = endpointOnly ? 81.0D : 144.0D;
-                        if ((endpointOnly && !nearEndpoint) || distSq > maxDistSq) {
-                            continue;
-                        }
-                        distSq += railYawPenalty(map, split, nearest, referenceYaw);
-                        if (activeRailMap != null && map == activeRailMap) {
-                            distSq -= endpointOnly ? 2.0D : 6.0D;
-                        }
-                        if (best == null || distSq < best.distanceSq()) {
-                            best = new RailFollowContext(map, split, nearest, distSq);
+                        for (RailMap map : maps) {
+                            if (map == null || map == exclude) continue;
+                            int split = getMovementSplitForMap(map);
+                            // RailMap#getNearlestPoint expects world X/Z in that order.
+                            int nearest = map.getNearlestPoint(split, worldPos.x, worldPos.z);
+                            nearest = Mth.clamp(nearest, 0, split);
+                            double[] p = map.getRailPos(split, nearest);
+                            double py = map.getRailHeight(split, nearest) + RAIL_HEIGHT_OFFSET;
+                            double distSq = new Vec3(p[1], py, p[0]).distanceToSqr(worldPos);
+                            boolean nearEndpoint = nearest <= Math.max(6, split / 6) || nearest >= split - Math.max(6, split / 6);
+                            double maxDistSq = endpointOnly ? 81.0D : 144.0D;
+                            if ((endpointOnly && !nearEndpoint) || distSq > maxDistSq) {
+                                continue;
+                            }
+                            distSq += railYawPenalty(map, split, nearest, referenceYaw);
+                            if (activeRailMap != null && map == activeRailMap) {
+                                distSq -= endpointOnly ? 2.0D : 6.0D;
+                            }
+                            if (best == null || distSq < best.distanceSq()) {
+                                best = new RailFollowContext(map, split, nearest, distSq);
+                            }
                         }
                     }
                 }
             }
         }
+        railLookupIncludeAllSegments = false;
 
         return best;
     }
@@ -2644,12 +3038,12 @@ public class TrainEntity extends Entity {
 
     private RailMap[] getRailMapsAt(BlockPos pos) {
         if (level().getBlockEntity(pos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-            return core.getActiveRailMaps();
+            return railLookupIncludeAllSegments ? core.getAllRailMaps() : core.getActiveRailMaps();
         }
         if (level().getBlockEntity(pos) instanceof RailCollisionBlockEntity collision) {
             BlockPos corePos = collision.getCorePos();
             if (corePos != null && level().getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                return core.getActiveRailMaps();
+                return railLookupIncludeAllSegments ? core.getAllRailMaps() : core.getActiveRailMaps();
             }
         }
         return new RailMap[0];
@@ -2691,6 +3085,7 @@ public class TrainEntity extends Entity {
         // stabilizeCoupledFormations handles: velocity zeroing, settings sync, position snapping,
         // formation rebuild, and immediate updateTrainMovement snap for all cars.
         stabilizeCoupledFormations(tail, otherHead);
+        clearCouplingModeInvolving(this, other);
         tail.hurtMarked = true;
         otherHead.hurtMarked = true;
     }
@@ -2785,6 +3180,8 @@ public class TrainEntity extends Entity {
                 continue;
             }
             if (source == target || source.isConnectedTo(target)) {
+                // 既に連結済み（別経路で接触連結された等）なら、残った連結モードを破棄する。
+                COUPLING_MODE.remove(entry.getKey());
                 continue;
             }
             if (source.canCompleteCouplingWith(target)) {
@@ -2923,38 +3320,38 @@ public class TrainEntity extends Entity {
             formationHead.markDriverControl(formationDriver.controller());
             formationHead.ensureDriverReadyForFormation(formationDriver.controller());
         }
-        if (sourceTail.coupledFollowerUuid != null) {
-            double distanceError = sourceTail.getCoupledFollowerDistanceErrorMeters(targetHead,
-                    sourceTail.coupledFollowerThisSide, sourceTail.coupledFollowerOtherSide);
-            boolean shouldSnap = !targetHead.isRailGuided() || !sourceTail.isRailGuided()
-                    || distanceError > Math.max(1.2, sourceTail.getDefaultDistanceToConnectedTrain(targetHead) * 0.12);
-            boolean snapped = false;
-            if (shouldSnap) {
-                snapped = sourceTail.placeCoupledFollowerOnRail(targetHead, sourceTail.coupledFollowerThisSide, sourceTail.coupledFollowerOtherSide);
-            }
-            if (!snapped) {
-                sourceTail.placeCoupledFollowerFallback(targetHead, sourceTail.coupledFollowerThisSide, sourceTail.coupledFollowerOtherSide, sourceTail.getDefaultDistanceToConnectedTrain(targetHead));
-                targetHead.clearRailGuidance();
-            }
-            targetHead.settleCoupledRailPose();
-            formationHead.settleConnectedFormationToRail();
-            formationHead.rememberConnectedFormationStableRailState();
-        }
+        // 本家RTM(Formation.connectTrain)準拠: 連結時に本体をテレポート・スナップさせない。
+        // 連結はトレインが接触している時にしか成立しない(canCompleteCouplingWith)ので、
+        // 既に隣接している。編成を結合してブレーキで止めるだけにし、位置は毎tickの追従で
+        // 自然に整える。以前の placeCoupledFollower* による即時スナップ+updateTrainMovement は
+        // 3両目連結時に中間車のレール状態が未確立のままフォールバック moveTo され、他車へ
+        // テレポート・重なりする不具合の原因だった。
         sourceTail.stopFormationMotionForResync(8L);
         targetHead.stopFormationMotionForResync(8L);
         // Rebuild Formation for the newly combined UUID chain
         sourceTail.getFormationHead().rebuildFormationFromUuidChain();
-        // Immediately snap ALL cars in the new formation to their correct rail positions.
-        // Without this, follower cars beyond the first would jump 12+ blocks on the next tick,
-        // causing violent distortion on sloped track.
         TrainEntity newHead = sourceTail.getFormationHead();
         if (newHead != null) {
             newHead.setNotchForFormation(0);
-            if (newHead.formation != null && newHead.formation.size() > 1) {
-                newHead.formation.updateTrainMovement();
+        }
+        // 連結直後に「新しく連結した車両(targetHead)だけ」を連結位置へ静かに寄せる。
+        // 接触連結なので元々隣接しており移動量は小さい(数ブロック以内)＝隙間が即座に詰まる。
+        // 大ジャンプ(レール状態未確立で他車上へ飛ぶケース)は棄却して元位置を維持し、
+        // 他車には一切触らないので重なり・TPは起きない。
+        if (sourceTail.coupledFollowerUuid != null && targetHead != null) {
+            double pX = targetHead.getX();
+            double pY = targetHead.getY();
+            double pZ = targetHead.getZ();
+            boolean ok = sourceTail.placeCoupledFollowerOnRail(targetHead,
+                    sourceTail.coupledFollowerThisSide, sourceTail.coupledFollowerOtherSide);
+            double jx = targetHead.getX() - pX;
+            double jz = targetHead.getZ() - pZ;
+            double maxJump = 6.0D; // 接触連結は約3m以内なので、隙間詰めは小移動。これを超えたらテレポート扱い。
+            if (!ok || jx * jx + jz * jz > maxJump * maxJump) {
+                targetHead.moveTo(pX, pY, pZ, targetHead.getYRot(), targetHead.getXRot());
+            } else {
+                targetHead.settleCoupledRailPose();
             }
-            newHead.settleConnectedFormationToRail();
-            newHead.rememberConnectedFormationStableRailState();
         }
     }
 
@@ -3125,6 +3522,7 @@ public class TrainEntity extends Entity {
         boolean coupled = coupleFormationsRtMLike(this, thisSide, otherTrain, otherSide)
                 || otherTrain.coupleFormationsRtMLike(otherTrain, otherSide, this, thisSide);
         if (coupled) {
+            clearCouplingModeInvolving(this, otherTrain);
             notifyCouplingChat(Component.literal("連結しました"), otherTrain, null);
         }
         return coupled;
@@ -3138,11 +3536,41 @@ public class TrainEntity extends Entity {
 
     public void handleBogieContactWithoutCoupling(int thisBogieIndex, TrainEntity otherTrain, int otherBogieIndex) {
         if (otherTrain == null || otherTrain == this || level().isClientSide()) return;
+        // 連結モード中(プレイヤーがこの2編成を選択して連結しようとしている)は、接触ブレーキを
+        // 抑止して接近・連結させる。ブレーキすると速度0/1の振動で連結完了距離まで近づけず、
+        // 3両目以降が連結できない不具合になっていた(tryCompletePendingCoupling が完了させる)。
+        if (isCouplingModeActiveBetween(this, otherTrain)) {
+            return;
+        }
         // 連結できない（既連結など）場合にめり込み防止のためブレーキ
         if (!isWithinUncoupledContactStopWindow() && !otherTrain.isWithinUncoupledContactStopWindow()) {
             applyImmediateContactBrake(12L);
             otherTrain.applyImmediateContactBrake(12L);
         }
+    }
+
+    /** 2編成間で連結モード(プレイヤー選択)がアクティブか。接触ブレーキ抑止の判定に使う。 */
+    private static boolean isCouplingModeActiveBetween(TrainEntity a, TrainEntity b) {
+        if (COUPLING_MODE.isEmpty() || a == null || b == null) {
+            return false;
+        }
+        java.util.Set<UUID> aSet = new java.util.HashSet<>();
+        a.forEachFormationTrain(t -> { if (t != null) aSet.add(t.getUUID()); });
+        java.util.Set<UUID> bSet = new java.util.HashSet<>();
+        b.forEachFormationTrain(t -> { if (t != null) bSet.add(t.getUUID()); });
+        for (CouplingSelection s : COUPLING_MODE.values()) {
+            if (s == null) {
+                continue;
+            }
+            boolean firstInA = s.first() != null && aSet.contains(s.first());
+            boolean firstInB = s.first() != null && bSet.contains(s.first());
+            boolean secondInA = s.second() != null && aSet.contains(s.second());
+            boolean secondInB = s.second() != null && bSet.contains(s.second());
+            if ((firstInA && secondInB) || (firstInB && secondInA)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean canResolveBogieContactWith(TrainEntity otherTrain, int thisBogieIndex, int otherBogieIndex) {
@@ -3767,6 +4195,32 @@ public class TrainEntity extends Entity {
         COUPLING_MODE.clear();
     }
 
+    /**
+     * 連結が成立したら、その2両（および各編成の全車両）を選択中の連結モードを解除する。
+     * プレイヤー操作・接触連結など、どの経路で連結しても確実にモードが消えるようにする。
+     */
+    private static void clearCouplingModeInvolving(TrainEntity a, TrainEntity b) {
+        if (COUPLING_MODE.isEmpty()) {
+            return;
+        }
+        java.util.Set<UUID> involved = new java.util.HashSet<>();
+        for (TrainEntity root : new TrainEntity[]{a, b}) {
+            if (root == null) {
+                continue;
+            }
+            root.forEachFormationTrain(t -> {
+                if (t != null) {
+                    involved.add(t.getUUID());
+                }
+            });
+            involved.add(root.getUUID());
+        }
+        COUPLING_MODE.entrySet().removeIf(e -> {
+            CouplingSelection s = e.getValue();
+            return s != null && (involved.contains(s.first()) || involved.contains(s.second()));
+        });
+    }
+
     @Override
     public boolean hurt(DamageSource source, float amount) {
         Entity attacker = source.getEntity();
@@ -3816,6 +4270,10 @@ public class TrainEntity extends Entity {
     // ---- 既存スクリプト向けAPI ----
     public float getTrainStateData(int stateType) {
         return getVehicleState(stateType);
+    }
+
+    public void setTrainStateData(int stateType, float value) {
+        syncVehicleState(stateType, value);
     }
 
     public float getVehicleState(int stateType) {
@@ -3915,7 +4373,17 @@ public class TrainEntity extends Entity {
     }
 
     public int func_70070_b() {
-        return 0x00F000F0;
+        if (level() == null) {
+            return 0;
+        }
+        try {
+            BlockPos bodyPos = BlockPos.containing(getX(), getY() + 1.5D, getZ());
+            int block = level().getBrightness(LightLayer.BLOCK, bodyPos);
+            int sky = level().getBrightness(LightLayer.SKY, bodyPos);
+            return (block << 4) | (sky << 20);
+        } catch (Throwable ignored) {
+            return 0;
+        }
     }
 
     public int func_70070_b(int ignored) {
@@ -3948,7 +4416,16 @@ public class TrainEntity extends Entity {
     }
 
     public BogieCompat getBogie(int index) {
-        return new BogieCompat(this, index);
+        return new BogieCompat(this, scriptBogieIndexToDefinitionIndex(index));
+    }
+
+    public int scriptBogieIndexToDefinitionIndex(int scriptIndex) {
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def == null || def.getBogies().isEmpty()) {
+            return Mth.clamp(scriptIndex, 0, 1);
+        }
+        int[] extremes = getExtremeBogieIndices(def);
+        return scriptIndex == 0 ? extremes[1] : extremes[0];
     }
 
     public static final class ResourceStateCompat {
@@ -4142,20 +4619,46 @@ public class TrainEntity extends Entity {
             values.put("customButtons", train.getCustomButtonBits());
             values.put("railProgress", train.getRailProgress());
             values.put("connected", train.isConnected() ? 1 : 0);
-            values.put("carNumber", 0);
-            values.put("prevFormationSize", 1);
+            values.put("carNumber", defaultCarNumber(train));
+            values.put("prevFormationSize", defaultFormationSize(train));
             values.put("isFormationA", false);
             values.put("isFormationB", false);
             values.put("isFormationError", false);
             values.putIfAbsent("prevRollsignId", train.getDestinationIndex());
             for (int i = 0; i < 16; i++) {
-                int state = train.isCustomButtonOn(i) ? 1 : 0;
+                int state = train.getCustomButtonValue(i);
                 values.put("Button" + i, state);
                 values.put("button" + i, state);
                 values.put("CustomButton" + i, state);
                 values.put("customButton" + i, state);
             }
-            train.scriptData.forEach(values::putIfAbsent);
+            train.scriptData.forEach(values::put);
+        }
+
+        private static int defaultCarNumber(TrainEntity train) {
+            if (train == null) {
+                return 1;
+            }
+            try {
+                List<TrainEntity> formationTrains = train.getFormationTrainsForDisplay();
+                int index = formationTrains.indexOf(train);
+                if (index >= 0) {
+                    return index + 1;
+                }
+            } catch (RuntimeException ignored) {
+            }
+            return 1;
+        }
+
+        private static int defaultFormationSize(TrainEntity train) {
+            if (train == null) {
+                return 1;
+            }
+            try {
+                return Math.max(1, train.getFormationTrainsForDisplay().size());
+            } catch (RuntimeException ignored) {
+                return 1;
+            }
         }
     }
 
@@ -4187,21 +4690,94 @@ public class TrainEntity extends Entity {
          * Returns the number of cars visible to this script.
          */
         public int size() {
-            return 1;
+            return scriptFormationSize();
         }
 
         /**
          * Returns a formation entry by index.
          */
         public FormationEntryCompat get(int index) {
-            return index == 0 ? new FormationEntryCompat(0, train) : null;
+            List<TrainEntity> trains = train.getFormationTrainsForDisplay();
+            if (index < 0 || index >= trains.size()) {
+                return null;
+            }
+            TrainEntity entryTrain = trains.get(index);
+            int dir = 0;
+            if (train.formation != null) {
+                com.portofino.realtrainmodunofficial.entity.formation.FormationEntry entry = train.formation.getEntry(entryTrain);
+                if (entry != null) {
+                    dir = entry.dir;
+                }
+            }
+            return new FormationEntryCompat(index, entryTrain, dir);
         }
 
         /**
          * Returns the entry for a train.
+         * ★引数は Object 受け: レガシー JS は entity(=LegacyScriptExecutor ラッパー)をそのまま渡すため。
+         *   TrainEntity 専用にすると Nashorn がラッパーを TrainEntity へキャストして ClassCastException
+         *   になる(isMiddleCar で発生していた)。中身は getTrain() で取り出すか、無ければ自分(train)。
          */
-        public FormationEntryCompat getEntry(TrainEntity entity) {
-            return new FormationEntryCompat(0, entity == null ? train : entity);
+        public FormationEntryCompat getEntry(Object entity) {
+            TrainEntity resolved = train;
+            if (entity instanceof TrainEntity t) {
+                resolved = t;
+            } else if (entity != null) {
+                try {
+                    Object r = entity.getClass().getMethod("getTrain").invoke(entity);
+                    if (r instanceof TrainEntity t) {
+                        resolved = t;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            // 号車位置(entryId)は「表示チェーン順(=先頭から数えた実際の連結位置)」を
+            // 唯一のソースにする。size() も同じ表示チェーンから数えるため、
+            // スクリプトの isMiddleCar (id==1||id==size の判定) が必ず整合する。
+            // ※ 旧実装は size を表示チェーン・entryId を formation.entries[] と別ソースから
+            //   取っており、編成方向によって不整合 → 連結器/幌が片側だけ消える原因だった。
+            //   また 06/07 だけ中間車に偽装するハックもあったが、本家スクリプトの
+            //   パーツ分けに任せる方針(ユーザー要望)で撤去した。
+            List<TrainEntity> trains = train.getFormationTrainsForDisplay();
+            int index = trains.indexOf(resolved);
+            int dir = 0;
+            if (train.formation != null) {
+                com.portofino.realtrainmodunofficial.entity.formation.FormationEntry entry = train.formation.getEntry(resolved);
+                if (entry != null) {
+                    dir = entry.dir;
+                }
+            }
+            return new FormationEntryCompat(index >= 0 ? index : 0, resolved, dir);
+        }
+
+        public int getNotch() {
+            TrainEntity front = frontTrain();
+            return front != null ? front.getNotch() : train.getNotch();
+        }
+
+        public float getSpeed() {
+            TrainEntity front = frontTrain();
+            return front != null ? front.getSpeed() : train.getSpeed();
+        }
+
+        public byte getDirection() {
+            return train.formation != null ? train.formation.getDirection() : 0;
+        }
+
+        private TrainEntity frontTrain() {
+            if (train.formation != null) {
+                com.portofino.realtrainmodunofficial.entity.formation.FormationEntry front = train.formation.getFrontEntry();
+                if (front != null && front.train != null) {
+                    return front.train;
+                }
+            }
+            List<TrainEntity> trains = train.getFormationTrainsForDisplay();
+            return trains.isEmpty() ? train : trains.get(0);
+        }
+
+        private int scriptFormationSize() {
+            // 連結中の実両数(表示チェーン順)をそのまま返す。getEntry().entryId と同じソース。
+            return train.getFormationTrainsForDisplay().size();
         }
 
         /**
@@ -4214,13 +4790,19 @@ public class TrainEntity extends Entity {
     public static final class FormationEntryCompat {
         public final int entryId;
         public final TrainEntity train;
+        public final int dir;
 
         /**
          * Creates a script-visible formation entry.
          */
         public FormationEntryCompat(int entryId, TrainEntity train) {
+            this(entryId, train, 0);
+        }
+
+        public FormationEntryCompat(int entryId, TrainEntity train, int dir) {
             this.entryId = entryId;
             this.train = train;
+            this.dir = dir;
         }
     }
 
@@ -4298,6 +4880,13 @@ public class TrainEntity extends Entity {
         // Legacy cab scripts inspect the array length to know the brake notch count.
         public final float[] deccelerations = {
             0.0F, 0.1F, 0.2F, 0.35F, 0.5F, 0.7F, 0.9F, 1.1F, 1.3F
+        };
+        // Legacy cab/monitor scripts read maxSpeed as an array of per-notch top speeds
+        // (e.g. CustomMonitor_JRE1: config.maxSpeed[config.maxSpeed.length-1]*72). Must be
+        // non-null with at least one element or scripts crash on undefined.length.
+        // 値は blocks/tick 相当(末尾要素 1.1 ≈ 約79km/h)。実速度はエンジン側で決まるので表示用の上限。
+        public final float[] maxSpeed = {
+            0.0F, 0.22F, 0.44F, 0.66F, 0.88F, 1.1F
         };
         public final String[] rollsignNames;
         // Legacy cab/server scripts read sound_Announcement as a 2D array [[name, soundPath], ...].
@@ -4945,6 +5534,9 @@ public class TrainEntity extends Entity {
 
     @Override
     public InteractionResult interactAt(Player player, Vec3 vec, InteractionHand hand) {
+        if (isHoldingTrainPlacementItem(player)) {
+            return InteractionResult.PASS;
+        }
         boolean holdingCrowbar = player.getMainHandItem().is(RealTrainModUnofficialItems.CROWBAR_ITEM.get())
             || player.getOffhandItem().is(RealTrainModUnofficialItems.CROWBAR_ITEM.get());
         if (holdingCrowbar) {
@@ -5073,10 +5665,16 @@ public class TrainEntity extends Entity {
 
         Vec3 offset = def != null ? def.getModelOffset() : Vec3.ZERO;
         float scale = def != null ? def.getModelScale() : 1.0F;
-        double renderX = Mth.lerp(partialTicks, this.xo, this.getX());
-        double renderY = Mth.lerp(partialTicks, this.yo, this.getY());
-        double renderZ = Mth.lerp(partialTicks, this.zo, this.getZ());
-        double yawRad = Math.toRadians(-renderYaw);
+        double dxo = this.getX() - this.xo;
+        double dyo = this.getY() - this.yo;
+        double dzo = this.getZ() - this.zo;
+        boolean staleOldPos = (dxo * dxo + dyo * dyo + dzo * dzo) > 64.0D;
+
+        double renderX = staleOldPos ? this.getX() : Mth.lerp(partialTicks, this.xo, this.getX());
+        double renderY = staleOldPos ? this.getY() : Mth.lerp(partialTicks, this.yo, this.getY());
+        double renderZ = staleOldPos ? this.getZ() : Mth.lerp(partialTicks, this.zo, this.getZ());
+        float effectiveYaw = staleOldPos ? this.getYRot() : renderYaw;
+        double yawRad = Math.toRadians(-effectiveYaw);
         double offsetX = Math.cos(yawRad) * offset.x - Math.sin(yawRad) * offset.z;
         double offsetZ = Math.sin(yawRad) * offset.x + Math.cos(yawRad) * offset.z;
         double dx = world.x - renderX - offsetX;
@@ -5090,6 +5688,9 @@ public class TrainEntity extends Entity {
 
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
+        if (isHoldingTrainPlacementItem(player)) {
+            return InteractionResult.PASS;
+        }
         boolean holdingCrowbar = player.getMainHandItem().is(RealTrainModUnofficialItems.CROWBAR_ITEM.get())
             || player.getOffhandItem().is(RealTrainModUnofficialItems.CROWBAR_ITEM.get());
         if (holdingCrowbar) {
@@ -5103,6 +5704,15 @@ public class TrainEntity extends Entity {
             return InteractionResult.PASS;
         }
         return tryRideWithSeat(player, findNearestSeatIndex(player));
+    }
+
+    private static boolean isHoldingTrainPlacementItem(Player player) {
+        return player != null && (
+            player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
+                || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
+                || player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get())
+                || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get())
+        );
     }
 
     private void ensureBogieHitboxes() {
@@ -5530,17 +6140,15 @@ public class TrainEntity extends Entity {
     }
 
     public TrainEntity resolveCoupledTrain(UUID uuid) {
-        if (uuid == null || !(level() instanceof net.minecraft.server.level.ServerLevel serverLevel)) return null;
-        Entity e = serverLevel.getEntity(uuid);
-        return e instanceof TrainEntity t ? t : null;
+        return resolveTrainByUuid(uuid);
     }
 
     public TrainEntity getCoupledLeader() {
-        return resolveCoupledTrain(coupledLeaderUuid);
+        return resolveTrainByUuid(getDisplayLeaderUuid());
     }
 
     public TrainEntity getCoupledFollower() {
-        return resolveCoupledTrain(coupledFollowerUuid);
+        return resolveTrainByUuid(getDisplayFollowerUuid());
     }
 
     private List<TrainEntity> getFormationTrainsInOrder() {
@@ -5623,10 +6231,23 @@ public class TrainEntity extends Entity {
 
     public void moveAsFormationFollower(TrainEntity leader, int leaderSide, int followerSide, float speed) {
         if (leader == null || level().isClientSide()) return;
+        // テレポート・ガード: フォロワーがレール追従に失敗した時のフォールバック moveTo は、
+        // 中間車のレール状態が未確立だと遠方(他車の上)へ飛ぶことがある。連結中の正当な
+        // 微調整を超える大ジャンプは棄却し、本体を元位置に留める(本家は台車を保持して飛ばさない)。
+        double preX = getX();
+        double preY = getY();
+        double preZ = getZ();
         boolean placed = leader.placeCoupledFollowerOnRail(this, leaderSide, followerSide);
         if (!placed) {
             double gap = leader.getCoupledGap(leader, this);
             leader.placeCoupledFollowerFallback(this, leaderSide, followerSide, gap);
+            double jumpX = getX() - preX;
+            double jumpZ = getZ() - preZ;
+            double maxJump = Math.max(8.0D, leader.getDefaultDistanceToConnectedTrain(this) + 2.0D);
+            if (jumpX * jumpX + jumpZ * jumpZ > maxJump * maxJump) {
+                // ありえない大移動 → テレポート扱いで棄却し元の位置を維持。
+                moveTo(preX, preY, preZ, getYRot(), getXRot());
+            }
             clearRailGuidance();
         } else {
             centerGuidanceFallbackTicks = 0;
@@ -5657,6 +6278,11 @@ public class TrainEntity extends Entity {
         if (customButtonValues == null) customButtonValues = new int[16];
         customButtonValues[index] = value;
         setCustomButton(index, value != 0);
+        scriptData.put("Button" + index, Integer.toString(value));
+        scriptData.put("button" + index, Integer.toString(value));
+        scriptData.put("CustomButton" + index, Integer.toString(value));
+        scriptData.put("customButton" + index, Integer.toString(value));
+        scriptDataDirty = true;
     }
 
     // ---- Previous-frame bogie world position (for bogie entity xo/yo/zo sync) ----

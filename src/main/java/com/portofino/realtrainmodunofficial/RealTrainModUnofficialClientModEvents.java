@@ -66,28 +66,31 @@ public final class RealTrainModUnofficialClientModEvents {
         ExternalSoundPackBridge.register(event);
     }
 
-    /** 一旦ティントを切って、両方とも白マーカーへ戻す。 */
+    // 本家RTM同様、テクスチャ(白の marker_0 等)は変えず tint 色だけ変える。
+    // 普通マーカー=赤、分岐マーカー=青。
+    private static final int MARKER_COLOR = 0xFF3B30;        // 赤
+    private static final int MARKER_SWITCH_COLOR = 0x0028C8; // 濃い青(本家寄り)
+
     @SubscribeEvent
     public static void registerBlockColors(RegisterColorHandlersEvent.Block event) {
         event.register(
-            (state, tintGetter, pos, tintIndex) -> 0xFFFFFF,
+            (state, tintGetter, pos, tintIndex) -> MARKER_COLOR,
             RealTrainModUnofficialBlocks.MARKER.get()
         );
         event.register(
-            (state, tintGetter, pos, tintIndex) -> 0xFFFFFF,
+            (state, tintGetter, pos, tintIndex) -> MARKER_SWITCH_COLOR,
             RealTrainModUnofficialBlocks.MARKER_SWITCH.get()
         );
     }
 
-    /** アイテム側も白へ戻す。 */
     @SubscribeEvent
     public static void registerItemColors(RegisterColorHandlersEvent.Item event) {
         event.register(
-            (stack, tintIndex) -> 0xFFFFFF,
+            (stack, tintIndex) -> MARKER_COLOR,
             RealTrainModUnofficialItems.MARKER_ITEM.get()
         );
         event.register(
-            (stack, tintIndex) -> 0xFFFFFF,
+            (stack, tintIndex) -> MARKER_SWITCH_COLOR,
             RealTrainModUnofficialItems.MARKER_SWITCH_ITEM.get()
         );
     }

@@ -37,8 +37,8 @@ import java.util.List;
 
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class RailPreviewRenderer {
-    private static final int SEARCH_DISTANCE = 50;
-    private static final int SEARCH_HEIGHT = 10;
+    private static final int SEARCH_DISTANCE = 64;
+    private static final int SEARCH_HEIGHT = 32;
     private static final int LABEL_SCAN_INTERVAL_TICKS = 30;
     private static List<RailPosition> cachedMarkerLabelPositions = List.of();
     private static long nextMarkerLabelScanTick;
@@ -179,7 +179,7 @@ public final class RailPreviewRenderer {
         double dirZ = -com.portofino.realtrainmodunofficial.block.MarkerBlock.getDirStepZ(dir);
         double len = Math.sqrt(dirX * dirX + dirZ * dirZ);
         if (len > 1.0e-6) { dirX /= len; dirZ /= len; }
-        for (int meters = 10; meters <= 50; meters += 10) {
+        for (int meters = 10; meters <= 120; meters += 10) {
             double x = rp.posX + dirX * meters;
             double y = rp.posY + 1.35D;
             double z = rp.posZ + dirZ * meters;
@@ -263,14 +263,28 @@ public final class RailPreviewRenderer {
                 hit = eye.add(mc.player.getViewVector(1.0F).scale(8.0D));
             }
             double dx = hit.x - start.posX;
-            double dy = hit.y - start.posY;
             double dz = hit.z - start.posZ;
             double lenH = Math.sqrt(dx * dx + dz * dz);
             if (lenH < 0.5D) lenH = 0.5D;
-            WrenchItem.liveYaw = (float) Math.toDegrees(Math.atan2(dx, dz));
-            WrenchItem.liveLenH = (float) lenH;
-            WrenchItem.livePitch = (float) Math.toDegrees(Math.atan2(dy, lenH));
-            WrenchItem.liveLenV = (float) lenH;
+            // 編集中マーカーが既存レールの端点に接続している場合、アンカー方向(レンチの線)は
+            // レールの接線にロックし、横方向には動かせない。視点では長さ(=伸ばす)だけ変え、
+            // それに伴いカーブが補正される(本家RTM挙動)。接続でなければ従来通り視点で自由に向ける。
+            RailPosition connectedEnd = findConnectedRailEndpoint(mc.level, start);
+            if (connectedEnd != null) {
+                WrenchItem.liveYaw = wrapDeg(connectedEnd.anchorYaw + 180.0F);
+                WrenchItem.livePitch = -connectedEnd.anchorPitch;
+                WrenchItem.liveLenH = (float) lenH;
+                WrenchItem.liveLenV = (float) lenH;
+            } else {
+                // アンカーの向き(水平)と長さは視線先で決めるが、ピッチは水平(0)を既定にする。
+                // 高い位置のマーカーを編集すると視線が地面(下)に当たり dy が大きく負になり、急な
+                // 下り勾配でレールが地下に潜って緑線も見えなくなっていた(ユーザー報告)。勾配は相手
+                // マーカーの高さ差から滑らかなS字カーブで自動的に付くため、端の接線は水平でよい。
+                WrenchItem.liveYaw = (float) Math.toDegrees(Math.atan2(dx, dz));
+                WrenchItem.liveLenH = (float) lenH;
+                WrenchItem.livePitch = 0.0F;
+                WrenchItem.liveLenV = (float) lenH;
+            }
         }
         // 保持しているライブ値を start に反映。
         if (WrenchItem.liveLenH > 0.0F) {
@@ -381,6 +395,77 @@ public final class RailPreviewRenderer {
         }
         if (tag.contains("StartRP")) {
             return RailPosition.readFromNBT(tag.getCompound("StartRP"));
+        }
+        return null;
+    }
+
+    private static float wrapDeg(float deg) {
+        float d = deg % 360.0F;
+        if (d >= 180.0F) d -= 360.0F;
+        if (d < -180.0F) d += 360.0F;
+        return d;
+    }
+
+    /**
+     * 編集中マーカー(start)が既存レールの端点に接続しているか調べ、接続していればその端点の
+     * RailPosition(接線=anchorYaw/anchorPitch を持つ)を返す。なければ null。
+     *
+     * <p>マーカー周辺を走査してレールコア(直接 or 当たり判定/道床から getCorePos で解決)を集め、
+     * その端点 posX/Y/Z がマーカー位置に十分近ければ「接続」とみなす。これによりレンチ編集時に
+     * 接続端のアンカーをレール接線にロックできる(本家RTM: 接続側は横に動かせず補正・伸ばしのみ)。</p>
+     */
+    private static RailPosition findConnectedRailEndpoint(net.minecraft.world.level.Level level, RailPosition start) {
+        if (level == null || start == null) {
+            return null;
+        }
+        final double tolSq = 2.25D; // 1.5ブロック以内を接続とみなす
+        int bx = (int) Math.floor(start.posX);
+        int by = (int) Math.floor(start.posY);
+        int bz = (int) Math.floor(start.posZ);
+        java.util.Set<BlockPos> visitedCores = new java.util.HashSet<>();
+        RailPosition best = null;
+        double bestSq = tolSq;
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -2; dy <= 2; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    BlockPos p = new BlockPos(bx + dx, by + dy, bz + dz);
+                    LargeRailCoreBlockEntity core = resolveCore(level, p);
+                    if (core == null || !visitedCores.add(core.getBlockPos())) {
+                        continue;
+                    }
+                    RailPosition[] rps = core.getRailPositions();
+                    if (rps == null) continue;
+                    for (RailPosition rp : rps) {
+                        if (rp == null) continue;
+                        double ex = rp.posX - start.posX;
+                        double ey = rp.posY - start.posY;
+                        double ez = rp.posZ - start.posZ;
+                        double d2 = ex * ex + ey * ey + ez * ez;
+                        if (d2 < bestSq) {
+                            bestSq = d2;
+                            best = rp;
+                        }
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    /** (pos) のブロックをレールコアに解決する(コア直接 / 当たり判定 / 道床 → getCorePos)。 */
+    private static LargeRailCoreBlockEntity resolveCore(net.minecraft.world.level.Level level, BlockPos pos) {
+        BlockEntity be = level.getBlockEntity(pos);
+        if (be instanceof LargeRailCoreBlockEntity core) {
+            return core;
+        }
+        BlockPos corePos = null;
+        if (be instanceof com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity rbe) {
+            corePos = rbe.getCorePos();
+        } else if (be instanceof com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity bbe) {
+            corePos = bbe.getCorePos();
+        }
+        if (corePos != null && level.getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core) {
+            return core;
         }
         return null;
     }

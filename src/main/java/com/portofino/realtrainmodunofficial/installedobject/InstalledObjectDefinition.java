@@ -24,9 +24,37 @@ public class InstalledObjectDefinition {
     private final String emissiveTexture;
     private final String runningSound;
     private final Map<Integer, List<String>> signalLightGroups;
+    private final List<String> renderObjects;
     private final Vec3 scriptBodyPos;
     private final int signFrame;
     private final int backTexture;
+    private Vec3 wireAttachPos = Vec3.ZERO;
+    // ワイヤー用パラメータ(WireConfig 相当)。コンストラクタ後に setWireParams で設定。
+    private float sectionLength = 0.5F;
+    private float deflectionCoefficient = 0.0F;
+
+    public float getSectionLength() {
+        return sectionLength;
+    }
+
+    public float getDeflectionCoefficient() {
+        return deflectionCoefficient;
+    }
+
+    public void setWireParams(float sectionLength, float deflectionCoefficient) {
+        if (sectionLength > 0.0F) {
+            this.sectionLength = sectionLength;
+        }
+        this.deflectionCoefficient = Math.max(0.0F, deflectionCoefficient);
+    }
+
+    public Vec3 getWireAttachPos() {
+        return wireAttachPos;
+    }
+
+    public void setWireAttachPos(Vec3 wireAttachPos) {
+        this.wireAttachPos = wireAttachPos == null ? Vec3.ZERO : wireAttachPos;
+    }
 
     public InstalledObjectDefinition(String id, String displayName, String packName, InstalledObjectCategory category,
                                      String modelFile, String scriptPath, Map<String, String> textureOverrides,
@@ -44,7 +72,7 @@ public class InstalledObjectDefinition {
                                      Vec3 scriptBodyPos) {
         this(id, displayName, packName, category, modelFile, scriptPath, buttonTexture, textureOverrides, modelOffset,
             modelScale, smoothing, width, height, depth, signTexture, emissiveTexture, runningSound,
-            signalLightGroups, scriptBodyPos, 1, 1);
+            signalLightGroups, List.of(), scriptBodyPos, 1, 1);
     }
 
     public InstalledObjectDefinition(String id, String displayName, String packName, InstalledObjectCategory category,
@@ -53,6 +81,17 @@ public class InstalledObjectDefinition {
                                      float width, float height, float depth, String signTexture,
                                      String emissiveTexture, String runningSound, Map<Integer, List<String>> signalLightGroups,
                                      Vec3 scriptBodyPos, int signFrame, int backTexture) {
+        this(id, displayName, packName, category, modelFile, scriptPath, buttonTexture, textureOverrides, modelOffset,
+            modelScale, smoothing, width, height, depth, signTexture, emissiveTexture, runningSound,
+            signalLightGroups, List.of(), scriptBodyPos, signFrame, backTexture);
+    }
+
+    public InstalledObjectDefinition(String id, String displayName, String packName, InstalledObjectCategory category,
+                                     String modelFile, String scriptPath, String buttonTexture, Map<String, String> textureOverrides,
+                                     Vec3 modelOffset, float modelScale, boolean smoothing,
+                                     float width, float height, float depth, String signTexture,
+                                     String emissiveTexture, String runningSound, Map<Integer, List<String>> signalLightGroups,
+                                     List<String> renderObjects, Vec3 scriptBodyPos, int signFrame, int backTexture) {
         this.id = id;
         this.displayName = displayName;
         this.packName = packName;
@@ -71,6 +110,7 @@ public class InstalledObjectDefinition {
         this.emissiveTexture = emissiveTexture == null ? "" : emissiveTexture;
         this.runningSound = runningSound == null ? "" : runningSound;
         this.signalLightGroups = signalLightGroups == null ? Map.of() : Map.copyOf(signalLightGroups);
+        this.renderObjects = renderObjects == null ? List.of() : List.copyOf(renderObjects);
         this.scriptBodyPos = scriptBodyPos == null ? Vec3.ZERO : scriptBodyPos;
         this.signFrame = Math.max(1, signFrame);
         this.backTexture = backTexture;
@@ -146,6 +186,10 @@ public class InstalledObjectDefinition {
 
     public Map<Integer, List<String>> getSignalLightGroups() {
         return signalLightGroups;
+    }
+
+    public List<String> getRenderObjects() {
+        return renderObjects;
     }
 
     public int getSignFrame() {

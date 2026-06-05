@@ -7,7 +7,6 @@ import com.portofino.realtrainmodunofficial.item.MarkerItem;
 import com.portofino.realtrainmodunofficial.item.RailItem;
 import com.portofino.realtrainmodunofficial.item.TrainItem;
 import com.portofino.realtrainmodunofficial.item.InstalledObjectItem;
-import com.portofino.realtrainmodunofficial.item.SignalCommunicatorItem;
 import com.portofino.realtrainmodunofficial.item.TrainVehicleItem;
 import com.portofino.realtrainmodunofficial.item.WireItem;
 import com.portofino.realtrainmodunofficial.item.WrenchItem;
@@ -22,26 +21,10 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> CROSSING_GATE_ITEM = ITEMS.register(
         "crossing_gate", () -> new InstalledObjectItem(InstalledObjectCategory.CROSSING)
     );
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_RECEIVER_ITEM = ITEMS.registerSimpleBlockItem(
-        "signal_receiver", RealTrainModUnofficialBlocks.SIGNAL_RECEIVER
-    );
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_VALUE_RECEIVER_ITEM = ITEMS.registerSimpleBlockItem(
-        "signal_value_receiver", RealTrainModUnofficialBlocks.SIGNAL_VALUE_RECEIVER
-    );
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> TRAIN_DETECTOR_ITEM = ITEMS.registerSimpleBlockItem(
-        "train_detector", RealTrainModUnofficialBlocks.TRAIN_DETECTOR
-    );
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_STATE_ITEM = ITEMS.registerSimpleBlockItem(
-        "signal_state", RealTrainModUnofficialBlocks.SIGNAL_STATE
-    );
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> SCRIPT_BLOCK_ITEM = ITEMS.registerSimpleBlockItem(
-        "script_block", RealTrainModUnofficialBlocks.SCRIPT_BLOCK
-    );
-    // 道床(ballast)アイテムは廃止 (ユーザー要望「道床を消す・アイテムからも」)。
-    // 道床ブロックはレール敷設時に配置せず(不可視の当たり判定のみ)、入手アイテムも登録しない。
-    public static final DeferredItem<SignalCommunicatorItem> SIGNAL_COMMUNICATOR_ITEM = ITEMS.register(
-        "signal_communicator", SignalCommunicatorItem::new
-    );
+    // 以下のアイテムはユーザー要望により削除:
+    //   受信機(signal_receiver) / 受信機シグナル値(signal_value_receiver) / 電車検知ブロック(train_detector)
+    //   状態ブロック(signal_state) / スクリプトブロック(script_block) / 通信機(signal_communicator)
+    // 道床(ballast)アイテムも廃止済み。ブロック自体は残るがアイテム(入手手段)は登録しない。
     public static final DeferredItem<MarkerItem> MARKER_ITEM = ITEMS.register(
         "marker", () -> new MarkerItem(RealTrainModUnofficialBlocks.MARKER.get(), false)
     );
@@ -60,9 +43,7 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<TrainItem> TRAIN_ITEM = ITEMS.register(
         "train", () -> new TrainItem(TrainItem.Category.ELECTRIC)
     );
-    public static final DeferredItem<TrainItem> TEST_TRAIN_ITEM = ITEMS.register(
-        "test_train", () -> new TrainItem(TrainItem.Category.TEST)
-    );
+    // 試験用車両(test_train)はユーザー要望により削除。
     public static final DeferredItem<TrainVehicleItem> TRAIN_VEHICLE_ITEM = ITEMS.register(
         "train_vehicle", TrainVehicleItem::new
     );
@@ -81,11 +62,10 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<WireItem> WIRE_ITEM = ITEMS.register(
         "wire", WireItem::new
     );
+    // 照明(light): 本家RTM の照明アイテム。外部パックのモデルを使用し、レッドストーン
+    // 信号を受けると点灯する(InstalledObjectBlock 側で発光処理)。
     public static final DeferredItem<InstalledObjectItem> LIGHT_ITEM = ITEMS.register(
         "light", () -> new InstalledObjectItem(InstalledObjectCategory.LIGHT)
-    );
-    public static final DeferredItem<InstalledObjectItem> SIGNBOARD_ITEM = ITEMS.register(
-        "signboard", () -> new InstalledObjectItem(InstalledObjectCategory.SIGNBOARD)
     );
     public static final DeferredItem<InstalledObjectItem> INSULATOR_ITEM = ITEMS.register(
         "insulator", () -> new InstalledObjectItem(InstalledObjectCategory.INSULATOR)
@@ -94,27 +74,12 @@ public class RealTrainModUnofficialItems {
         "signal", () -> new InstalledObjectItem(InstalledObjectCategory.SIGNAL)
     );
     public static final DeferredItem<InstalledObjectItem> OVERHEAD_LINE_POLE_ITEM = ITEMS.register(
-        "overhead_line_pole", () -> new InstalledObjectItem(InstalledObjectCategory.INSULATOR)
+        "overhead_line_pole", () -> new InstalledObjectItem(InstalledObjectCategory.OVERHEAD_LINE_POLE)
     );
     public static final DeferredItem<InstalledObjectItem> TICKET_GATE_ITEM = ITEMS.register(
         "ticket_gate", () -> new InstalledObjectItem(InstalledObjectCategory.TICKET_GATE)
     );
     public static final DeferredItem<InstalledObjectItem> SPEAKER_ITEM = ITEMS.register(
         "speaker", () -> new InstalledObjectItem(InstalledObjectCategory.SPEAKER)
-    );
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> ATSA_GROUND_UNIT_ITEM = ITEMS.registerSimpleBlockItem(
-        "atsa_ground_unit", RealTrainModUnofficialBlocks.ATSA_GROUND_UNIT
-    );
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> ATSA_IFTTT_ITEM = ITEMS.registerSimpleBlockItem(
-        "atsa_ifttt", RealTrainModUnofficialBlocks.ATSA_IFTTT
-    );
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> ATSA_STATION_ANNOUNCE_ITEM = ITEMS.registerSimpleBlockItem(
-        "atsa_station_announce", RealTrainModUnofficialBlocks.ATSA_STATION_ANNOUNCE
-    );
-    public static final DeferredItem<com.portofino.realtrainmodunofficial.compat.atsassist.item.TrainProtectionSelectorItem> ATSA_TRAIN_PROTECTION_SELECTOR = ITEMS.register(
-        "atsa_train_protection_selector", com.portofino.realtrainmodunofficial.compat.atsassist.item.TrainProtectionSelectorItem::new
-    );
-    public static final DeferredItem<com.portofino.realtrainmodunofficial.compat.atsassist.item.DataMapEditorItem> ATSA_DATA_MAP_EDITOR = ITEMS.register(
-        "atsa_data_map_editor", com.portofino.realtrainmodunofficial.compat.atsassist.item.DataMapEditorItem::new
     );
 }

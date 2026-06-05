@@ -21,6 +21,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.List;
 import java.util.Comparator;
+import java.util.Locale;
 
 @OnlyIn(Dist.CLIENT)
 public final class ClientItemHelper {
@@ -112,11 +113,19 @@ public final class ClientItemHelper {
         }
         // 内蔵の basic_train 系は packName だけでなく id / displayName 由来で残る場合がある。
         String packName = definition.getPackName() == null ? "" : definition.getPackName();
-        String id = definition.getId() == null ? "" : definition.getId().toLowerCase();
+        String id = definition.getId() == null ? "" : definition.getId().toLowerCase(Locale.ROOT);
         String displayName = definition.getDisplayName() == null ? "" : definition.getDisplayName();
+        String displayNameLower = displayName.toLowerCase(Locale.ROOT);
+        String buttonTexture = definition.getButtonTexture() == null ? "" : definition.getButtonTexture().toLowerCase(Locale.ROOT);
+        // [RTM]SL_D51_v1.2 contains stale DD51-498 entries whose button textures are not bundled.
+        // The pack author confirmed they are not intended selectable vehicles.
+        if ((id.startsWith("dd51-498") || displayNameLower.startsWith("dd51-498"))
+                && buttonTexture.contains("button_dd51-498")) {
+            return false;
+        }
         return !HIDDEN_TRAIN_PACK.equalsIgnoreCase(packName)
             && !id.contains(HIDDEN_TRAIN_PACK)
-            && !displayName.toLowerCase().contains(HIDDEN_TRAIN_PACK);
+            && !displayNameLower.contains(HIDDEN_TRAIN_PACK);
     }
 
     public static void openCarSelectScreen(Player player, ItemStack stack) {
@@ -156,6 +165,7 @@ public final class ClientItemHelper {
             case LIGHT -> "screen.realtrainmodunofficial.select_light";
             case SIGNBOARD -> "screen.realtrainmodunofficial.select_signboard";
             case INSULATOR -> "screen.realtrainmodunofficial.select_insulator";
+            case OVERHEAD_LINE_POLE -> "screen.realtrainmodunofficial.select_overhead_line_pole";
             case WIRE -> "screen.realtrainmodunofficial.select_wire";
             case SIGNAL -> "screen.realtrainmodunofficial.select_signal";
             case CROSSING -> "screen.realtrainmodunofficial.select_crossing";

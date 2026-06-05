@@ -165,6 +165,9 @@ public final class TrainSeatEntity extends Entity {
 
     @Override
     public @NotNull InteractionResult interact(@NotNull Player player, @NotNull InteractionHand hand) {
+        if (isHoldingTrainPlacementItem(player)) {
+            return InteractionResult.PASS;
+        }
         TrainEntity train = resolveTrain();
         if (train == null) {
             return InteractionResult.PASS;
@@ -175,6 +178,13 @@ public final class TrainSeatEntity extends Entity {
             return train.interact(player, hand);
         }
         return train.rideSeat(player, getSeatIndex());
+    }
+
+    private static boolean isHoldingTrainPlacementItem(Player player) {
+        return player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
+            || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
+            || player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get())
+            || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get());
     }
 
     @Override

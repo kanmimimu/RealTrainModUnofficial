@@ -54,6 +54,7 @@ public record SelectModelPayload(String modelId, String dataMapValue) implements
                 ItemStack stack = player.getItemInHand(hand);
                 if (stack.getItem() instanceof RailItem
                     || stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.TrainItem
+                    || stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.CarItem
                     || stack.getItem() instanceof ModelSelectableItem) {
                     LegacyItemStackBridge.setSelectedModelData(stack, safeModelId, safeDataMap);
                     break;

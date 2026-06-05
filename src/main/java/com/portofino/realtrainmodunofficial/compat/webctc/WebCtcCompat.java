@@ -1,7 +1,6 @@
 package com.portofino.realtrainmodunofficial.compat.webctc;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import com.portofino.realtrainmodunofficial.compat.atsassist.AtsaTrainController;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.rail.RailRegistry;
 import com.portofino.realtrainmodunofficial.signal.SignalNetworkSavedData;
@@ -102,8 +101,9 @@ public final class WebCtcCompat {
             + ",\"notch\":" + train.getNotch()
             + ",\"doorOpen\":" + train.isDoorOpen()
             + ",\"reverser\":" + train.getReverser()
-            + ",\"trainProtection\":\"" + escape(train.getScriptDataValue(AtsaTrainController.KEY_TP)) + "\""
-            + ",\"speedLimit\":\"" + escape(train.getScriptDataValue(AtsaTrainController.KEY_SPEED_LIMIT)) + "\""
+            // ATSA(別mod)が書き込む script-data キーを読むだけ。ATSA未導入時は空文字。
+            + ",\"trainProtection\":\"" + escape(train.getScriptDataValue("ATSAssist_CurrentTP")) + "\""
+            + ",\"speedLimit\":\"" + escape(train.getScriptDataValue("ATSAssist_SpeedLimit")) + "\""
             + ",\"x\":" + train.getX()
             + ",\"y\":" + train.getY()
             + ",\"z\":" + train.getZ()

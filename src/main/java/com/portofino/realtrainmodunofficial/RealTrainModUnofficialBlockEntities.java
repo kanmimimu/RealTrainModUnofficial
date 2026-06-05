@@ -8,8 +8,6 @@ import com.portofino.realtrainmodunofficial.blockentity.ScriptBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.SignalRemoteBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.SignalStateBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.TrainDetectorBlockEntity;
-import com.portofino.realtrainmodunofficial.compat.atsassist.blockentity.AtsaGroundUnitBlockEntity;
-import com.portofino.realtrainmodunofficial.compat.atsassist.blockentity.AtsaSimpleBlockEntity;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -60,13 +58,4 @@ public class RealTrainModUnofficialBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ScriptBlockEntity>> SCRIPT_BLOCK =
         BLOCK_ENTITY_TYPES.register("script_block", () -> BlockEntityType.Builder.of(ScriptBlockEntity::new,
             RealTrainModUnofficialBlocks.SCRIPT_BLOCK.get()).build(null));
-
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AtsaGroundUnitBlockEntity>> ATSA_GROUND_UNIT =
-        BLOCK_ENTITY_TYPES.register("atsa_ground_unit", () -> BlockEntityType.Builder.of(AtsaGroundUnitBlockEntity::new,
-            RealTrainModUnofficialBlocks.ATSA_GROUND_UNIT.get()).build(null));
-
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AtsaSimpleBlockEntity>> ATSA_SIMPLE =
-        BLOCK_ENTITY_TYPES.register("atsa_simple", () -> BlockEntityType.Builder.of(AtsaSimpleBlockEntity::new,
-            RealTrainModUnofficialBlocks.ATSA_IFTTT.get(),
-            RealTrainModUnofficialBlocks.ATSA_STATION_ANNOUNCE.get()).build(null));
 }

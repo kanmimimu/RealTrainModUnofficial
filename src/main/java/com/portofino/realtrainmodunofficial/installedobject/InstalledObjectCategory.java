@@ -4,6 +4,7 @@ public enum InstalledObjectCategory {
     LIGHT,
     SIGNBOARD,
     INSULATOR,
+    OVERHEAD_LINE_POLE,
     WIRE,
     SIGNAL,
     CROSSING,

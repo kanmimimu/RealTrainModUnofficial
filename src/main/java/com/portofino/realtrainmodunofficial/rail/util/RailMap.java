@@ -87,8 +87,10 @@ public abstract class RailMap {
         // 距離フィールド方式: レール曲線を密サンプルし、各候補セル中心から曲線までの距離が
         // 帯の半幅以内なら道床を置く。垂直掃引+floor だと縁がギザつき隙間も出る (ユーザー報告
         // 「カーブで道床がかくかく/隙間」) ため、距離判定で均一幅・最小ギザつきの綺麗な帯にする。
-        double halfW = prop.ballastWidth / 2.0D;
-        if (halfW <= 0.0D) return;
+        // ballastWidth=0 のレールでも、列車をレール全長のどこにでも設置できるよう中心線に
+        // 不可視の検出ブロックを並べる(本家RTMはレール全長に当たり判定あり)。最小半幅 0.6 で
+        // 中心線が通るブロックだけを薄く埋める(地形は壊さない=setRail 側で置換可否を判定)。
+        double halfW = Math.max(prop.ballastWidth / 2.0D, 0.6D);
         int split = (int) (this.getLength() * 4.0D);
         if (split < 2) split = 2;
         int n = split + 1;
@@ -96,6 +98,8 @@ public abstract class RailMap {
         double[] sx = new double[n];
         double[] sz = new double[n];
         int[] sy = new int[n];
+        // 各サンプルでのブロック内レール面高さ(0..1)。坂で薄い当たり判定をレール面に合わせるため。
+        double[] soff = new double[n];
         double minx = Double.MAX_VALUE, maxx = -Double.MAX_VALUE;
         double minz = Double.MAX_VALUE, maxz = -Double.MAX_VALUE;
         for (int j = 0; j < n; ++j) {
@@ -104,7 +108,9 @@ public abstract class RailMap {
             sz[j] = point[0];
             // 当たり判定はレール高さ(=レール面のブロック)に置く。1 ブロック下(地面)に置くと
             // 地面ブロックを置換して抉れて見えるため。レール高さは通常空中なので置換で問題が出ない。
-            sy[j] = (int) Math.floor(this.getRailHeight(split, j) + 1.0e-4);
+            double h = this.getRailHeight(split, j);
+            sy[j] = (int) Math.floor(h + 1.0e-4);
+            soff[j] = h - sy[j]; // ブロック内のレール面の高さ(端数)
             if (sx[j] < minx) minx = sx[j];
             if (sx[j] > maxx) maxx = sx[j];
             if (sz[j] < minz) minz = sz[j];
@@ -122,7 +128,6 @@ public abstract class RailMap {
                 double cx = X + 0.5D;
                 double cz = Z + 0.5D;
                 double best = Double.MAX_VALUE;
-                int bestY = 0;
                 int bestJ = 0;
                 for (int j = 0; j < n; ++j) {
                     double dx = cx - sx[j];
@@ -130,7 +135,6 @@ public abstract class RailMap {
                     double d = dx * dx + dz * dz;
                     if (d < best) {
                         best = d;
-                        bestY = sy[j];
                         bestJ = j;
                     }
                 }
@@ -149,21 +153,41 @@ public abstract class RailMap {
                         continue;
                     }
                 }
-                this.addRailBlock(X, bestY, Z);
+                // 坂対応: このセル近傍を通る全サンプルの高さに当たり判定を置く。
+                // 平坦レールは全サンプルが同じ高さなので1つだけ。急勾配では1つのXZ列に
+                // レールが複数の高さで通るため、各高さに置いて縦方向の隙間(=端しか壊せない)を無くす。
+                for (int j = 0; j < n; ++j) {
+                    double dx = cx - sx[j];
+                    double dz = cz - sz[j];
+                    if (dx * dx + dz * dz > thrSq) continue;
+                    // レール面端数を 1/16 単位(0..15)で保持し、当たり判定スラブの高さに使う。
+                    int off16 = (int) Math.round(soff[j] * 16.0D);
+                    if (off16 < 0) off16 = 0;
+                    if (off16 > 15) off16 = 15;
+                    this.addRailBlock(X, sy[j], Z, off16);
+                }
             }
         }
     }
 
     protected void addRailBlock(int x, int y, int z) {
+        addRailBlock(x, y, z, 0);
+    }
+
+    protected void addRailBlock(int x, int y, int z, int surfaceOffset16) {
+        // (x,y,z) が完全一致する場合は、当たり判定スラブ高さ(surfaceOffset16)を最大値で更新する。
+        // 坂では同じブロック内をレールが下端→上端と通るので、最も高いレール面まで床から詰める
+        // (本家RTM: box(0,0,0,1,レール面高さ,1))。異なる Y(=別ブロック)はそれぞれ追加する。
         for (int i = 0; i < this.rails.size(); ++i) {
             int[] ia = this.rails.get(i);
-            if (ia[0] == x && ia[2] == z) {
-                if (ia[1] <= y) return;
-                this.rails.remove(i);
-                --i;
+            if (ia[0] == x && ia[1] == y && ia[2] == z) {
+                if (ia.length >= 4 && surfaceOffset16 > ia[3]) {
+                    ia[3] = surfaceOffset16;
+                }
+                return;
             }
         }
-        this.rails.add(new int[]{x, y, z});
+        this.rails.add(new int[]{x, y, z, surfaceOffset16});
     }
 
     /**
@@ -173,7 +197,9 @@ public abstract class RailMap {
      * 当たり判定は AIR と既存の判定/道床/マーカーのみ置換する (草・土など地形は壊さない)。
      */
     public void setRail(Level level, Block ballastBlock, int x0, int y0, int z0, RailProperties prop) {
-        if (level == null || prop == null || prop.ballastWidth <= 0) {
+        // ballastWidth<=0 でも検出ブロックは置く(createRailList が中心線を最小幅で生成する)。
+        // ここで return すると ballast なしレールがコア(端)でしか列車検出されなくなる。
+        if (level == null || prop == null) {
             this.rails.clear();
             return;
         }
@@ -196,6 +222,9 @@ public abstract class RailMap {
                 net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(pos);
                 if (be instanceof RailCollisionBlockEntity rbe) {
                     rbe.setCorePos(corePos);
+                    // レール面の高さ(端数)を保存し、当たり判定スラブをブロック底からその高さまで出す(本家RTM準拠)。
+                    float surfaceY = rail.length >= 4 ? rail[3] / 16.0f : 0.0f;
+                    rbe.setSurfaceY(surfaceY);
                     level.sendBlockUpdated(pos, rbe.getBlockState(), rbe.getBlockState(), Block.UPDATE_ALL);
                 }
             }

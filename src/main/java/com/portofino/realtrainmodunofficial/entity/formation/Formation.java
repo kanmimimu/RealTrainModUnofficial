@@ -29,8 +29,32 @@ public final class Formation {
         return stream().map(e -> e.train).filter(Objects::nonNull);
     }
 
-    public FormationEntry getEntry(TrainEntity train) {
-        return stream().filter(e -> train.equals(e.train)).findFirst().orElse(null);
+    /**
+     * 引数は TrainEntity でも、レガシー JS が渡す LegacyScriptExecutor ラッパーでも受け付ける。
+     * ★TrainEntity 専用オーバーロードを作らないこと: Nashorn はオーバーロードがあると
+     *   getEntry(TrainEntity) を選び、ラッパー引数を TrainEntity へキャストして ClassCastException に
+     *   なる。Object 1 本にして内部で getTrain() で中身を取り出す(スクリプト互換)。
+     */
+    public FormationEntry getEntry(Object obj) {
+        TrainEntity train = asTrainEntity(obj);
+        return train == null ? null : stream().filter(e -> train.equals(e.train)).findFirst().orElse(null);
+    }
+
+    private static TrainEntity asTrainEntity(Object obj) {
+        if (obj instanceof TrainEntity t) {
+            return t;
+        }
+        if (obj == null) {
+            return null;
+        }
+        try {
+            Object r = obj.getClass().getMethod("getTrain").invoke(obj);
+            if (r instanceof TrainEntity t) {
+                return t;
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     /** Returns the front-most entry (the one driving the formation) */

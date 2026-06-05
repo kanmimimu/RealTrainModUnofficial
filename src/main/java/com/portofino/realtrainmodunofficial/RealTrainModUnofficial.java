@@ -34,31 +34,13 @@ public class RealTrainModUnofficial {
             .icon(() -> RealTrainModUnofficialItems.RAIL_ITEM.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 output.accept(RealTrainModUnofficialItems.TRAIN_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.TEST_TRAIN_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CAR_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.IC_CARD_ITEM.get());
-                // 通常のレールアイテム (未選択状態、右クリックで選択画面)
                 output.accept(RealTrainModUnofficialItems.RAIL_ITEM.get());
-                // RTM 互換: 軌間×枕木種別ごとにプリセット済みのレールアイテムを並べる。
-                // (1067mm_wood / 1067mm_pc / 1435mm_wood 等)
-                for (com.portofino.realtrainmodunofficial.rail.RailDefinition railDef
-                        : com.portofino.realtrainmodunofficial.rail.RailRegistry.getAll()) {
-                    net.minecraft.world.item.ItemStack stack =
-                        new net.minecraft.world.item.ItemStack(RealTrainModUnofficialItems.RAIL_ITEM.get());
-                    com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge
-                        .setSelectedModelData(stack, railDef.getId(), "");
-                    output.accept(stack);
-                }
                 output.accept(RealTrainModUnofficialItems.WIRE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CROWBAR_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.WRENCH_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CROSSING_GATE_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.SIGNAL_RECEIVER_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.SIGNAL_VALUE_RECEIVER_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.TRAIN_DETECTOR_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.SIGNAL_STATE_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.SCRIPT_BLOCK_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.SIGNAL_COMMUNICATOR_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.MARKER_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.MARKER_DIAGONAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.MARKER_SWITCH_ITEM.get());
@@ -68,7 +50,6 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.OVERHEAD_LINE_POLE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_GATE_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.SIGNBOARD_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.SPEAKER_ITEM.get());
             }).build());
 
@@ -135,12 +116,6 @@ public class RealTrainModUnofficial {
         if (CreativeModeTabs.REDSTONE_BLOCKS.equals(event.getTabKey())) {
             event.accept(RealTrainModUnofficialItems.CROSSING_GATE_ITEM.get());
             event.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
-            event.accept(RealTrainModUnofficialItems.SIGNAL_RECEIVER_ITEM.get());
-            event.accept(RealTrainModUnofficialItems.SIGNAL_VALUE_RECEIVER_ITEM.get());
-            event.accept(RealTrainModUnofficialItems.TRAIN_DETECTOR_ITEM.get());
-            event.accept(RealTrainModUnofficialItems.SIGNAL_STATE_ITEM.get());
-            event.accept(RealTrainModUnofficialItems.SCRIPT_BLOCK_ITEM.get());
-            event.accept(RealTrainModUnofficialItems.SIGNAL_COMMUNICATOR_ITEM.get());
             event.accept(RealTrainModUnofficialItems.SPEAKER_ITEM.get());
         }
     }

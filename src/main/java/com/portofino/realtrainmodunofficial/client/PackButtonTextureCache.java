@@ -80,10 +80,12 @@ public final class PackButtonTextureCache {
         );
         int width = image.getWidth();
         int height = image.getHeight();
-        int[] sourceBounds = detectContentBounds(image, texturePath);
+        // RTM 本家どおり、テクスチャは (0,0) から 160×32 をそのまま使う。
+        // 以前は余白検出クロップ+アスペクト比維持で縮小していたため余白だらけになっていた。
+        int srcW = Math.min(width, 160);
+        int srcH = Math.min(height, 32);
         Minecraft.getInstance().getTextureManager().register(location, new DynamicTexture(image));
-        return new ButtonTextureInfo(location, width, height,
-            sourceBounds[0], sourceBounds[1], sourceBounds[2], sourceBounds[3]);
+        return new ButtonTextureInfo(location, width, height, 0, 0, srcW, srcH);
     }
 
     private static NativeImage loadFromDirectory(Path packPath, String texturePath) throws Exception {
@@ -230,6 +232,17 @@ public final class PackButtonTextureCache {
     private static int[] detectContentBounds(NativeImage image, String texturePath) {
         int width = image.getWidth();
         int height = image.getHeight();
+        int[] legacyAtlasBounds = detectLegacyRtmButtonAtlasBounds(image);
+        if (legacyAtlasBounds != null) {
+            return legacyAtlasBounds;
+        }
+        if (width >= 160 && height >= 32) {
+            int widthScale = width / 160;
+            int heightScale = height / 32;
+            if (width % 160 == 0 && height % 32 == 0 && widthScale == heightScale) {
+                return new int[]{0, 0, width, height};
+            }
+        }
         int[] edgeTrimBounds = detectUniformEdgeBounds(image);
         if (edgeTrimBounds != null) {
             return edgeTrimBounds;
@@ -247,6 +260,37 @@ public final class PackButtonTextureCache {
             return new int[]{0, 0, 160, 32};
         }
         return new int[]{0, 0, width, height};
+    }
+
+    private static int[] detectLegacyRtmButtonAtlasBounds(NativeImage image) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        if (width != height || width < 256) {
+            return null;
+        }
+        int background = image.getPixelRGBA(width - 1, height - 1);
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = image.getPixelRGBA(x, y);
+                if (((pixel >>> 24) & 0xFF) <= 8 || colorDistanceSq(pixel, background) <= 8 * 8 * 4) {
+                    continue;
+                }
+                maxX = Math.max(maxX, x);
+                maxY = Math.max(maxY, y);
+            }
+        }
+        if (maxX < 0 || maxY < 0 || maxX > width / 2 + 16 || maxY > height / 4) {
+            return null;
+        }
+        int sourceWidth = Math.min(width, Math.max(160, roundUp(maxX + 1, 16)));
+        int sourceHeight = Math.min(height, Math.max(32, roundUp(maxY + 1, 16)));
+        return new int[]{0, 0, sourceWidth, sourceHeight};
+    }
+
+    private static int roundUp(int value, int step) {
+        return ((Math.max(1, value) + step - 1) / step) * step;
     }
 
     private static int[] detectDominantBackgroundBounds(NativeImage image) {

@@ -79,18 +79,7 @@ public final class CrossingGateSoundManager {
             return false;
         }
         String runningSound = definition.getRunningSound();
-        if (runningSound != null && !runningSound.isBlank()) {
-            return true;
-        }
-        String id = definition.getId() == null ? "" : definition.getId().toLowerCase(java.util.Locale.ROOT);
-        String name = definition.getDisplayName() == null ? "" : definition.getDisplayName().toLowerCase(java.util.Locale.ROOT);
-        String model = definition.getModelFile() == null ? "" : definition.getModelFile().toLowerCase(java.util.Locale.ROOT);
-        return id.contains("crossing")
-            || id.contains("fumikiri")
-            || name.contains("crossing")
-            || name.contains("fumikiri")
-            || model.contains("crossing")
-            || model.contains("fumikiri");
+        return runningSound != null && !runningSound.isBlank();
     }
 
     private static ResourceLocation resolveSoundId(InstalledObjectBlockEntity blockEntity) {
@@ -168,6 +157,7 @@ public final class CrossingGateSoundManager {
                 || !level.isClientSide()
                 || blockEntity.isRemoved()
                 || !blockEntity.isPowered()
+                || !shouldPlayCrossingSound(blockEntity)
                 || level.getBlockEntity(blockEntity.getBlockPos()) != blockEntity) {
                 if (level != null) {
                     ACTIVE.remove(key(level, blockEntity.getBlockPos()), this);

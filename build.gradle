@@ -102,6 +102,9 @@ dependencies {
     implementation "org.graalvm.polyglot:js:24.2.2"
     jsRuntime "org.graalvm.js:js-scriptengine:24.2.2"
     jsRuntime "org.graalvm.polyglot:js:24.2.2"
+    // Bundled add-on ATSAssistMod+ uses Jackson for IFTTT rule serialization.
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.15.2"
+    jsRuntime "com.fasterxml.jackson.core:jackson-databind:2.15.2"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -161,6 +164,37 @@ tasks.named('build').configure {
 // When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
 // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
 tasks.withType(ProcessResources).configureEach {
+    // Do not ship RTM's built-in model packs. Runtime should show only user-added
+    // external packs while keeping this mod's item/block textures and item models.
+    exclude 'assets/minecraft/models/**'
+    exclude 'assets/minecraft/textures/connector/**'
+    exclude 'assets/minecraft/textures/container/**'
+    exclude 'assets/minecraft/textures/decoration/**'
+    exclude 'assets/minecraft/textures/ebb/**'
+    exclude 'assets/minecraft/textures/firearm/**'
+    exclude 'assets/minecraft/textures/flag/**'
+    exclude 'assets/minecraft/textures/machine/**'
+    exclude 'assets/minecraft/textures/mechanism/**'
+    exclude 'assets/minecraft/textures/npc/**'
+    exclude 'assets/minecraft/textures/ornament/**'
+    exclude 'assets/minecraft/textures/rail/**'
+    exclude 'assets/minecraft/textures/rrs/**'
+    exclude 'assets/minecraft/textures/signal/**'
+    exclude 'assets/minecraft/textures/signboard/**'
+    exclude 'assets/minecraft/textures/train/**'
+    exclude 'assets/minecraft/textures/vehicle/**'
+    exclude 'assets/minecraft/textures/wire/**'
+    exclude 'assets/rtm/models/**'
+    exclude 'assets/rtm/advancements/lay_rail.json'
+    exclude 'assets/rtm/advancements/drive_train.json'
+    exclude 'assets/rtm/textures/items/large_rail*.png'
+    exclude 'assets/rtm/textures/train/**'
+    exclude 'assets/realtrainmodunofficial/bundled_packs/**'
+    exclude 'assets/realtrainmodunofficial/vehicle_packs/**'
+    exclude 'assets/realtrainmodunofficial/models/car/**'
+    exclude 'assets/realtrainmodunofficial/textures/car/**'
+    exclude 'assets/realtrainmodunofficial/models/test-model.mqo'
+
     var replaceProperties = [
             minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,
