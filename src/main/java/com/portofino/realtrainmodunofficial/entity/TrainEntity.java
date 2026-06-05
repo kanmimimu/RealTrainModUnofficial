@@ -2921,33 +2921,39 @@ public class TrainEntity extends Entity {
         int radius = (int) RAIL_SEARCH_RADIUS;
         float referenceYaw = getYRot();
 
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    BlockPos pos = center.offset(dx, dy, dz);
-                    RailMap[] maps = getRailMapsAt(pos);
-                    if (maps.length == 0) continue;
+        // 1st pass: アクティブ分岐のみ。見つからなければ 2nd pass で全分岐へフォールバック
+        // (分岐器の非アクティブ側に触れて再取得が走った時に弾かれないように)。
+        for (int pass = 0; pass < 2 && best == null; pass++) {
+            railLookupIncludeAllSegments = pass == 1;
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -2; dy <= 2; dy++) {
+                    for (int dz = -radius; dz <= radius; dz++) {
+                        BlockPos pos = center.offset(dx, dy, dz);
+                        RailMap[] maps = getRailMapsAt(pos);
+                        if (maps.length == 0) continue;
 
-                    for (RailMap map : maps) {
-                        if (map == null) continue;
-                        int split = getMovementSplitForMap(map);
-                        int nearest = map.getNearlestPoint(split, getX(), getZ());
-                        nearest = Mth.clamp(nearest, 0, split);
-                        double[] p = map.getRailPos(split, nearest);
-                        double py = map.getRailHeight(split, nearest) + RAIL_HEIGHT_OFFSET;
-                        double distSq = distanceToSqr(p[1], py, p[0]);
+                        for (RailMap map : maps) {
+                            if (map == null) continue;
+                            int split = getMovementSplitForMap(map);
+                            int nearest = map.getNearlestPoint(split, getX(), getZ());
+                            nearest = Mth.clamp(nearest, 0, split);
+                            double[] p = map.getRailPos(split, nearest);
+                            double py = map.getRailHeight(split, nearest) + RAIL_HEIGHT_OFFSET;
+                            double distSq = distanceToSqr(p[1], py, p[0]);
 
-                        distSq += railYawPenalty(map, split, nearest, referenceYaw);
-                        if (activeRailMap != null && map == activeRailMap) {
-                            distSq -= 6.0D;
-                        }
-                        if (best == null || distSq < best.distanceSq()) {
-                            best = new RailFollowContext(map, split, nearest, distSq);
+                            distSq += railYawPenalty(map, split, nearest, referenceYaw);
+                            if (activeRailMap != null && map == activeRailMap) {
+                                distSq -= 6.0D;
+                            }
+                            if (best == null || distSq < best.distanceSq()) {
+                                best = new RailFollowContext(map, split, nearest, distSq);
+                            }
                         }
                     }
                 }
             }
         }
+        railLookupIncludeAllSegments = false;
 
         return best;
     }
