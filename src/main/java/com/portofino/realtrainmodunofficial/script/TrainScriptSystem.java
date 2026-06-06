@@ -2660,6 +2660,13 @@ public class TrainScriptSystem {
         }
 
         /** 指定グループ名のリストを現在の poseStack で描画する。 */
+        /** 台車・車輪(走り装置)グループ名か。.class台車車両でスクリプト描画を抑制する判定用。 */
+        private static boolean isBogieGroupName(String x) {
+            if (x == null) return false;
+            return x.contains("bogie") || x.contains("truck") || x.contains("wheel")
+                || x.contains("daisya") || x.contains("sharin") || x.contains("台車") || x.contains("車輪");
+        }
+
         public void renderRegisteredGroups(List<String> rawNames) {
             if (rawNames == null || rawNames.isEmpty() || mqoModel == null
                 || poseStack == null || buffer == null) {

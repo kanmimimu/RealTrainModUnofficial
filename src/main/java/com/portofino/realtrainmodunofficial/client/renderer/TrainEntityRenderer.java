@@ -632,7 +632,11 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         if (BogieRenderer.isDummyBogieModel(bogieDef.modelFile())) {
             return true;
         }
-        return selfDrawsRunningGear && bogieDef.modelFile().toLowerCase(java.util.Locale.ROOT).endsWith(".class");
+        // .class 台車(本家組込 ModelBogie 等)は、車体モデル/スクリプトが自前で台車(bogieF 等)を
+        // 描画・回転させる前提のもの。RTMU 標準台車(ft1)へ差し替えて BogieRenderer で描くと、
+        // 純正台車の回転が反映されず見た目が崩れるため、ここでは描かずスクリプト/車体側に任せる。
+        // (台車は車体固定位置で接線方向へ回転する＝本家RTMと同一挙動。)
+        return bogieDef.modelFile().toLowerCase(java.util.Locale.ROOT).endsWith(".class");
     }
 
     private static boolean shouldUseCompatibilityRendering(VehicleDefinition def, MqoModelLoader.MqoModel model) {

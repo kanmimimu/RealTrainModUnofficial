@@ -88,6 +88,24 @@ public class TrainEntity extends Entity {
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.OPTIONAL_UUID);
     private static final EntityDataAccessor<Boolean> INTERIOR_LIGHT_ON =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.BOOLEAN);
+    // 前後(端)台車のワールド位置を「エンティティ位置からのオフセット」でサーバー→クライアント同期する。
+    // クライアントは movement(travelAlongRail)を走らせずレールマップも持たないため、これが無いと
+    // 台車を剛体(弦上)で描画してカーブでレールからズレる。サーバーの実台車位置を同期して正確に描く。
+    private static final EntityDataAccessor<Float> FRONT_BOGIE_DX =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> FRONT_BOGIE_DY =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> FRONT_BOGIE_DZ =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> REAR_BOGIE_DX =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> REAR_BOGIE_DY =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> REAR_BOGIE_DZ =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
+    /** 端台車のワールド位置同期が有効か(サーバーがレール上に乗っている間のみ true)。 */
+    private static final EntityDataAccessor<Boolean> BOGIE_SYNC_VALID =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.BOOLEAN);
 
     private static final float ACCEL = 0.012f;
     private static final float BRAKE = 0.013f; // 減速度
@@ -182,6 +200,13 @@ public class TrainEntity extends Entity {
     private double clientLerpZ;
     private double clientLerpYRot;
     private double clientLerpXRot;
+    // クライアント: 同期された端台車オフセット(エンティティ相対)の前tick/現tick値。
+    // tick段付きを無くすため、描画時に partialTicks で補間する(本家RTMの台車補間に相当)。
+    private Vec3 clientRearBogieOffPrev = Vec3.ZERO;
+    private Vec3 clientRearBogieOffCurr = Vec3.ZERO;
+    private Vec3 clientFrontBogieOffPrev = Vec3.ZERO;
+    private Vec3 clientFrontBogieOffCurr = Vec3.ZERO;
+    private boolean clientBogieOffInit;
     private int interactionHitboxRefreshCooldown;
     /** 診断用: STALL ログのスパム防止クールダウン(tick)。 */
     private int stallLogCooldown;
@@ -283,6 +308,13 @@ public class TrainEntity extends Entity {
         builder.define(COUPLED_FOLLOWER, Optional.empty());
         builder.define(COUPLED_LEADER, Optional.empty());
         builder.define(INTERIOR_LIGHT_ON, false);
+        builder.define(FRONT_BOGIE_DX, 0.0F);
+        builder.define(FRONT_BOGIE_DY, 0.0F);
+        builder.define(FRONT_BOGIE_DZ, 0.0F);
+        builder.define(REAR_BOGIE_DX, 0.0F);
+        builder.define(REAR_BOGIE_DY, 0.0F);
+        builder.define(REAR_BOGIE_DZ, 0.0F);
+        builder.define(BOGIE_SYNC_VALID, false);
     }
 
     public String getVehicleId() { return entityData.get(VEHICLE_ID); }
@@ -615,6 +647,7 @@ public class TrainEntity extends Entity {
                 reapplyPosition();
                 setRot(getYRot(), getXRot());
             }
+            updateClientBogieOffsetInterpolation();
             return;
         }
 
@@ -663,6 +696,10 @@ public class TrainEntity extends Entity {
                 setDeltaMovement(Vec3.ZERO);
                 this.hurtMarked = true;
                 this.hasImpulse = true;
+                // 後続車もここで早期returnするため、台車位置の同期を必ず行う。
+                // (アンカーは編成側 formation.updateTrainMovement が設定済み。)
+                // これをしないと後続車の台車がクライアントで剛体描画になりカーブでズレる。
+                syncBogieRenderOffsets();
                 return;
             }
 
@@ -724,6 +761,9 @@ public class TrainEntity extends Entity {
                 formation.updateTrainMovement();
             }
             tryCompletePendingCoupling();
+
+            // 端台車のワールド位置をクライアントへ同期(カーブで台車をレール上に正確に描くため)。
+            syncBogieRenderOffsets();
 
             hasImpulse = Math.abs(speed) > 0.001F;
         }
@@ -1221,10 +1261,30 @@ public class TrainEntity extends Entity {
      */
     private boolean isUnsupportedInAir() {
         if (level() == null) return false;
-        // 列車を支えるのは「地面の任意ブロック」ではなく「レール」。台車面付近(おおよそ trainY-1)に
-        // レール系ブロック(当たり判定/コア/道床)が無ければ脱線=支え無しとみなし重力で落下させる。
-        // 以前は真下の任意ブロックを支えとしていたため、レールを壊しても地面で浮いたままだった。
-        net.minecraft.core.BlockPos base = blockPosition();
+        // 列車を支えるのは「地面の任意ブロック」ではなく「レール」。レール系ブロック(当たり判定/コア/道床)が
+        // 近くに無ければ脱線=支え無しとみなし重力で落下させる。
+        // 車体中心だけ見ると、カーブでは車体中心がレール中心線から内側へずれて当たり判定ブロックを外し、
+        // 誤って「非支持」と判定→重力で地面に埋まる。前後台車はレール上にあるので、台車位置周辺も見る。
+        // (レールが折れた場合は台車位置の当たり判定ブロックも消えるため、落下判定は従来どおり機能する。)
+        if (hasRailSupportNear(blockPosition())) {
+            return false;
+        }
+        if (isRailAnchorUsable(frontRailAnchor)) {
+            RailSample s = sampleBogieRail(frontRailAnchor.map(), frontRailAnchor.split(), frontRailAnchor.index());
+            if (s != null && hasRailSupportNear(net.minecraft.core.BlockPos.containing(s.x(), s.y(), s.z()))) {
+                return false;
+            }
+        }
+        if (isRailAnchorUsable(rearRailAnchor)) {
+            RailSample s = sampleBogieRail(rearRailAnchor.map(), rearRailAnchor.split(), rearRailAnchor.index());
+            if (s != null && hasRailSupportNear(net.minecraft.core.BlockPos.containing(s.x(), s.y(), s.z()))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean hasRailSupportNear(net.minecraft.core.BlockPos base) {
         for (int dy = -2; dy <= 1; dy++) {
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
@@ -1233,12 +1293,12 @@ public class TrainEntity extends Entity {
                     if (b instanceof com.portofino.realtrainmodunofficial.block.RailCollisionBlock
                         || b instanceof com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock
                         || b instanceof com.portofino.realtrainmodunofficial.block.BallastBlock) {
-                        return false;
+                        return true;
                     }
                 }
             }
         }
-        return true;
+        return false;
     }
 
     private boolean travelAlongRail(float speed, Entity controller, TrainEntity cabTrain) {
@@ -2496,19 +2556,23 @@ public class TrainEntity extends Entity {
         if (def == null) {
             return bogie.position();
         }
-        Vec3 railWorldY = getBogieWorldPosition(bogieIndex);
+        // クライアントはサーバー同期の台車ワールド位置を partialTicks 補間で使う(本家RTMの台車補間相当)。
+        boolean clientSynced = level().isClientSide() && entityData.get(BOGIE_SYNC_VALID);
+        Vec3 railWorldY = clientSynced ? clientSyncedBogieWorld(bogieIndex, partialTicks) : getBogieWorldPosition(bogieIndex);
+        if (railWorldY == null) {
+            railWorldY = getBogieWorldPosition(bogieIndex);
+        }
         // 本家RTM準拠の台車高さ:
         //   本家は車体・台車とも func_70033_W()=0 で、両者を「同じレール面基準」に置く。
         //   台車の縦オフセットは JSON の bogiePos[i].y のみ(全実パックで 0.0 = 車体中心と同じ高さ)。
-        //   RTMU は車体に RAIL_HEIGHT_OFFSET(1.09)、台車に BOGIE_HITBOX_HEIGHT_OFFSET(0.27)と
-        //   別基準を当てていたため台車が車体より約0.82低く、視覚リフトで誤魔化していた。
-        //   ここで台車基準を車体と同一(RAIL_HEIGHT_OFFSET)へ揃え、bogiePos.y だけ足す。
-        //   これによりモデルパック本来の作り込み通り(=本家と同じ見た目)に車輪が接地する。
-        // カーブ上では車体中心線とレール中心線が一致しないため、X/Z はレールアンカーへ追従。
+        //   台車基準を車体と同一(RAIL_HEIGHT_OFFSET)へ揃え、bogiePos.y だけ足す。
+        // カーブ上では車体中心線とレール中心線が一致しないため、X/Z はレール位置へ追従。
         RailAnchor anchor = getAnchorForRenderedBogie(bogieIndex);
-        if (isRailAnchorUsable(anchor)) {
+        if (clientSynced || isRailAnchorUsable(anchor)) {
             double bodyRefY = railWorldY.y + (RAIL_HEIGHT_OFFSET - BOGIE_HITBOX_HEIGHT_OFFSET) + bogie.position().y;
-            Vec3 railLocal = worldToLocalForRender(new Vec3(railWorldY.x, bodyRefY, railWorldY.z), baseYaw, partialTicks);
+            // 本体ポーズ(yaw/pitch/bank/modelOffset/scale)を厳密に逆変換して、カーブのバンクでも
+            // 台車がレール上の正しい位置に描画されるようにする。
+            Vec3 railLocal = worldToBogieLocalForRender(new Vec3(railWorldY.x, bodyRefY, railWorldY.z), partialTicks);
             return new Vec3(railLocal.x, railLocal.y, railLocal.z);
         }
         // レール非追従時(浮いている等)は本家 updatePosAndRotationClient と同様、
@@ -2600,7 +2664,9 @@ public class TrainEntity extends Entity {
         if (def == null) {
             return Float.NaN;
         }
-        Vec3 mount = localToWorld(getBogieLocalPosition(bogieIndex, def));
+        // 同期された実台車ワールド位置でレール接線を求める(剛体マウントだと弦上=レールずれ位置で
+        // 接線を取ってしまうため)。同期が無い時は従来どおり剛体マウント位置にフォールバック。
+        Vec3 mount = getBogieWorldPosition(bogieIndex);
         RailMap map = clientBogieRailMap[side];
         // キャッシュ済みレールが取付位置から遠ければ(別レールへ移った)再探索。
         if (map == null || farFromRail(map, mount)) {
@@ -2652,6 +2718,16 @@ public class TrainEntity extends Entity {
     }
 
     public Vec3 getBogieWorldPosition(int bogieIndex) {
+        // クライアントは movement を走らせずレールも持たないため、サーバーが同期した端台車の
+        // ワールド位置を使う(カーブで台車をレール上に正確に描く)。中間台車は前後で補間。
+        if (level().isClientSide() && entityData.get(BOGIE_SYNC_VALID)) {
+            // partialTicks 無しの呼び出し(ヨー計算等)は現tick値(pt=1)を使う。描画位置の補間は
+            // getBogieRenderOffset 側が partialTicks 付きで clientSyncedBogieWorld を呼ぶ。
+            Vec3 synced = clientSyncedBogieWorld(bogieIndex, 1.0F);
+            if (synced != null) {
+                return synced;
+            }
+        }
         RailAnchor anchor = getAnchorForRenderedBogie(bogieIndex);
         if (isRailAnchorUsable(anchor)) {
             RailSample sample = sampleBogieRail(anchor.map(), anchor.split(), anchor.index());
@@ -2660,6 +2736,84 @@ public class TrainEntity extends Entity {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
         Vec3 local = getBogieLocalPosition(bogieIndex, def);
         return localToWorld(local);
+    }
+
+    /** クライアント: 毎tick、同期された端台車オフセットを prev/curr へ取り込む(描画補間用)。 */
+    private void updateClientBogieOffsetInterpolation() {
+        Vec3 rear = new Vec3(entityData.get(REAR_BOGIE_DX), entityData.get(REAR_BOGIE_DY), entityData.get(REAR_BOGIE_DZ));
+        Vec3 front = new Vec3(entityData.get(FRONT_BOGIE_DX), entityData.get(FRONT_BOGIE_DY), entityData.get(FRONT_BOGIE_DZ));
+        if (!clientBogieOffInit) {
+            clientRearBogieOffPrev = clientRearBogieOffCurr = rear;
+            clientFrontBogieOffPrev = clientFrontBogieOffCurr = front;
+            clientBogieOffInit = true;
+            return;
+        }
+        clientRearBogieOffPrev = clientRearBogieOffCurr;
+        clientFrontBogieOffPrev = clientFrontBogieOffCurr;
+        clientRearBogieOffCurr = rear;
+        clientFrontBogieOffCurr = front;
+    }
+
+    /**
+     * サーバーが同期した端台車ワールド位置から、指定台車のワールド位置を返す(中間は前後で補間)。
+     * 本家RTMの台車補間に倣い、エンティティ位置・台車オフセットとも partialTicks で前tick↔現tick
+     * 補間して滑らかに追従させる(tick段付き防止)。
+     */
+    private Vec3 clientSyncedBogieWorld(int bogieIndex, float partialTicks) {
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def == null || def.getBogies().isEmpty()) {
+            return null;
+        }
+        float pt = Mth.clamp(partialTicks, 0.0F, 1.0F);
+        double ex = Mth.lerp(pt, this.xo, getX());
+        double ey = Mth.lerp(pt, this.yo, getY());
+        double ez = Mth.lerp(pt, this.zo, getZ());
+        Vec3 rearOff = clientRearBogieOffPrev.lerp(clientRearBogieOffCurr, pt);
+        Vec3 frontOff = clientFrontBogieOffPrev.lerp(clientFrontBogieOffCurr, pt);
+        Vec3 rearWorld = new Vec3(ex + rearOff.x, ey + rearOff.y, ez + rearOff.z);
+        Vec3 frontWorld = new Vec3(ex + frontOff.x, ey + frontOff.y, ez + frontOff.z);
+        int[] ext = getExtremeBogieIndices(def);
+        if (bogieIndex == ext[0]) {
+            return rearWorld;
+        }
+        if (bogieIndex == ext[1]) {
+            return frontWorld;
+        }
+        // 中間台車: z位置の比率で前後台車間を補間。
+        double rearZ = def.getBogies().get(Mth.clamp(ext[0], 0, def.getBogies().size() - 1)).position().z;
+        double frontZ = def.getBogies().get(Mth.clamp(ext[1], 0, def.getBogies().size() - 1)).position().z;
+        double z = def.getBogies().get(Mth.clamp(bogieIndex, 0, def.getBogies().size() - 1)).position().z;
+        double denom = frontZ - rearZ;
+        double t = Math.abs(denom) < 1.0E-6D ? 0.5D : Mth.clamp((z - rearZ) / denom, 0.0D, 1.0D);
+        return new Vec3(
+            Mth.lerp(t, rearWorld.x, frontWorld.x),
+            Mth.lerp(t, rearWorld.y, frontWorld.y),
+            Mth.lerp(t, rearWorld.z, frontWorld.z));
+    }
+
+    /** サーバー専用: 端台車のワールド位置をエンティティ相対オフセットでクライアントへ同期する。 */
+    private void syncBogieRenderOffsets() {
+        if (level().isClientSide()) {
+            return;
+        }
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def == null || def.getBogies().isEmpty()
+            || !isRailAnchorUsable(frontRailAnchor) || !isRailAnchorUsable(rearRailAnchor)) {
+            if (entityData.get(BOGIE_SYNC_VALID)) {
+                entityData.set(BOGIE_SYNC_VALID, false);
+            }
+            return;
+        }
+        int[] ext = getExtremeBogieIndices(def);
+        Vec3 frontWorld = getBogieWorldPosition(ext[1]);
+        Vec3 rearWorld = getBogieWorldPosition(ext[0]);
+        entityData.set(FRONT_BOGIE_DX, (float) (frontWorld.x - getX()));
+        entityData.set(FRONT_BOGIE_DY, (float) (frontWorld.y - getY()));
+        entityData.set(FRONT_BOGIE_DZ, (float) (frontWorld.z - getZ()));
+        entityData.set(REAR_BOGIE_DX, (float) (rearWorld.x - getX()));
+        entityData.set(REAR_BOGIE_DY, (float) (rearWorld.y - getY()));
+        entityData.set(REAR_BOGIE_DZ, (float) (rearWorld.z - getZ()));
+        entityData.set(BOGIE_SYNC_VALID, true);
     }
 
     public Vec3 getBogieEntityWorldPosition(int bogieIndex) {
@@ -4432,6 +4586,25 @@ public class TrainEntity extends Entity {
         return new BogieCompat(this, scriptBogieIndexToDefinitionIndex(index));
     }
 
+    /**
+     * 台車モデルが .class(本家組込 ModelBogie 等、RTMU は標準台車へ差し替え)の車両か。
+     * この場合、台車を BogieRenderer でレール追従描画し、車体モデル/スクリプト側の
+     * 車体固定 bogie グループ描画は抑制する(でないとカーブで台車がレールからズレる)。
+     */
+    public boolean usesReplacementBogies() {
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def == null) {
+            return false;
+        }
+        for (VehicleDefinition.BogieDefinition b : def.getBogies()) {
+            String m = b.modelFile();
+            if (m != null && m.toLowerCase(java.util.Locale.ROOT).endsWith(".class")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public int scriptBogieIndexToDefinitionIndex(int scriptIndex) {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
         if (def == null || def.getBogies().isEmpty()) {
@@ -5668,6 +5841,45 @@ public class TrainEntity extends Entity {
         double localX = Math.cos(yawRad) * dx + Math.sin(yawRad) * dz;
         double localZ = -Math.sin(yawRad) * dx + Math.cos(yawRad) * dz;
         return new Vec3(localX / scale, dy / scale, localZ / scale);
+    }
+
+    /**
+     * 台車描画用の world→body-local 変換。台車は TrainEntityRenderer の本体ポーズ
+     * (yaw → pitch → bank → modelOffset → scale)の中で translate されるため、その全段を厳密に
+     * 逆変換しないと、カーブのバンク(カント)や坂のpitchで台車がレールからズレて描画される。
+     * (従来の worldToLocalForRender は yaw しか逆回転しておらずバンク分ズレていた。)
+     */
+    private Vec3 worldToBogieLocalForRender(Vec3 world, float partialTicks) {
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def == null) {
+            def = VehicleRegistry.getSelected();
+        }
+        Vec3 offset = def != null ? def.getModelOffset() : Vec3.ZERO;
+        float scale = def != null ? def.getModelScale() : 1.0F;
+        double dxo = this.getX() - this.xo;
+        double dyo = this.getY() - this.yo;
+        double dzo = this.getZ() - this.zo;
+        boolean staleOldPos = (dxo * dxo + dyo * dyo + dzo * dzo) > 64.0D;
+        double renderX = staleOldPos ? this.getX() : Mth.lerp(partialTicks, this.xo, this.getX());
+        double renderY = staleOldPos ? this.getY() : Mth.lerp(partialTicks, this.yo, this.getY());
+        double renderZ = staleOldPos ? this.getZ() : Mth.lerp(partialTicks, this.zo, this.getZ());
+        // TrainEntityRenderer と同じ式で yaw / pitch / bank を求める。
+        float renderYaw = staleOldPos ? getYRot() : Mth.rotLerp(partialTicks, this.yRotO, getYRot());
+        float renderPitch = Mth.clamp(staleOldPos ? getXRot() : Mth.lerp(partialTicks, this.xRotO, getXRot()), -45.0F, 45.0F);
+        float yawDelta = Mth.wrapDegrees(getYRot() - this.yRotO);
+        float horizSpeed = (float) getDeltaMovement().horizontalDistance();
+        float bankAngle = Mth.clamp(-yawDelta * horizSpeed * 5.0F, -10.0F, 10.0F);
+        // レンダラの回転(YP yaw → XP -pitch → ZP bank)を組み、その逆(共役)で world ベクトルを戻す。
+        org.joml.Quaternionf q = new org.joml.Quaternionf()
+            .rotateY((float) Math.toRadians(renderYaw))
+            .rotateX((float) Math.toRadians(-renderPitch))
+            .rotateZ((float) Math.toRadians(bankAngle));
+        org.joml.Vector3f d = new org.joml.Vector3f(
+            (float) (world.x - renderX), (float) (world.y - renderY), (float) (world.z - renderZ));
+        q.conjugate().transform(d);
+        // modelOffset は回転後の本体フレームで translate されるので、回転を戻した後に引く。
+        d.sub((float) offset.x, (float) offset.y, (float) offset.z);
+        return new Vec3(d.x / scale, d.y / scale, d.z / scale);
     }
 
     private Vec3 worldToLocalForRender(Vec3 world, float renderYaw, float partialTicks) {
