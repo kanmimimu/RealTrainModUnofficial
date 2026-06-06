@@ -929,8 +929,10 @@ public class TrainEntity extends Entity {
     private void updateTrainAnimationState() {
         doorMoveL = approach(doorMoveL, isDoorLeftOpen() ? 60.0F : 0.0F, 1.0F);
         doorMoveR = approach(doorMoveR, isDoorRightOpen() ? 60.0F : 0.0F, 1.0F);
-        pantograph_F = approach(pantograph_F, isPantographUp() ? 40.0F : 0.0F, 1.0F);
-        pantograph_B = approach(pantograph_B, isPantographUp() ? 40.0F : 0.0F, 1.0F);
+        // 本家RTM準拠: pantograph movement(=pantograph_F/40) は「下降量」。DOWN で 40(=1.0)、UP で 0。
+        // (RTMU は従来 UP で 40 にしており、パンタ上で下降表示・下で上昇表示と逆になっていた。)
+        pantograph_F = approach(pantograph_F, isPantographUp() ? 0.0F : 40.0F, 1.0F);
+        pantograph_B = approach(pantograph_B, isPantographUp() ? 0.0F : 40.0F, 1.0F);
         int reverserDir = getReverser();
         // 座席 script 側は -45〜45 度前提なので、進行方向へゆっくり寄せていく。
         if (reverserDir < 0 && seatRotation > -45.0F) {
