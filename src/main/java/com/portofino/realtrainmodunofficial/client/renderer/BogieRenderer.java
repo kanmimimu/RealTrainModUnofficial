@@ -59,7 +59,7 @@ public class BogieRenderer {
             // (従来の BOGIE_VISUAL_LIFT/-0.05 は車種ごとの浮き・沈みの原因だったので撤去)。
             poseStack.translate(offset.x, offset.y, offset.z);
             if (entity != null) {
-                float yawApplied = entity.getBogieYawOffset(bogieIndex, bogieDef, baseYaw);
+                float yawApplied = entity.getBogieYawOffset(bogieIndex, bogieDef, baseYaw, partialTicks);
                 poseStack.mulPose(Axis.YP.rotationDegrees(yawApplied));
                 float bogiePitch = entity.getBogiePitch(bogieIndex);
                 if (Math.abs(bogiePitch) > 0.001F) {

@@ -106,6 +106,12 @@ public class TrainEntity extends Entity {
     /** 端台車のワールド位置同期が有効か(サーバーがレール上に乗っている間のみ true)。 */
     private static final EntityDataAccessor<Boolean> BOGIE_SYNC_VALID =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.BOOLEAN);
+    // 端台車のレール接線ヨー(度)もサーバーから同期する。クライアントで毎フレーム探索計算すると
+    // 別レールを拾う/180°反転で「一瞬明日の方向」になるため、サーバーのアンカー接線を正とする(RTM同様)。
+    private static final EntityDataAccessor<Float> FRONT_BOGIE_YAW =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> REAR_BOGIE_YAW =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
 
     private static final float ACCEL = 0.012f;
     private static final float BRAKE = 0.013f; // 減速度
@@ -128,6 +134,8 @@ public class TrainEntity extends Entity {
     private static final double BOGIE_INTERACT_HALF_HEIGHT = 1.1D;
     private static final double BOGIE_INTERACT_HALF_LENGTH = 1.18D;
     private static final double RTM_VEHICLE_Y_OFFSET = 1.1875D;
+    /** BogieRenderer 描画台車(MQO台車モデル車両)の高さ微調整。MSE 等で台車がレールに少し埋まるのを補正。 */
+    private static final double BOGIE_RENDER_LIFT = 0.18D;
     private static final double DEFAULT_HALF_WIDTH = 1.35D;
     private static final double DEFAULT_HALF_HEIGHT = 2.2D;
     private static final double TRAIN_BODY_MARGIN = 1.2D;
@@ -207,6 +215,14 @@ public class TrainEntity extends Entity {
     private Vec3 clientFrontBogieOffPrev = Vec3.ZERO;
     private Vec3 clientFrontBogieOffCurr = Vec3.ZERO;
     private boolean clientBogieOffInit;
+    // クライアント: 端台車(0=後/1=前)のレール接線ヨーの前tick/現tick値。
+    // 毎フレーム生計算すると微振動(ガクガク)、減衰平滑すると遅延する。tick値を partialTicks で
+    // 補間して「滑らか＋遅延なし(RTM同等)」にする。
+    private final float[] clientBogieYawPrev = {Float.NaN, Float.NaN};
+    private final float[] clientBogieYawCurr = {Float.NaN, Float.NaN};
+    private final int[] clientBogieYawRejectCount = {0, 0};
+    // 位置(同期オフセット)のレール継ぎ目グリッチ除去用。0=後/1=前。
+    private final int[] clientBogieOffRejectCount = {0, 0};
     private int interactionHitboxRefreshCooldown;
     /** 診断用: STALL ログのスパム防止クールダウン(tick)。 */
     private int stallLogCooldown;
@@ -315,6 +331,8 @@ public class TrainEntity extends Entity {
         builder.define(REAR_BOGIE_DY, 0.0F);
         builder.define(REAR_BOGIE_DZ, 0.0F);
         builder.define(BOGIE_SYNC_VALID, false);
+        builder.define(FRONT_BOGIE_YAW, 0.0F);
+        builder.define(REAR_BOGIE_YAW, 0.0F);
     }
 
     public String getVehicleId() { return entityData.get(VEHICLE_ID); }
@@ -2502,11 +2520,24 @@ public class TrainEntity extends Entity {
     }
 
     public float getBogieYawOffset(int bogieIndex, VehicleDefinition.BogieDefinition bogie, float baseYaw) {
+        return getBogieYawOffset(bogieIndex, bogie, baseYaw, 1.0F);
+    }
+
+    public float getBogieYawOffset(int bogieIndex, VehicleDefinition.BogieDefinition bogie, float baseYaw, float partialTicks) {
         RailAnchor anchor = resolveRenderAnchorForBogie(bogieIndex);
         if (isRailAnchorUsable(anchor)) {
             return relativeBogieYaw(getAnchorRailYaw(anchor, baseYaw), baseYaw);
         }
-        // クライアント: 台車位置のレール接線を直接計算(ラグ無し)。スクリプト車両と同じ経路。
+        // クライアント: tick記録した端台車ヨーを partialTicks で補間(滑らか＋遅延なし=RTM同等)。
+        if (level().isClientSide()) {
+            int side = resolveExtremeSideForBogieIndex(bogieIndex);
+            if (side >= 0 && side < 2 && !Float.isNaN(clientBogieYawCurr[side])) {
+                float prev = Float.isNaN(clientBogieYawPrev[side]) ? clientBogieYawCurr[side] : clientBogieYawPrev[side];
+                float interp = Mth.rotLerp(Mth.clamp(partialTicks, 0.0F, 1.0F), prev, clientBogieYawCurr[side]);
+                return relativeBogieYaw(interp, baseYaw);
+            }
+        }
+        // フォールバック: 台車位置のレール接線を直接計算(ラグ無し)。スクリプト車両と同じ経路。
         float railYaw = computeClientBogieRailYaw(bogieIndex);
         if (!Float.isNaN(railYaw)) {
             return relativeBogieYaw(railYaw, baseYaw);
@@ -2569,7 +2600,7 @@ public class TrainEntity extends Entity {
         // カーブ上では車体中心線とレール中心線が一致しないため、X/Z はレール位置へ追従。
         RailAnchor anchor = getAnchorForRenderedBogie(bogieIndex);
         if (clientSynced || isRailAnchorUsable(anchor)) {
-            double bodyRefY = railWorldY.y + (RAIL_HEIGHT_OFFSET - BOGIE_HITBOX_HEIGHT_OFFSET) + bogie.position().y;
+            double bodyRefY = railWorldY.y + (RAIL_HEIGHT_OFFSET - BOGIE_HITBOX_HEIGHT_OFFSET) + bogie.position().y + BOGIE_RENDER_LIFT;
             // 本体ポーズ(yaw/pitch/bank/modelOffset/scale)を厳密に逆変換して、カーブのバンクでも
             // 台車がレール上の正しい位置に描画されるようにする。
             Vec3 railLocal = worldToBogieLocalForRender(new Vec3(railWorldY.x, bodyRefY, railWorldY.z), partialTicks);
@@ -2750,8 +2781,64 @@ public class TrainEntity extends Entity {
         }
         clientRearBogieOffPrev = clientRearBogieOffCurr;
         clientFrontBogieOffPrev = clientFrontBogieOffCurr;
-        clientRearBogieOffCurr = rear;
-        clientFrontBogieOffCurr = front;
+        clientRearBogieOffCurr = filterOffsetJump(0, clientRearBogieOffCurr, rear);
+        clientFrontBogieOffCurr = filterOffsetJump(1, clientFrontBogieOffCurr, front);
+        // 端台車のレール接線ヨーを tick 単位で記録(描画時に partialTicks 補間=滑らか＋遅延なし)。
+        // ヨーはサーバーのアンカー接線を同期した値を使う(クライアント探索の誤方向/180°反転を回避)。
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def != null && !def.getBogies().isEmpty()) {
+            if (entityData.get(BOGIE_SYNC_VALID)) {
+                updateTickBogieYaw(0, entityData.get(REAR_BOGIE_YAW));
+                updateTickBogieYaw(1, entityData.get(FRONT_BOGIE_YAW));
+            } else {
+                int[] ext = getExtremeBogieIndices(def);
+                updateTickBogieYaw(0, computeClientBogieRailYaw(ext[0]));
+                updateTickBogieYaw(1, computeClientBogieRailYaw(ext[1]));
+            }
+        }
+    }
+
+    /**
+     * レール継ぎ目で同期台車位置が一瞬飛ぶグリッチを除去する。明らかな大ジャンプ(>6ブロック/tick、
+     * 遠レール誤取得や180°反転に伴う反対側への飛び等)だけを弾き前回値を維持する。
+     * 台車オフセットはカーブで回転するため急カーブ+高速では1tick変化が数ブロックになる。しきい値を
+     * 低くすると正当なカーブ変化を弾いて「追従が外れて一瞬戻る」原因になるため 6 と高めにする。
+     * 連続したら本物の変化として採用(固着回避)。
+     */
+    private Vec3 filterOffsetJump(int side, Vec3 cur, Vec3 target) {
+        if (cur == null || target == null) {
+            return target;
+        }
+        if (target.distanceToSqr(cur) > 6.0D * 6.0D && clientBogieOffRejectCount[side] < 2) {
+            clientBogieOffRejectCount[side]++;
+            return cur;
+        }
+        clientBogieOffRejectCount[side] = 0;
+        return target;
+    }
+
+    /** side(0=後/1=前)のレール接線ヨーを prev/curr へ記録(NaNは前回値維持、初回は即セット)。 */
+    private void updateTickBogieYaw(int side, float target) {
+        if (Float.isNaN(target)) {
+            return;
+        }
+        if (Float.isNaN(clientBogieYawCurr[side])) {
+            clientBogieYawPrev[side] = clientBogieYawCurr[side] = target;
+            clientBogieYawRejectCount[side] = 0;
+            return;
+        }
+        // グリッチ除去: 明らかな誤値(fixBogieYaw の約180°反転や別レール接線の拾い間違い)だけを弾く。
+        // 急カーブ＋高速の正当な1tick変化(最大~50°程度)を棄却しないよう、しきい値は 100° と高めにする。
+        // (45°など低くすると急カーブで正当変化を弾き「追従が外れて一瞬戻る」原因になる。)
+        // 大ジャンプが連続したら本物の向き変化(=固着回避)として採用する。
+        if (Math.abs(Mth.wrapDegrees(target - clientBogieYawCurr[side])) > 100.0F
+            && clientBogieYawRejectCount[side] < 2) {
+            clientBogieYawRejectCount[side]++;
+            return;
+        }
+        clientBogieYawRejectCount[side] = 0;
+        clientBogieYawPrev[side] = clientBogieYawCurr[side];
+        clientBogieYawCurr[side] = target;
     }
 
     /**
@@ -2813,6 +2900,9 @@ public class TrainEntity extends Entity {
         entityData.set(REAR_BOGIE_DX, (float) (rearWorld.x - getX()));
         entityData.set(REAR_BOGIE_DY, (float) (rearWorld.y - getY()));
         entityData.set(REAR_BOGIE_DZ, (float) (rearWorld.z - getZ()));
+        // 台車のレール接線ヨーもサーバーのアンカーから求めて同期(クライアントの探索計算より安定=誤方向なし)。
+        entityData.set(FRONT_BOGIE_YAW, getBogieWorldYaw(ext[1]));
+        entityData.set(REAR_BOGIE_YAW, getBogieWorldYaw(ext[0]));
         entityData.set(BOGIE_SYNC_VALID, true);
     }
 
