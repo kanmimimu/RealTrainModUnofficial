@@ -6,7 +6,7 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
-import com.portofino.realtrainmodunofficial.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailMap;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import net.minecraft.util.Mth;
@@ -162,7 +162,7 @@ public class TrainItem extends Item {
     }
 
     private boolean isOccupiedSpawnArea(Level level, double x, double y, double z, float yaw, VehicleDefinition def,
-                                        com.portofino.realtrainmodunofficial.rail.util.RailMap spawnMap) {
+                                        jp.ngt.rtm.rail.util.RailMap spawnMap) {
         double halfLength = Math.max(1.75D, def.getTrainDistance());
         for (VehicleDefinition.BogieDefinition bogie : def.getBogies()) {
             halfLength = Math.max(halfLength, Math.abs(bogie.position().z) + 0.95D);

@@ -1,0 +1,74 @@
+package jp.ngt.ngtlib.io;
+
+import org.openjdk.nashorn.api.scripting.NashornScriptEngineFactory;
+
+import javax.script.Invocable;
+import javax.script.ScriptEngine;
+import javax.script.ScriptException;
+
+/**
+ * 本家 NGTLib (jp.ngt.ngtlib.io.ScriptUtil) の忠実移植。
+ * 本家は JDK 同梱 Nashorn (jdk.nashorn.*) を使用していたが、Java 21 では
+ * スタンドアロン版 (org.openjdk.nashorn) を使用する。エンジン挙動・フラグ
+ * ("-doe", "--language=es6") および mozilla_compat.js ロードは本家と同一。
+ *
+ * 1.21 移植差分:
+ * - LaunchClassLoader のクラスローダ除外処理は不要 (FML 構造が異なる) ため削除。
+ * - NeoForge の TransformingClassLoader 下でスクリプトから Packages.jp.ngt.* を
+ *   解決できるよう、MOD 自身のクラスローダを明示的に渡す。
+ */
+public final class ScriptUtil {
+    private static NashornScriptEngineFactory SEM;
+
+    private ScriptUtil() {
+    }
+
+    private static void init() {
+        SEM = new NashornScriptEngineFactory();
+    }
+
+    /**
+     * JavaScriptの実行
+     */
+    public static ScriptEngine doScript(String s) {
+        if (SEM == null) {
+            init();
+        }
+        // MOD のクラスローダを appLoader として渡す (Packages.jp.ngt.* 解決の鍵)
+        ScriptEngine se = SEM.getScriptEngine(
+                new String[]{"-doe", "--language=es6"},
+                ScriptUtil.class.getClassLoader());
+        try {
+            if (se.toString().contains("Nashorn") || se.getClass().getName().contains("nashorn")) {
+                // Java8ではimportPackage()が使えないので、その対策 (本家コメントのまま)
+                se.eval("load(\"nashorn:mozilla_compat.js\");");
+            }
+
+            se.eval(s);
+            return se;
+        } catch (ScriptException e) {
+            throw new RuntimeException("Script exec error" + "\n" + s, e);
+        }
+    }
+
+    public static Object doScriptFunction(ScriptEngine se, String func, Object... args) {
+        try {
+            return ((Invocable) se).invokeFunction(func, args);
+        } catch (NoSuchMethodException | ScriptException e) {
+            throw new RuntimeException("Script exec error : " + func, e);
+        }
+    }
+
+    public static Object doScriptIgnoreError(ScriptEngine se, String func, Object... args) {
+        try {
+            return doScriptFunction(se, func, args);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static Object getScriptField(ScriptEngine se, String fieldName) {
+        return se.get(fieldName);
+    }
+}

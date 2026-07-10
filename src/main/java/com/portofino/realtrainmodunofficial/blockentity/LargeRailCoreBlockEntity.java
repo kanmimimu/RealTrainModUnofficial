@@ -1,13 +1,13 @@
 package com.portofino.realtrainmodunofficial.blockentity;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
-import com.portofino.realtrainmodunofficial.rail.util.Point;
-import com.portofino.realtrainmodunofficial.rail.util.RailMap;
-import com.portofino.realtrainmodunofficial.rail.util.RailMapBasic;
-import com.portofino.realtrainmodunofficial.rail.util.RailMaker;
-import com.portofino.realtrainmodunofficial.rail.util.RailPosition;
-import com.portofino.realtrainmodunofficial.rail.util.RailMapSwitch;
-import com.portofino.realtrainmodunofficial.rail.util.SwitchType;
+import jp.ngt.rtm.rail.util.Point;
+import jp.ngt.rtm.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailMapBasic;
+import jp.ngt.rtm.rail.util.RailMaker;
+import jp.ngt.rtm.rail.util.RailPosition;
+import jp.ngt.rtm.rail.util.RailMapSwitch;
+import jp.ngt.rtm.rail.util.SwitchType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -246,7 +246,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
     }
 
     /** 本家RTM準拠の分岐レンダリング用: 分岐の Point 配列(分岐でなければ null)。 */
-    public com.portofino.realtrainmodunofficial.rail.util.Point[] getSwitchPoints() {
+    public jp.ngt.rtm.rail.util.Point[] getSwitchPoints() {
         return switchType != null ? switchType.getPoints() : null;
     }
 

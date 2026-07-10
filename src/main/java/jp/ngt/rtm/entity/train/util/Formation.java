@@ -1,4 +1,4 @@
-package com.portofino.realtrainmodunofficial.entity.formation;
+package jp.ngt.rtm.entity.train.util;
 
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import java.util.Arrays;

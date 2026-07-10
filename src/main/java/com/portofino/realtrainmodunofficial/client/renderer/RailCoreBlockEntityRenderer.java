@@ -7,8 +7,8 @@ import com.portofino.realtrainmodunofficial.client.ClientRenderProfiler;
 import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 import com.portofino.realtrainmodunofficial.rail.RailDefinition;
 import com.portofino.realtrainmodunofficial.rail.RailRegistry;
-import com.portofino.realtrainmodunofficial.rail.util.RailMap;
-import com.portofino.realtrainmodunofficial.rail.util.RailPosition;
+import jp.ngt.rtm.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.util.Mth;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -97,7 +97,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
                 //  ・base/ballast/sleeper は全 RailMap に沿って描画(地面なので重なりOK)
                 //  ・レール本体(railL/railR)とトング(L0/L1/R0/R1)は Point 単位で半分ずつ + トング分離アニメ
                 // これでレール本体が二重に重ならず、転てつ時にトングが動く(本家と同じ)。
-                com.portofino.realtrainmodunofficial.rail.util.Point[] points = be.getSwitchPoints();
+                jp.ngt.rtm.rail.util.Point[] points = be.getSwitchPoints();
                 if (points != null && points.length > 0 && railModelHasSwitchParts(model)) {
                     // base/ballast/sleeper は本家同様 全 RailMap に沿って描画。マップ毎に微小Yオフセットを
                     // 与え、平行/収束区間で土台が同位置に重なって起きる z-fight(チカチカ)を防ぐ。
@@ -107,7 +107,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
                                 def, cameraDistanceSq, compatibilityHeavy, RailGroup.BASE, mi * 0.01F);
                         }
                     }
-                    for (com.portofino.realtrainmodunofficial.rail.util.Point point : points) {
+                    for (jp.ngt.rtm.rail.util.Point point : points) {
                         if (point != null) {
                             renderSwitchPoint(be, point, poseStack, buffer, packedLight, ox, oy, oz, mo, scale,
                                 model, def, cameraDistanceSq, compatibilityHeavy);
@@ -318,13 +318,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     }
 
     /** 本家 LibRenderRail.renderPoint 移植。Point ごとにレール本体+トングを描く。 */
-    private void renderSwitchPoint(LargeRailCoreBlockEntity be, com.portofino.realtrainmodunofficial.rail.util.Point point,
+    private void renderSwitchPoint(LargeRailCoreBlockEntity be, jp.ngt.rtm.rail.util.Point point,
                                    PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                                    double ox, double oy, double oz, net.minecraft.world.phys.Vec3 mo, float scale,
                                    MqoModelLoader.MqoModel model, RailDefinition def, double cameraDistanceSq, boolean compatibilityHeavy) {
-        if (point.branchDir == com.portofino.realtrainmodunofficial.rail.util.RailDir.NONE || point.rmBranch == null) {
+        if (point.branchDir == jp.ngt.rtm.rail.util.RailDir.NONE || point.rmBranch == null) {
             // 分岐なし区間: rmMain の半分(頂点→中間点)を両レールで描画。
-            renderRailMapDynamic(be, point.rmMain, com.portofino.realtrainmodunofficial.rail.util.RailDir.NONE,
+            renderRailMapDynamic(be, point.rmMain, jp.ngt.rtm.rail.util.RailDir.NONE,
                 point.mainDirIsPositive, 0.0F, 0, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, cameraDistanceSq, compatibilityHeavy, 0.0F);
             return;
         }
@@ -341,13 +341,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
 
     /** 本家 LibRenderRail.renderRailMapDynamic 移植。半分の区間+トング分離アニメ。 */
     private void renderRailMapDynamic(LargeRailCoreBlockEntity be, RailMap rms,
-                                      com.portofino.realtrainmodunofficial.rail.util.RailDir dir, boolean par3, float move, int tongIndex,
+                                      jp.ngt.rtm.rail.util.RailDir dir, boolean par3, float move, int tongIndex,
                                       PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                                       double ox, double oy, double oz, net.minecraft.world.phys.Vec3 mo, float scale,
                                       MqoModelLoader.MqoModel model, RailDefinition def, double cameraDistanceSq, boolean compatibilityHeavy,
                                       float depthBias) {
-        com.portofino.realtrainmodunofficial.rail.util.RailDir LEFT = com.portofino.realtrainmodunofficial.rail.util.RailDir.LEFT;
-        com.portofino.realtrainmodunofficial.rail.util.RailDir RIGHT = com.portofino.realtrainmodunofficial.rail.util.RailDir.RIGHT;
+        jp.ngt.rtm.rail.util.RailDir LEFT = jp.ngt.rtm.rail.util.RailDir.LEFT;
+        jp.ngt.rtm.rail.util.RailDir RIGHT = jp.ngt.rtm.rail.util.RailDir.RIGHT;
         double railLength = rms.getLength();
         int max = computeRailSampleMax(rms, railLength, def, cameraDistanceSq);
         int halfMax = max / 2;
@@ -367,7 +367,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
             poseStack.mulPose(Axis.XP.rotationDegrees(-s.pitch));
             // 分岐してない側のレール(開始位置が逆なら左右反対のパーツ)
             renderModelGroup(model, poseStack, buffer, packedLight, mo, scale, flip ? RailGroup.RIGHT : RailGroup.LEFT);
-            if (dir != com.portofino.realtrainmodunofficial.rail.util.RailDir.NONE && halfMax > 0) {
+            if (dir != jp.ngt.rtm.rail.util.RailDir.NONE && halfMax > 0) {
                 // トング分離: 分岐点側ほど開く(sigmoid)。move=0 で開通(密着)。
                 float sep = (float) (par3 ? i : (max - i)) / (float) halfMax;
                 sep = (1.0F - sigmoid2(sep)) * move * dirFixture;

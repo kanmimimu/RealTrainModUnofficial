@@ -1,4 +1,4 @@
-package com.portofino.realtrainmodunofficial.rail.math;
+package jp.ngt.ngtlib.math;
 
 import net.minecraft.util.Mth;
 
@@ -19,7 +19,7 @@ public final class BezierCurve implements ILine {
     private final int split;
 
     /**
-     * 弧長に応じた分割数。{@link com.portofino.realtrainmodunofficial.rail.util.RailMap#curveSplitForLength(double)} と同じ値を返す。
+     * 弧長に応じた分割数。{@link jp.ngt.rtm.rail.util.RailMap#curveSplitForLength(double)} と同じ値を返す。
      */
     public static int splitForLength(double arcLength) {
         if (arcLength < 1.0e-4) {
@@ -100,7 +100,7 @@ public final class BezierCurve implements ILine {
             if (this.normalizedParameters == null) {
                 this.initNP();
             }
-            int i0 = CurveMath.floor((float) par2 * (float) this.split / (float) n);
+            int i0 = NGTMath.floor((float) par2 * (float) this.split / (float) n);
             if (i0 < 0) i0 = 0;
             if (i0 >= this.normalizedParameters.length) i0 = this.normalizedParameters.length - 1;
             return this.normalizedParameters[i0];
@@ -162,7 +162,7 @@ public final class BezierCurve implements ILine {
         double x0 = this.sp[0] - this.ep[0];
         double y0 = this.sp[1] - this.ep[1];
         double l0 = Math.sqrt(x0 * x0 + y0 * y0);
-        int n = CurveMath.floor(l0 * 2.0D);
+        int n = NGTMath.floor(l0 * 2.0D);
         if (n < 1) n = 1;
         float ni = 1.0F / (float) n;
         float tt = 0.0F;

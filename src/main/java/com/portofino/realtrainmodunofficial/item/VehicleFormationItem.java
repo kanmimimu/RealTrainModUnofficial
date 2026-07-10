@@ -191,7 +191,7 @@ public class VehicleFormationItem extends Item {
                         var blockEntity = level.getBlockEntity(pos);
                         if (blockEntity instanceof com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity railEntity) {
                             // レールの方向をRailPositionから取得
-                            com.portofino.realtrainmodunofficial.rail.util.RailPosition[] railPositions = railEntity.getRailPositions();
+                            jp.ngt.rtm.rail.util.RailPosition[] railPositions = railEntity.getRailPositions();
                             float yaw = 0;
                             if (railPositions != null && railPositions.length > 0 && railPositions[0] != null) {
                                 yaw = railPositions[0].anchorYaw;

@@ -9,7 +9,7 @@ import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.formation.TrainFormation;
 import com.portofino.realtrainmodunofficial.formation.TrainFormationData;
-import com.portofino.realtrainmodunofficial.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailMap;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import net.minecraft.core.BlockPos;

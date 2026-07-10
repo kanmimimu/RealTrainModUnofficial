@@ -5,8 +5,8 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
-import com.portofino.realtrainmodunofficial.rail.util.RailMap;
-import com.portofino.realtrainmodunofficial.rail.util.RailPosition;
+import jp.ngt.rtm.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailPosition;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -79,8 +79,8 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
                 RailMap[] maps = core.getAllRailMaps();
                 if (maps.length > 0) {
                     // Prevent collision blocks from recursively trying to delete this core.
-                    boolean prev = com.portofino.realtrainmodunofficial.rail.util.RailMap.suppressRailRemoval;
-                    com.portofino.realtrainmodunofficial.rail.util.RailMap.suppressRailRemoval = true;
+                    boolean prev = jp.ngt.rtm.rail.util.RailMap.suppressRailRemoval;
+                    jp.ngt.rtm.rail.util.RailMap.suppressRailRemoval = true;
                     try {
                         for (RailMap map : maps) {
                             if (map != null) {
@@ -89,7 +89,7 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
                         }
                         removeRemainingCollisionBlocks(level, pos, maps);
                     } finally {
-                        com.portofino.realtrainmodunofficial.rail.util.RailMap.suppressRailRemoval = prev;
+                        jp.ngt.rtm.rail.util.RailMap.suppressRailRemoval = prev;
                     }
                 }
             }

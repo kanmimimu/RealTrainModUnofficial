@@ -1,14 +1,23 @@
-package com.portofino.realtrainmodunofficial.rail.util;
+package jp.ngt.rtm.rail.util;
 
-import com.portofino.realtrainmodunofficial.rail.math.CurveMath;
+
+import jp.ngt.ngtlib.math.NGTMath;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.Level;
 
 /**
- * Port of jp.legacy.legacy.rail.util.RailPosition (subset used by RealTrainModUnofficial rails).
+ * レールの曲線を構成する点
+ * (本家 jp.ngt.rtm.rail.util.RailPosition の忠実移植)
  */
 public final class RailPosition {
+    /**
+     * 補正値、デフォルト長=これ*マーカー間距離最小値
+     */
+    protected static final float Anchor_Correction_Value = 0.55228475F;//(√(2)-1)*4/3
+    /**
+     * 向きごとのベジェ曲線開始位置への補正値
+     */
     public static final float[][] REVISION = new float[][]{
         {0.0F, -0.5F}, {-0.5F, -0.5F}, {-0.5F, 0.0F}, {-0.5F, 0.499999F},
         {0.0F, 0.499999F}, {0.499999F, 0.499999F}, {0.499999F, 0.0F}, {0.499999F, -0.5F}
@@ -41,7 +50,7 @@ public final class RailPosition {
         this.direction = (byte) dir;
         this.switchType = (byte) type;
         this.height = 0;
-        this.anchorYaw = CurveMath.wrapAngle((float) dir * 45.0F);
+        this.anchorYaw = NGTMath.wrapAngle((float) dir * 45.0F);
         this.anchorLengthHorizontal = -1.0F;
         this.constLimitHP = 3.99F;
         this.constLimitHN = 0.0F;
@@ -109,11 +118,28 @@ public final class RailPosition {
         this.posY = (double) this.blockY + (double) (par1 + 1) * 0.0625D;
     }
 
-    public BlockPos getNeighborBlockPos() {
-        int x2 = CurveMath.floor(this.posX + (double) REVISION[this.direction & 7][0]);
+    /**
+     * 与えられた距離だけ平行移動
+     */
+    public void movePos(int x, int y, int z) {
+        this.blockX += x;
+        this.blockY += y;
+        this.blockZ += z;
+        this.posX += x;
+        this.posY += y;
+        this.posZ += z;
+    }
+
+    public int[] getNeighborPos() {
+        int x2 = NGTMath.floor(this.posX + (double) REVISION[this.direction & 7][0]);
         int y2 = this.blockY;
-        int z2 = CurveMath.floor(this.posZ + (double) REVISION[this.direction & 7][1]);
-        return new BlockPos(x2, y2, z2);
+        int z2 = NGTMath.floor(this.posZ + (double) REVISION[this.direction & 7][1]);
+        return new int[]{x2, y2, z2};
+    }
+
+    public BlockPos getNeighborBlockPos() {
+        int[] pos = this.getNeighborPos();
+        return new BlockPos(pos[0], pos[1], pos[2]);
     }
 
     public RailDir getDir(RailPosition p1, RailPosition p2) {
@@ -134,8 +160,8 @@ public final class RailPosition {
         if (!(obj instanceof RailPosition other)) {
             return false;
         }
-        return this.blockX == other.blockX && this.blockY == other.blockY && this.blockZ == other.blockZ
-            && this.switchType == other.switchType;
+        // 本家同様、座標のみで比較 (switchType は含めない)
+        return this.blockX == other.blockX && this.blockY == other.blockY && this.blockZ == other.blockZ;
     }
 
     @Override

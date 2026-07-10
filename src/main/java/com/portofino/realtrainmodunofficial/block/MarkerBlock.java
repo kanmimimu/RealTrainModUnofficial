@@ -1,5 +1,6 @@
 package com.portofino.realtrainmodunofficial.block;
 
+import jp.ngt.ngtlib.math.NGTMath;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -14,12 +15,12 @@ import com.portofino.realtrainmodunofficial.item.RailItem;
 import com.portofino.realtrainmodunofficial.item.WrenchItem;
 import com.portofino.realtrainmodunofficial.rail.RailDefinition;
 import com.portofino.realtrainmodunofficial.rail.RailRegistry;
-import com.portofino.realtrainmodunofficial.rail.util.RailMap;
-import com.portofino.realtrainmodunofficial.rail.util.RailMapBasic;
-import com.portofino.realtrainmodunofficial.rail.util.RailMaker;
-import com.portofino.realtrainmodunofficial.rail.util.RailPosition;
-import com.portofino.realtrainmodunofficial.rail.util.RailProperties;
-import com.portofino.realtrainmodunofficial.rail.util.SwitchType;
+import jp.ngt.rtm.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailMapBasic;
+import jp.ngt.rtm.rail.util.RailMaker;
+import jp.ngt.rtm.rail.util.RailPosition;
+import jp.ngt.rtm.rail.util.RailProperties;
+import jp.ngt.rtm.rail.util.SwitchType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -670,8 +671,8 @@ public class MarkerBlock extends BaseEntityBlock {
             int j = samples <= 1 ? 0 : (int) Math.round((double) split * i / (samples - 1));
             if (j > split) j = split;
             double[] point = railMap.getRailPos(split, j);
-            int x = com.portofino.realtrainmodunofficial.rail.math.CurveMath.floor(point[1]);
-            int z = com.portofino.realtrainmodunofficial.rail.math.CurveMath.floor(point[0]);
+            int x = jp.ngt.ngtlib.math.NGTMath.floor(point[1]);
+            int z = jp.ngt.ngtlib.math.NGTMath.floor(point[0]);
             int y = (int) railMap.getRailHeight(split, j);
             int railDir = Math.floorMod(Math.round(railMap.getRailYaw(split, j) / 45.0F), 8);
             int sideDir = (railDir + 2) & 7;
@@ -693,8 +694,8 @@ public class MarkerBlock extends BaseEntityBlock {
 
     private static void placeCollisionBlocksAtEndpoint(Level level, RailMap railMap, BlockPos corePos, Set<BlockPos> placed, int split, int index) {
         double[] point = railMap.getRailPos(split, index);
-        int x = com.portofino.realtrainmodunofficial.rail.math.CurveMath.floor(point[1]);
-        int z = com.portofino.realtrainmodunofficial.rail.math.CurveMath.floor(point[0]);
+        int x = jp.ngt.ngtlib.math.NGTMath.floor(point[1]);
+        int z = jp.ngt.ngtlib.math.NGTMath.floor(point[0]);
         int y = (int) railMap.getRailHeight(split, index);
         int railDir = Math.floorMod(Math.round(railMap.getRailYaw(split, index) / 45.0F), 8);
         int sideDir = (railDir + 2) & 7;

@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.entity;
 
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
-import com.portofino.realtrainmodunofficial.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;

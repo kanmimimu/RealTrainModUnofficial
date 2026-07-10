@@ -1,4 +1,4 @@
-package com.portofino.realtrainmodunofficial.rail.util;
+package jp.ngt.rtm.rail.util;
 
 import net.minecraft.world.level.Level;
 

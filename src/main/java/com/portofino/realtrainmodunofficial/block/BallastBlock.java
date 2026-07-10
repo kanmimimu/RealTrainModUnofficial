@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.block;
 
 import com.mojang.serialization.MapCodec;
 import com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity;
-import com.portofino.realtrainmodunofficial.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;

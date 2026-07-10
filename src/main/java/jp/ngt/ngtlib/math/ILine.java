@@ -1,4 +1,4 @@
-package com.portofino.realtrainmodunofficial.rail.math;
+package jp.ngt.ngtlib.math;
 
 public interface ILine {
     double[] getPoint(int split, int index);

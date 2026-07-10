@@ -1,4 +1,4 @@
-package com.portofino.realtrainmodunofficial.rail.util;
+package jp.ngt.rtm.rail.util;
 
 /**
  * Simplified {@code ResourceStateRail} stand-in: ballast width from rail pack (legacy {@code RailConfig#ballastWidth}).

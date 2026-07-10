@@ -1,4 +1,4 @@
-package com.portofino.realtrainmodunofficial.rail.math;
+package jp.ngt.ngtlib.math;
 
 /**
  * Port of jp.legacy.legacylib.math.StraightLine (XZ plane: first coord = Z, second = X).
@@ -50,7 +50,7 @@ public final class StraightLine implements ILine {
             double x0 = (x + this.slope * y - this.slope * this.intercept) * a21;
             t = (x0 - this.startX) / (this.endX - this.startX);
         }
-        return CurveMath.floor(t * (double) par1);
+        return NGTMath.floor(t * (double) par1);
     }
 
     @Override

@@ -534,9 +534,7 @@ public class TrainScriptSystem {
             scriptEngine.eval(script);
             prepareScriptRuntimeBeforeInit(scriptEngine);
 
-            if (model instanceof com.portofino.realtrainmodunofficial.model.MQOModel oldModel) {
-                oldModel.setScriptEngine(scriptEngine);
-            } else if (model instanceof com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel newModel) {
+            if (model instanceof com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel newModel) {
                 newModel.setScriptEngine(scriptEngine, renderer);
             } else {
                 RealTrainModUnofficial.LOGGER.warn("legacy script model is not recognized type: {}", model == null ? "null" : model.getClass().getName());

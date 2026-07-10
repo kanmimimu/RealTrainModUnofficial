@@ -4,7 +4,7 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.block.MarkerBlock;
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.MarkerBlockEntity;
-import com.portofino.realtrainmodunofficial.rail.util.RailPosition;
+import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;

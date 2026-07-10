@@ -59,6 +59,10 @@ public final class TrainCommands {
                         ))
                     )
                 )
+                .then(Commands.literal("nashorntest")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(context -> executeNashornTest(context.getSource()))
+                )
         );
     }
 
@@ -76,6 +80,37 @@ public final class TrainCommands {
         int finalRemovedCount = removedCount;
         source.sendSuccess(() -> Component.literal("電車を " + finalRemovedCount + " 両削除しました。残って見える場合はワールドを開き直してください。"), true);
         return removedCount;
+    }
+
+    /**
+     * Phase 0 スモークテスト: スタンドアロン Nashorn が本家 RTM と同じフラグ
+     * ("-doe" "--language=es6" + mozilla_compat.js) で NeoForge/Java21 上で動き、
+     * MOD クラス (Packages.jp.ngt / Java.type) を解決できるかを検証する。
+     */
+    private static int executeNashornTest(CommandSourceStack source) {
+        try {
+            String script =
+                // mozilla_compat: importPackage / importClass が生えていること
+                "importPackage(java.util);\n" +
+                "var list = new ArrayList(); list.add('a'); list.add('b');\n" +
+                // ES6 構文が有効であること (--language=es6)
+                "let square = (x) => x * x;\n" +
+                "const msg = `es6:${square(4)}`;\n" +
+                // MOD クラスローダ経由で jp.ngt.* が見えること
+                "var su = Java.type('jp.ngt.ngtlib.io.ScriptUtil');\n" +
+                "function result() { return msg + ' list:' + list.size() + ' cls:' + su.class.getSimpleName(); }\n";
+            javax.script.ScriptEngine se = jp.ngt.ngtlib.io.ScriptUtil.doScript(script);
+            Object result = jp.ngt.ngtlib.io.ScriptUtil.doScriptFunction(se, "result");
+            String engineName = se.getFactory().getEngineName() + " " + se.getFactory().getEngineVersion();
+            source.sendSuccess(() -> Component.literal(
+                "Nashorn OK: engine=[" + engineName + "] result=[" + result + "]"), false);
+            return 1;
+        } catch (Throwable t) {
+            String detail = t.getClass().getSimpleName() + ": " + t.getMessage();
+            source.sendFailure(Component.literal("Nashorn NG: " + detail));
+            RealTrainModUnofficial.LOGGER.error("Nashorn smoke test failed", t);
+            return 0;
+        }
     }
 
     private static int executeSetFlySpeed(CommandSourceStack source, int speed) throws com.mojang.brigadier.exceptions.CommandSyntaxException {

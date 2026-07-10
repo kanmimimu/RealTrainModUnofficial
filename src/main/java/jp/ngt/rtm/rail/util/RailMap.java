@@ -1,12 +1,13 @@
-package com.portofino.realtrainmodunofficial.rail.util;
+package jp.ngt.rtm.rail.util;
 
+import jp.ngt.ngtlib.math.NGTMath;
 import com.portofino.realtrainmodunofficial.block.BallastBlock;
 import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
 import com.portofino.realtrainmodunofficial.block.MarkerBlock;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
-import com.portofino.realtrainmodunofficial.rail.math.BezierCurve;
-import com.portofino.realtrainmodunofficial.rail.math.CurveMath;
+import jp.ngt.ngtlib.math.BezierCurve;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -117,10 +118,10 @@ public abstract class RailMap {
             if (sz[j] > maxz) maxz = sz[j];
         }
 
-        int bx0 = CurveMath.floor(minx - halfW - 1.0D);
-        int bx1 = CurveMath.floor(maxx + halfW + 1.0D);
-        int bz0 = CurveMath.floor(minz - halfW - 1.0D);
-        int bz1 = CurveMath.floor(maxz + halfW + 1.0D);
+        int bx0 = NGTMath.floor(minx - halfW - 1.0D);
+        int bx1 = NGTMath.floor(maxx + halfW + 1.0D);
+        int bz0 = NGTMath.floor(minz - halfW - 1.0D);
+        int bz1 = NGTMath.floor(maxz + halfW + 1.0D);
         double thrSq = halfW * halfW;
 
         for (int X = bx0; X <= bx1; ++X) {
@@ -247,8 +248,8 @@ public abstract class RailMap {
             int j = samples <= 1 ? 0 : (int) Math.round((double) split * i / (samples - 1));
             if (j > split) j = split;
             double[] point = this.getRailPos(split, j);
-            int x = CurveMath.floor(point[1]);
-            int z = CurveMath.floor(point[0]);
+            int x = NGTMath.floor(point[1]);
+            int z = NGTMath.floor(point[0]);
             int y = (int) this.getRailHeight(split, j);
             BlockPos pos = new BlockPos(x, y, z);
             if (pos.equals(startNeighbor) || pos.equals(endNeighbor)) {
@@ -285,8 +286,8 @@ public abstract class RailMap {
             int j = samples <= 1 ? 0 : (int) Math.round((double) split * i / (samples - 1));
             if (j > split) j = split;
             double[] point = this.getRailPos(split, j);
-            int x = CurveMath.floor(point[1]);
-            int z = CurveMath.floor(point[0]);
+            int x = NGTMath.floor(point[1]);
+            int z = NGTMath.floor(point[0]);
             int y = (int) this.getRailHeight(split, j);
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {

@@ -8,7 +8,7 @@ import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity
 import com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge;
 import com.portofino.realtrainmodunofficial.entity.CarEntity;
 import com.portofino.realtrainmodunofficial.item.RailItem;
-import com.portofino.realtrainmodunofficial.rail.util.RailPosition;
+import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;

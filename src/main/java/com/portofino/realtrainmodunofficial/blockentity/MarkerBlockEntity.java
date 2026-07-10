@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.blockentity;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import com.portofino.realtrainmodunofficial.block.MarkerBlock;
-import com.portofino.realtrainmodunofficial.rail.util.RailPosition;
+import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
