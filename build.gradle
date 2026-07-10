@@ -144,7 +144,10 @@ tasks.named('jar', Jar).configure {
     }
 }
 
-def modrinthModsDir = file("${System.properties['user.home']}/Library/Application Support/ModrinthApp/profiles/Server test/mods")
+// Windows: ModrinthApp の rtmu プロファイル (APPDATA 配下)。他OSは従来パスにフォールバック。
+def modrinthModsDir = System.getenv('APPDATA') != null
+        ? file("${System.getenv('APPDATA')}/ModrinthApp/profiles/rtmu/mods")
+        : file("${System.properties['user.home']}/Library/Application Support/ModrinthApp/profiles/Server test/mods")
 
 tasks.register('copyJarToModrinthMods', Copy) {
     dependsOn tasks.named('jar')

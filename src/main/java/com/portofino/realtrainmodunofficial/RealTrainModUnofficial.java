@@ -74,6 +74,7 @@ public class RealTrainModUnofficial {
         // jp.ngt.rtm.rail: 本家忠実移植のレール/マーカー (Phase 1)
         jp.ngt.rtm.rail.RTMRailBlocks.REGISTER.register(modEventBus);
         jp.ngt.rtm.rail.RTMRailBlockEntities.REGISTER.register(modEventBus);
+        jp.ngt.rtm.item.RTMItems.REGISTER.register(modEventBus);
         RealTrainModUnofficialItems.ITEMS.register(modEventBus);
         RealTrainModUnofficialEntities.ENTITIES.register(modEventBus);
         com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.ENTITY_TYPES.register(modEventBus);

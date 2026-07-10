@@ -108,6 +108,22 @@ public class BlockLargeRailBase extends BaseEntityBlock {
         return false;
     }
 
+    /**
+     * 本家 getPickBlock: レールをピックブロックすると RailPosition 込みのコピーアイテムを得る
+     * (レールコピー&ペースト機能)。
+     */
+    @Override
+    public net.minecraft.world.item.ItemStack getCloneItemStack(net.minecraft.world.level.LevelReader level, BlockPos pos, BlockState state) {
+        BlockEntity tileEntity = level.getBlockEntity(pos);
+        if (tileEntity instanceof TileEntityLargeRailBase) {
+            TileEntityLargeRailCore coreTile = ((TileEntityLargeRailBase) tileEntity).getRailCore();
+            if (coreTile != null) {
+                return jp.ngt.rtm.item.ItemRail.copyItemFromRail(coreTile);
+            }
+        }
+        return net.minecraft.world.item.ItemStack.EMPTY;
+    }
+
     @Override
     protected void onRemove(BlockState state, Level world, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock())) {

@@ -422,6 +422,12 @@ public class BlockMarker extends BaseEntityBlock {
         }
 
         ItemStack item = player.getInventory().getSelected();
+        //本家 ItemRail (Property NBT 保持)
+        if (!item.isEmpty() && item.getItem() instanceof jp.ngt.rtm.item.ItemRail) {
+            RailProperty prop = jp.ngt.rtm.item.ItemRail.getProperty(item);
+            return prop != null ? prop : RailProperty.getDefaultProperty();
+        }
+        //Remaster RailItem (選択中モデル)
         if (!item.isEmpty() && item.getItem() instanceof com.portofino.realtrainmodunofficial.item.RailItem) {
             com.portofino.realtrainmodunofficial.rail.RailDefinition def =
                     com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
