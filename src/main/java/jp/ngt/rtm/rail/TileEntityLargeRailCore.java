@@ -284,4 +284,54 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
      * レール形状の説明を取得(アイテム表示用)
      */
     public abstract String getRailShapeName();
+
+    // ================= Remaster 暫定互換 API (旧レンダラ用、Phase 4 で削除予定) =================
+
+    /**
+     * @deprecated Remaster 独自。property.railModel を返す。
+     */
+    @Deprecated
+    public String getRailDefinitionId() {
+        return this.getProperty().railModel;
+    }
+
+    /**
+     * @deprecated Remaster 独自。
+     */
+    @Deprecated
+    public AABB getCachedRenderBounds() {
+        return this.getRenderBoundingBox();
+    }
+
+    /**
+     * @deprecated Remaster 独自。分岐の Point 配列 (非分岐は null)。
+     */
+    @Deprecated
+    public jp.ngt.rtm.rail.util.Point[] getSwitchPoints() {
+        return null;
+    }
+
+    /**
+     * @deprecated Remaster 独自。開通中セグメント index。
+     */
+    @Deprecated
+    public int getActiveSegmentIndex() {
+        return 0;
+    }
+
+    /**
+     * @deprecated Remaster 独自。
+     */
+    @Deprecated
+    public int getPreviousSegmentIndex() {
+        return 0;
+    }
+
+    /**
+     * @deprecated Remaster 独自。切替アニメーション進行度 0-1。
+     */
+    @Deprecated
+    public float getSwitchProgress(float partialTick) {
+        return 1.0F;
+    }
 }

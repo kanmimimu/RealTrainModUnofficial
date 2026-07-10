@@ -18,22 +18,22 @@ public class RealTrainModUnofficialBlockEntities {
         DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, RealTrainModUnofficial.MODID);
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MarkerBlockEntity>> MARKER =
-        BLOCK_ENTITY_TYPES.register("marker", () -> BlockEntityType.Builder.of(MarkerBlockEntity::new,
+        BLOCK_ENTITY_TYPES.register("legacy_marker", () -> BlockEntityType.Builder.of(MarkerBlockEntity::new,
             RealTrainModUnofficialBlocks.MARKER.get(), RealTrainModUnofficialBlocks.MARKER_SWITCH.get()).build(null));
 
     /** レールコア: 起点ブロック1個。道床とは無関係。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LargeRailCoreBlockEntity>> LARGE_RAIL_CORE =
-        BLOCK_ENTITY_TYPES.register("large_rail_core", () -> BlockEntityType.Builder.of(LargeRailCoreBlockEntity::new,
+        BLOCK_ENTITY_TYPES.register("legacy_large_rail_core", () -> BlockEntityType.Builder.of(LargeRailCoreBlockEntity::new,
             RealTrainModUnofficialBlocks.LARGE_RAIL_CORE.get()).build(null));
 
     /** レール当たり判定ブロック: レールコア削除に追従する。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RailCollisionBlockEntity>> RAIL_COLLISION =
-        BLOCK_ENTITY_TYPES.register("rail_collision", () -> BlockEntityType.Builder.of(RailCollisionBlockEntity::new,
+        BLOCK_ENTITY_TYPES.register("legacy_rail_collision", () -> BlockEntityType.Builder.of(RailCollisionBlockEntity::new,
             RealTrainModUnofficialBlocks.RAIL_COLLISION.get()).build(null));
 
     /** 道床ブロック: 対応レールコア位置を保持し、壊すとレールも撤去・列車設置検出にも使う。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity>> BALLAST =
-        BLOCK_ENTITY_TYPES.register("ballast", () -> BlockEntityType.Builder.of(
+        BLOCK_ENTITY_TYPES.register("legacy_ballast", () -> BlockEntityType.Builder.of(
             com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity::new,
             RealTrainModUnofficialBlocks.BALLAST.get()).build(null));
 

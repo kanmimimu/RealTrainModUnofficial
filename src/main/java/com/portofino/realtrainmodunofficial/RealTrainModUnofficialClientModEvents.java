@@ -24,8 +24,21 @@ public final class RealTrainModUnofficialClientModEvents {
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         // レールコアのブロックエンティティレンダラーを登録（MQOモデル描画）
+        // jp.ngt.rtm.rail の各コア BE に登録 (Phase 1 フリップ)
         event.registerBlockEntityRenderer(
-            RealTrainModUnofficialBlockEntities.LARGE_RAIL_CORE.get(),
+            jp.ngt.rtm.rail.RTMRailBlockEntities.LARGE_RAIL_NORMAL_CORE.get(),
+            RailCoreBlockEntityRenderer::new
+        );
+        event.registerBlockEntityRenderer(
+            jp.ngt.rtm.rail.RTMRailBlockEntities.LARGE_RAIL_SWITCH_CORE.get(),
+            RailCoreBlockEntityRenderer::new
+        );
+        event.registerBlockEntityRenderer(
+            jp.ngt.rtm.rail.RTMRailBlockEntities.LARGE_RAIL_SLOPE_CORE.get(),
+            RailCoreBlockEntityRenderer::new
+        );
+        event.registerBlockEntityRenderer(
+            jp.ngt.rtm.rail.RTMRailBlockEntities.TURNTABLE_CORE.get(),
             RailCoreBlockEntityRenderer::new
         );
         event.registerBlockEntityRenderer(
@@ -75,11 +88,11 @@ public final class RealTrainModUnofficialClientModEvents {
     public static void registerBlockColors(RegisterColorHandlersEvent.Block event) {
         event.register(
             (state, tintGetter, pos, tintIndex) -> MARKER_COLOR,
-            RealTrainModUnofficialBlocks.MARKER.get()
+            jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get()
         );
         event.register(
             (state, tintGetter, pos, tintIndex) -> MARKER_SWITCH_COLOR,
-            RealTrainModUnofficialBlocks.MARKER_SWITCH.get()
+            jp.ngt.rtm.rail.RTMRailBlocks.MARKER_SWITCH.get()
         );
     }
 

@@ -129,6 +129,35 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
         return new int[]{minX, minY, minZ, maxX, maxY, maxZ};
     }
 
+    /**
+     * @deprecated Remaster 暫定互換 (旧レンダラ用)。
+     */
+    @Deprecated
+    @Override
+    public jp.ngt.rtm.rail.util.Point[] getSwitchPoints() {
+        SwitchType st = this.getSwitch();
+        return st != null ? st.getPoints() : null;
+    }
+
+    /**
+     * @deprecated Remaster 暫定互換 (旧レンダラ用)。
+     */
+    @Deprecated
+    @Override
+    public int getActiveSegmentIndex() {
+        SwitchType st = this.getSwitch();
+        return st != null ? st.firstOpenRailIndex() : 0;
+    }
+
+    /**
+     * @deprecated Remaster 暫定互換 (旧レンダラ用)。
+     */
+    @Deprecated
+    @Override
+    public int getPreviousSegmentIndex() {
+        return this.getActiveSegmentIndex();
+    }
+
     @Override
     public String getRailShapeName() {
         SwitchType st = this.getSwitch();

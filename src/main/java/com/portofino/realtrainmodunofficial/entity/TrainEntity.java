@@ -2286,6 +2286,16 @@ public class TrainEntity extends Entity {
                 return switchCandidateMaps(core, currentMap);
             }
         }
+        // jp.ngt.rtm.rail (Phase 1 本家忠実システム): ベース/コアどちらでもコア経由で全 RailMap を返す
+        if (blockEntity instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase) {
+            jp.ngt.rtm.rail.TileEntityLargeRailCore core = railBase.getRailCore();
+            if (core != null && core.isLoaded()) {
+                RailMap[] maps = core.getAllRailMaps();
+                if (maps != null) {
+                    return maps;
+                }
+            }
+        }
         return new RailMap[0];
     }
 
@@ -3303,6 +3313,23 @@ public class TrainEntity extends Entity {
             BlockPos corePos = collision.getCorePos();
             if (corePos != null && level().getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
                 return railLookupIncludeAllSegments ? core.getAllRailMaps() : core.getActiveRailMaps();
+            }
+        }
+        // jp.ngt.rtm.rail (Phase 1 本家忠実システム)
+        if (level().getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase) {
+            jp.ngt.rtm.rail.TileEntityLargeRailCore core = railBase.getRailCore();
+            if (core != null && core.isLoaded()) {
+                if (core instanceof jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore switchCore && !railLookupIncludeAllSegments) {
+                    jp.ngt.rtm.rail.util.SwitchType st = switchCore.getSwitch();
+                    if (st != null) {
+                        java.util.List<RailMap> open = st.getOpenRailMaps();
+                        return open.toArray(new RailMap[0]);
+                    }
+                }
+                RailMap[] maps = core.getAllRailMaps();
+                if (maps != null) {
+                    return maps;
+                }
             }
         }
         return new RailMap[0];

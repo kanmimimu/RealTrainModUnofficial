@@ -353,13 +353,23 @@ public class TrainItem extends Item {
                     continue;
                 }
                 for (net.minecraft.world.level.block.entity.BlockEntity be : levelChunk.getBlockEntities().values()) {
-                    if (!(be instanceof LargeRailCoreBlockEntity core) || !core.isLoaded()) {
+                    RailMap[] coreMaps = null;
+                    BlockPos corePos = null;
+                    if (be instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
+                        coreMaps = core.getAllRailMaps();
+                        corePos = core.getBlockPos();
+                    } else if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore newCore && newCore.isLoaded()) {
+                        //jp.ngt.rtm.rail (Phase 1 本家忠実システム)
+                        coreMaps = newCore.getAllRailMaps();
+                        corePos = newCore.getBlockPos();
+                    }
+                    if (coreMaps == null || corePos == null) {
                         continue;
                     }
-                    if (!visitedCores.add(core.getBlockPos())) {
+                    if (!visitedCores.add(corePos)) {
                         continue;
                     }
-                    for (RailMap map : core.getAllRailMaps()) {
+                    for (RailMap map : coreMaps) {
                         if (map == null) continue;
                         int max = getSpawnSplit(map);
                         for (int i = 0; i <= max; i++) {
@@ -398,7 +408,38 @@ public class TrainItem extends Item {
                 return getNearestRailMap(core, targetPoint);
             }
         }
+        // jp.ngt.rtm.rail (Phase 1 本家忠実システム): ベース/コアどちらもコア経由で解決
+        if (level.getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase) {
+            jp.ngt.rtm.rail.TileEntityLargeRailCore core = railBase.getRailCore();
+            if (core != null && core.isLoaded()) {
+                return getNearestRailMapNew(core, targetPoint);
+            }
+        }
         return null;
+    }
+
+    private static RailMap getNearestRailMapNew(jp.ngt.rtm.rail.TileEntityLargeRailCore core, Vec3 targetPoint) {
+        RailMap[] maps = core.getAllRailMaps();
+        if (maps == null || maps.length == 0) return null;
+        if (maps.length == 1) return maps[0];
+        RailMap best = null;
+        double bestDistSq = Double.POSITIVE_INFINITY;
+        for (RailMap map : maps) {
+            if (map == null) continue;
+            int max = getSpawnSplit(map);
+            for (int i = 0; i <= max; i++) {
+                double[] posData = map.getRailPos(max, i);
+                double x = posData[1];
+                double y = map.getRailHeight(max, i);
+                double z = posData[0];
+                double d2 = (x - targetPoint.x) * (x - targetPoint.x) + (y - targetPoint.y) * (y - targetPoint.y) + (z - targetPoint.z) * (z - targetPoint.z);
+                if (d2 < bestDistSq) {
+                    bestDistSq = d2;
+                    best = map;
+                }
+            }
+        }
+        return best;
     }
 
     private static RailMap getNearestRailMap(LargeRailCoreBlockEntity core, Vec3 targetPoint) {

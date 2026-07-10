@@ -52,9 +52,9 @@ public class BlockMarker extends BaseEntityBlock {
     public static final MapCodec<BlockMarker> CODEC = simpleCodec(props -> new BlockMarker(0, props));
 
     /**
-     * 本家 metadata 相当 (0-7)
+     * 本家 metadata 相当 (0-7)。ID は既存アセット (blockstates) と互換の "facing"。
      */
-    public static final IntegerProperty META = IntegerProperty.create("meta", 0, 7);
+    public static final IntegerProperty META = IntegerProperty.create("facing", 0, 7);
 
     private static final VoxelShape SHAPE = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 0.0625D, 1.0D);
 
@@ -118,6 +118,11 @@ public class BlockMarker extends BaseEntityBlock {
         float yaw = placer != null ? placer.getYRot() : 0.0F;
         int playerFacing = Mth.floor(NGTMath.normalizeAngle(yaw + 180.0D) / 45.0D + 0.5D) & 7;
         playerFacing = playerFacing / 2 + (playerFacing % 2 == 0 ? 0 : 4);
+        //Remaster 拡張: 斜め専用マーカーアイテムは斜め向きを強制
+        if (context.getItemInHand().getItem() instanceof com.portofino.realtrainmodunofficial.item.MarkerItem mi
+                && mi.isDiagonal() && playerFacing < 4) {
+            playerFacing += 4;
+        }
         return this.defaultBlockState().setValue(META, playerFacing);
     }
 

@@ -59,9 +59,24 @@ public final class SrbRailBridge {
         List<RailPosition> rps = new ArrayList<>(2);
         rps.add(start);
         rps.add(end);
-        boolean ok = MarkerBlock.buildRailForScript(level, rps, toModelId(modelId));
+        boolean ok = buildRailFaithful(level, rps, toModelId(modelId));
         com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] SRB buildNormalRail result={}", ok);
         return ok;
+    }
+
+    /**
+     * jp.ngt.rtm.rail (Phase 1 本家忠実システム) でレールを構築する。
+     * 本家 BlockMarker.createRail 相当。
+     */
+    private static boolean buildRailFaithful(Level level, List<RailPosition> rps, String modelId) {
+        if (rps.isEmpty()) {
+            return false;
+        }
+        jp.ngt.rtm.rail.util.RailProperty prop = new jp.ngt.rtm.rail.util.RailProperty(
+            modelId == null ? "" : modelId, net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+        RailPosition first = rps.get(0);
+        return jp.ngt.rtm.rail.BlockMarker.createRail(
+            level, first.blockX, first.blockY, first.blockZ, rps, prop, true, true);
     }
 
     /** SRB の buildBranchRail 相当(3点以上で分岐レール)。 */
@@ -76,7 +91,7 @@ public final class SrbRailBridge {
                 rps.add(rp);
             }
         }
-        return MarkerBlock.buildRailForScript(level, rps, toModelId(modelId));
+        return buildRailFaithful(level, rps, toModelId(modelId));
     }
 
     /** SRB の deleteRail 相当。(x,y,z) にレール(コア or 当たり判定)があれば撤去し true。 */
@@ -88,6 +103,11 @@ public final class SrbRailBridge {
         BlockPos pos = new BlockPos(x, y, z);
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
+        // jp.ngt.rtm.rail (Phase 1 本家忠実システム): レールベース/コアどこを消しても breakRail が伝播
+        if (block instanceof jp.ngt.rtm.rail.BlockLargeRailBase) {
+            level.removeBlock(pos, false);
+            return true;
+        }
         if (block instanceof LargeRailCoreBlock) {
             level.removeBlock(pos, false); // onRemove が当たり判定ブロックも掃除する
             return true;
@@ -152,6 +172,11 @@ public final class SrbRailBridge {
         }
         BlockPos pos = new BlockPos(x, y, z);
         net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(pos);
+        // jp.ngt.rtm.rail (Phase 1 本家忠実システム): ベースならコアへ解決
+        if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase newBase) {
+            jp.ngt.rtm.rail.TileEntityLargeRailCore newCore = newBase.getRailCore();
+            return newCore != null ? newCore : be;
+        }
         if (be instanceof com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity) {
             return be;
         }

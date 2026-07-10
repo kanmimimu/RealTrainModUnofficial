@@ -26,16 +26,16 @@ public class RealTrainModUnofficialItems {
     //   状態ブロック(signal_state) / スクリプトブロック(script_block) / 通信機(signal_communicator)
     // 道床(ballast)アイテムも廃止済み。ブロック自体は残るがアイテム(入手手段)は登録しない。
     public static final DeferredItem<MarkerItem> MARKER_ITEM = ITEMS.register(
-        "marker", () -> new MarkerItem(RealTrainModUnofficialBlocks.MARKER.get(), false)
+        "marker", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get(), false)
     );
     public static final DeferredItem<MarkerItem> MARKER_DIAGONAL_ITEM = ITEMS.register(
-        "marker_diagonal", () -> new MarkerItem(RealTrainModUnofficialBlocks.MARKER.get(), true)
+        "marker_diagonal", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get(), true)
     );
     public static final DeferredItem<MarkerItem> MARKER_SWITCH_ITEM = ITEMS.register(
-        "marker_switch", () -> new MarkerItem(RealTrainModUnofficialBlocks.MARKER_SWITCH.get(), false)
+        "marker_switch", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER_SWITCH.get(), false)
     );
     public static final DeferredItem<MarkerItem> MARKER_SWITCH_DIAGONAL_ITEM = ITEMS.register(
-        "marker_switch_diagonal", () -> new MarkerItem(RealTrainModUnofficialBlocks.MARKER_SWITCH.get(), true)
+        "marker_switch_diagonal", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER_SWITCH.get(), true)
     );
     public static final DeferredItem<RailItem> RAIL_ITEM = ITEMS.register(
         "rail", RailItem::new

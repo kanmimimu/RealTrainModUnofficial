@@ -19,21 +19,21 @@ public class RealTrainModUnofficialBlocks {
     public static final DeferredBlock<CrossingGateBlock> CROSSING_GATE
         = BLOCKS.register("crossing_gate", () -> new CrossingGateBlock());
     public static final DeferredBlock<MarkerBlock> MARKER
-        = BLOCKS.register("marker", () -> new MarkerBlock(false));
+        = BLOCKS.register("legacy_marker", () -> new MarkerBlock(false));
     public static final DeferredBlock<MarkerBlock> MARKER_SWITCH
-        = BLOCKS.register("marker_switch", () -> new MarkerBlock(true));
+        = BLOCKS.register("legacy_marker_switch", () -> new MarkerBlock(true));
 
     /** 道床ブロック（レールと独立した物理ブロック） */
     public static final DeferredBlock<BallastBlock> BALLAST
-        = BLOCKS.register("ballast", BallastBlock::new);
+        = BLOCKS.register("legacy_ballast", BallastBlock::new);
 
     /** レールコアブロック（起点1個のみ、MQOモデル描画を担当） */
     public static final DeferredBlock<LargeRailCoreBlock> LARGE_RAIL_CORE
-        = BLOCKS.register("large_rail_core", () -> new LargeRailCoreBlock());
+        = BLOCKS.register("legacy_large_rail_core", () -> new LargeRailCoreBlock());
 
     /** レール当たり判定ブロック（非表示・薄い） */
     public static final DeferredBlock<RailCollisionBlock> RAIL_COLLISION
-        = BLOCKS.register("rail_collision", () -> new RailCollisionBlock());
+        = BLOCKS.register("legacy_rail_collision", () -> new RailCollisionBlock());
 
     public static final DeferredBlock<InstalledObjectBlock> INSTALLED_OBJECT
         = BLOCKS.register("installed_object", () -> new InstalledObjectBlock());

@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.client.renderer;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
+import jp.ngt.rtm.rail.TileEntityLargeRailCore;
 import com.portofino.realtrainmodunofficial.client.ClientRenderProfiler;
 import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 import com.portofino.realtrainmodunofficial.rail.RailDefinition;
@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRailCoreBlockEntity> {
+public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEntityLargeRailCore> {
     private record RailSample(double x, double y, double z, float yaw, float pitch, float roll) {}
     private record RailCacheKey(BlockPos corePos, int mapId, int sampleMax) {}
     private static final Map<RailCacheKey, RailSample[]> SAMPLE_CACHE = new ConcurrentHashMap<>();
@@ -66,7 +66,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     }
 
     @Override
-    public void render(LargeRailCoreBlockEntity be, float partialTick, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
+    public void render(TileEntityLargeRailCore be, float partialTick, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
         long profilerStart = ClientRenderProfiler.begin();
         try {
             if (!be.isLoaded()) return;
@@ -141,7 +141,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     }
 
     private void renderRailMap(
-        LargeRailCoreBlockEntity blockEntity,
+        TileEntityLargeRailCore blockEntity,
         RailMap map,
         int mapIndex,
         RenderSwitchLayout layout,
@@ -296,7 +296,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     }
 
     /** RailMap に沿って指定グループ(base/ballast 等)を全長描画する。 */
-    private void renderMapGroups(LargeRailCoreBlockEntity be, RailMap map, PoseStack poseStack, MultiBufferSource buffer,
+    private void renderMapGroups(TileEntityLargeRailCore be, RailMap map, PoseStack poseStack, MultiBufferSource buffer,
                                  int packedLight, double ox, double oy, double oz, net.minecraft.world.phys.Vec3 mo, float scale,
                                  MqoModelLoader.MqoModel model, RailDefinition def, double cameraDistanceSq, boolean compatibilityHeavy,
                                  RailGroup group, float depthBias) {
@@ -318,7 +318,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     }
 
     /** 本家 LibRenderRail.renderPoint 移植。Point ごとにレール本体+トングを描く。 */
-    private void renderSwitchPoint(LargeRailCoreBlockEntity be, jp.ngt.rtm.rail.util.Point point,
+    private void renderSwitchPoint(TileEntityLargeRailCore be, jp.ngt.rtm.rail.util.Point point,
                                    PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                                    double ox, double oy, double oz, net.minecraft.world.phys.Vec3 mo, float scale,
                                    MqoModelLoader.MqoModel model, RailDefinition def, double cameraDistanceSq, boolean compatibilityHeavy) {
@@ -340,7 +340,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     }
 
     /** 本家 LibRenderRail.renderRailMapDynamic 移植。半分の区間+トング分離アニメ。 */
-    private void renderRailMapDynamic(LargeRailCoreBlockEntity be, RailMap rms,
+    private void renderRailMapDynamic(TileEntityLargeRailCore be, RailMap rms,
                                       jp.ngt.rtm.rail.util.RailDir dir, boolean par3, float move, int tongIndex,
                                       PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                                       double ox, double oy, double oz, net.minecraft.world.phys.Vec3 mo, float scale,
@@ -484,7 +484,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
         }
         if (layout == RenderSwitchLayout.SCISSORS) {
             // 信号 ON でストレート区間が有効、OFF で対角区間が有効。
-            // referenceIndex は LargeRailCoreBlockEntity で計算された active 番号なので
+            // referenceIndex は TileEntityLargeRailCore で計算された active 番号なので
             // そのままピンポイント比較する。
             return mapIndex == referenceIndex;
         }
@@ -556,7 +556,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     }
 
     private void renderInterpolatedMap(
-        LargeRailCoreBlockEntity blockEntity,
+        TileEntityLargeRailCore blockEntity,
         RailMap previousMap,
         RailMap activeMap,
         float progress,
@@ -605,7 +605,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     }
 
     private void renderRailSample(
-        LargeRailCoreBlockEntity blockEntity,
+        TileEntityLargeRailCore blockEntity,
         double wx,
         double wy,
         double wz,
@@ -738,12 +738,12 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     }
 
     @Override
-    public @NotNull AABB getRenderBoundingBox(LargeRailCoreBlockEntity be) {
+    public @NotNull AABB getRenderBoundingBox(TileEntityLargeRailCore be) {
         return be.getCachedRenderBounds();
     }
 
     @Override
-    public boolean shouldRenderOffScreen(LargeRailCoreBlockEntity blockEntity) {
+    public boolean shouldRenderOffScreen(TileEntityLargeRailCore blockEntity) {
         return true;
     }
 
