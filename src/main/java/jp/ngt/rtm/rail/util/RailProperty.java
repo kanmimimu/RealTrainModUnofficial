@@ -23,6 +23,13 @@ public final class RailProperty {
     public final float blockHeight;
     public final String unlocalizedName;
 
+    /**
+     * 本家では ItemRail.getDefaultProperty()。TODO(Phase 4): ItemRail 移植後に移動。
+     */
+    public static RailProperty getDefaultProperty() {
+        return new RailProperty("", Blocks.GRAVEL, 0, 0.0625F);
+    }
+
     public RailProperty(String par1, Block par2, int par3, float par4) {
         this.railModel = par1;
         this.block = par2;

@@ -22,6 +22,9 @@ public class RailMapBasic extends RailMap {
     protected RailPosition startRP;
     protected RailPosition endRP;
 
+    //本家準拠: RailMap.rails をシャドーイングしている (RailMapSlope が使用)
+    protected final java.util.List<int[]> rails = new java.util.ArrayList<>();
+
     protected double length;
     // version 0: RTM original or KaizPatch 1.6.0.older
     // version 1: KaizPatch 1.7.0...
