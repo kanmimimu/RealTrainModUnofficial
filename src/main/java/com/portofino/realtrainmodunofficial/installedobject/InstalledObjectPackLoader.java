@@ -76,6 +76,12 @@ public final class InstalledObjectPackLoader {
                     loadPack(input, path.getFileName().toString());
                 }
             }
+            //RTM-Official-Assets (コネクタ Input01/Output01 等の本家デフォルトモデルを含む)
+            for (Path path : BundledPackStore.listBundledPacks("official")) {
+                try (InputStream input = Files.newInputStream(path)) {
+                    loadPack(input, path.getFileName().toString());
+                }
+            }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not scan bundled installed object packs", e);
         }

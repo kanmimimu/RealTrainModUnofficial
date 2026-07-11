@@ -191,20 +191,16 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         net.minecraft.world.phys.Vec3 eye = mc.player.getEyePosition();
         net.minecraft.world.phys.Vec3 look = mc.player.getViewVector(1.0F);
 
+        //ユーザー要望: 掴めるのは緑 (水平) の線のみ
         MarkerElement best = MarkerElement.NONE;
         double bestDist = Double.MAX_VALUE;
         double bestEyeDist = Double.MAX_VALUE;
-        for (MarkerElement elm : MarkerElement.values()) {
-            if (elm == MarkerElement.NONE) {
-                continue;
-            }
-            for (net.minecraft.world.phys.Vec3[] seg : anchorSegments(marker, rp, elm)) {
-                double[] d = raySegmentDistance(eye, look, seg[0], seg[1]);
-                if (d[0] < bestDist) {
-                    bestDist = d[0];
-                    bestEyeDist = d[1];
-                    best = elm;
-                }
+        for (net.minecraft.world.phys.Vec3[] seg : anchorSegments(marker, rp, MarkerElement.HORIZONTIAL)) {
+            double[] d = raySegmentDistance(eye, look, seg[0], seg[1]);
+            if (d[0] < bestDist) {
+                bestDist = d[0];
+                bestEyeDist = d[1];
+                best = MarkerElement.HORIZONTIAL;
             }
         }
         double threshold = 0.2D + bestEyeDist * 0.01D;
@@ -528,84 +524,31 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
     }
 
     /**
-     * 本家 1122 renderAnchorLine: 高さ(赤)/水平(緑)/勾配(橙)/カント(桃) の線 + 数値表示。
-     * ホバー/編集中の線は減光ハイライト。
+     * アンカー線の描画 — ユーザー要望で緑 (水平) のみ。
+     * 通常は 5 ブロック固定、掴んでいる間は実際の制御長まで伸びる (本家同様)。
      */
     private void renderAnchor(TileEntityMarker marker, PoseStack poseStack, MultiBufferSource buffer) {
         RailPosition rp = marker.getMarkerRP();
         if (rp == null) {
             return;
         }
-        MarkerElement activeElm = editingMarker == marker
-                ? MarkerElement.values()[Math.min(marker.editMode, MarkerElement.values().length - 1)]
-                : (hoveredMarker == marker ? hoveredElement : MarkerElement.NONE);
+        boolean editing = editingMarker == marker && marker.editMode == MarkerElement.HORIZONTIAL.ordinal();
+        boolean active = editing || (hoveredMarker == marker && hoveredElement == MarkerElement.HORIZONTIAL);
 
         VertexConsumer lines = buffer.getBuffer(AnchorRenderTypes.THICK_LINES);
 
-        //マーカーブロック原点 → RP 位置へ (レンダラは BlockPos 原点)
         double ox = rp.posX - marker.getBlockPos().getX();
         double oy = rp.posY - marker.getBlockPos().getY();
         double oz = rp.posZ - marker.getBlockPos().getZ();
 
+        //掴んでいる間は制御長そのまま (視線先まで伸びる)、通常は 5 ブロック固定
+        float len = editing ? rp.anchorLengthHorizontal : displayLen(rp.anchorLengthHorizontal);
+
         poseStack.pushPose();
         poseStack.translate(ox, oy, oz);
-
-        //高さ (赤)
-        drawLine(lines, poseStack, 0, 0, 0, 0, 1, 0, colorOf(MarkerElement.HEIGHT, activeElm));
-
-        //水平 (緑) — yaw 回転下、表示長は 5 ブロック固定 (プレビュー線との重なり防止)
-        poseStack.pushPose();
         poseStack.mulPose(new Quaternionf().rotationY(rp.anchorYaw * Mth.DEG_TO_RAD));
-        drawLine(lines, poseStack, 0, 0, 0, 0, 0, displayLen(rp.anchorLengthHorizontal), colorOf(MarkerElement.HORIZONTIAL, activeElm));
-
-        //勾配 (橙)
-        poseStack.pushPose();
-        poseStack.mulPose(new Quaternionf().rotationX(-rp.anchorPitch * Mth.DEG_TO_RAD));
-        drawLine(lines, poseStack, 0, 0, 0, 0, 0, displayLen(rp.anchorLengthVertical), colorOf(MarkerElement.VERTICAL, activeElm));
-        poseStack.popPose();
-
-        //カント端 (桃)
-        poseStack.pushPose();
-        poseStack.mulPose(new Quaternionf().rotationZ(rp.cantEdge * Mth.DEG_TO_RAD));
-        int cantColor = colorOf(MarkerElement.CANT_EDGE, activeElm);
-        drawLine(lines, poseStack, 0, 0, 0, 1, 0, 0, cantColor);
-        drawLine(lines, poseStack, 0, 0, 0, -1, 0, 0, cantColor);
-        poseStack.popPose();
-        poseStack.popPose();
-        poseStack.popPose();
-
-        //カント中央 (コアマーカーのみ、レール中央に描画)
-        net.minecraft.world.phys.Vec3[] mid = this.cantCenterSegmentBase(marker, rp);
-        if (mid != null) {
-            poseStack.pushPose();
-            poseStack.translate(mid[0].x - marker.getBlockPos().getX(),
-                    mid[0].y - marker.getBlockPos().getY(),
-                    mid[0].z - marker.getBlockPos().getZ());
-            int ccColor = colorOf(MarkerElement.CANT_CENTER, activeElm);
-            drawLine(lines, poseStack, 0, 0, 0, (float) mid[1].x, (float) mid[1].y, (float) mid[1].z, ccColor);
-            drawLine(lines, poseStack, 0, 0, 0, (float) -mid[1].x, (float) -mid[1].y, (float) -mid[1].z, ccColor);
-            poseStack.popPose();
-        }
-
-        //数値表示 (本家: height/yaw/pitch/cantEdge/cantCenter)
-        Quaternionf cameraRot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
-        poseStack.pushPose();
-        poseStack.translate(ox, oy + 1.6D, oz);
-        poseStack.mulPose(cameraRot);
-        poseStack.scale(0.03F, -0.03F, 0.03F);
-        Matrix4f tm = poseStack.last().pose();
-        String[] values = {
-                "H " + rp.height,
-                String.format("Yaw %.2f", rp.anchorYaw),
-                String.format("Pitch %.2f", rp.anchorPitch),
-                String.format("CantE %.2f", rp.cantEdge),
-                String.format("CantC %.2f", rp.cantCenter)};
-        MarkerElement[] elms = {MarkerElement.HEIGHT, MarkerElement.HORIZONTIAL, MarkerElement.VERTICAL,
-                MarkerElement.CANT_EDGE, MarkerElement.CANT_CENTER};
-        for (int i = 0; i < values.length; i++) {
-            this.font.drawInBatch(values[i], 3.0F, -34.0F + 6.0F * i, elms[i].color | 0xFF000000, false,
-                    tm, buffer, Font.DisplayMode.NORMAL, 0, 0xF000F0);
-        }
+        drawLine(lines, poseStack, 0, 0, 0, 0, 0, len,
+                colorOf(MarkerElement.HORIZONTIAL, active ? MarkerElement.HORIZONTIAL : MarkerElement.NONE));
         poseStack.popPose();
     }
 
