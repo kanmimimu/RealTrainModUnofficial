@@ -119,7 +119,9 @@ public abstract class EntityVehiclePart extends Entity {
     }
 
     /**
-     * 位置を更新 (両サイド: クライアントは補間済みの車体位置に追従)
+     * 位置を更新 (両サイド: クライアントは補間済みの車体位置に追従)。
+     * 回転は設定しない — 乗員の視点が車両の向きに固定されないように
+     * (視点は完全に自由、本家の座席と同じ感覚)。
      */
     public void updatePartPos(EntityVehicleBase<?> vehicle) {
         Vec3 v3 = this.getPartVec();
@@ -127,7 +129,13 @@ public abstract class EntityVehiclePart extends Entity {
         v3 = v3.rotateAroundX(vehicle.getXRot());
         v3 = v3.rotateAroundY(vehicle.getYRot());
         this.setPos(vehicle.getX() + v3.getX(), vehicle.getY() + v3.getY(), vehicle.getZ() + v3.getZ());
-        this.setRot(vehicle.getYRot(), vehicle.getXRot());
+    }
+
+    /**
+     * 乗員の視点回転には一切干渉しない
+     */
+    @Override
+    public void onPassengerTurned(net.minecraft.world.entity.Entity rider) {
     }
 
     /**

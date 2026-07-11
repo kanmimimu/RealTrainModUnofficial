@@ -170,16 +170,24 @@ public final class ModelLoader {
                 }
             }
         }
+        //本家 MqoModel.parseFaceQuads は addVertex(3 - i, ...) で頂点/UV を逆順格納する。
+        //法線 (=CustomAnimator の左右判定/CustomMonitor の向き) がこれに依存するため必ず一致させる。
         Vertex[] faceVerts = new Vertex[count];
+        float[] revUvs = uvs != null ? new float[count * 2] : null;
         try {
             for (int i = 0; i < count; i++) {
+                int rev = count - 1 - i;
                 float[] v = verts.get(Integer.parseInt(vidx[i]));
-                faceVerts[i] = new Vertex(v[0], v[1], v[2]);
+                faceVerts[rev] = new Vertex(v[0], v[1], v[2]);
+                if (revUvs != null) {
+                    revUvs[rev * 2] = uvs[i * 2];
+                    revUvs[rev * 2 + 1] = uvs[i * 2 + 1];
+                }
             }
         } catch (Exception e) {
             return;
         }
-        Face face = new Face(faceVerts, uvs, matId);
+        Face face = new Face(faceVerts, revUvs, matId);
         //本家はロード時に法線計算済み — スクリプト (CustomAnimator 等) は
         //face.faceNormal が非 null である前提で toVec() を呼ぶ
         face.calculateFaceNormal(VecAccuracy.LOW);
