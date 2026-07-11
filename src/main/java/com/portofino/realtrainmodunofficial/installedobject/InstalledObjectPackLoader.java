@@ -59,8 +59,11 @@ public final class InstalledObjectPackLoader {
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not scan installed object packs", e);
         }
+        ensureDefaultConnectors();
         InstalledObjectRegistry.setDefinitions(LOADED);
-        RealTrainModUnofficial.LOGGER.info("Loaded {} installed object definition(s)", LOADED.size());
+        long connectors = LOADED.stream().filter(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT
+                || d.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT).count();
+        RealTrainModUnofficial.LOGGER.info("Loaded {} installed object definition(s) ({} connectors)", LOADED.size(), connectors);
     }
 
     private static void loadFromModJar() {
@@ -225,6 +228,41 @@ public final class InstalledObjectPackLoader {
                     }
                 });
         }
+    }
+
+    /**
+     * コネクタ定義がパックから読めなかった場合の保険:
+     * 本家デフォルト (Input01/Output01, RTM-Official-Assets の Connector.mqo) をコードで登録する。
+     */
+    private static void ensureDefaultConnectors() {
+        boolean hasInput = LOADED.stream().anyMatch(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT);
+        boolean hasOutput = LOADED.stream().anyMatch(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT);
+        if (!hasInput) {
+            LOADED.add(builtinConnector(InstalledObjectCategory.CONNECTOR_INPUT, "Input01", "textures/connector/input.png",
+                    "textures/connector/button_Input01.png"));
+            RealTrainModUnofficial.LOGGER.info("Registered built-in connector definition: Input01");
+        }
+        if (!hasOutput) {
+            LOADED.add(builtinConnector(InstalledObjectCategory.CONNECTOR_OUTPUT, "Output01", "textures/connector/output.png",
+                    "textures/connector/button_Output01.png"));
+            RealTrainModUnofficial.LOGGER.info("Registered built-in connector definition: Output01");
+        }
+    }
+
+    private static InstalledObjectDefinition builtinConnector(InstalledObjectCategory category, String name,
+                                                              String texture, String buttonTexture) {
+        String packName = "RTM-Official-Assets.zip";
+        String id = category.name().toLowerCase(Locale.ROOT) + ":" + packName + ":" + name;
+        Map<String, String> textures = new HashMap<>();
+        textures.put("default", texture);
+        InstalledObjectDefinition def = new InstalledObjectDefinition(
+                id, name, packName, category,
+                "Connector.mqo", "", buttonTexture, textures,
+                Vec3.ZERO, 1.0F, false,
+                1.0F, 1.0F, 0.125F, "", "", "",
+                Map.of(), List.of(), Vec3.ZERO, 1, 1);
+        def.setWireAttachPos(new Vec3(0.0D, -0.25D, 0.0D));
+        return def;
     }
 
     private static boolean isSupportedJson(String path) {

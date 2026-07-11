@@ -49,9 +49,22 @@ public record MarkerAnchorPayload(BlockPos markerPos, CompoundTag railPositionTa
             RailPosition rp = RailPosition.readFromNBT(payload.railPositionTag());
             marker.setMarkerRP(rp);
             marker.setChanged();
-            //プレビュー再構築 (本家: makeRailMap)
-            if (player.level().getBlockState(payload.markerPos()).getBlock() instanceof BlockMarker block) {
-                block.makeRailMap(marker, payload.markerPos().getX(), payload.markerPos().getY(), payload.markerPos().getZ(), player);
+            //本家 PacketMarkerRPClient: RP 適用後は updateRailMap のみ。
+            //makeRailMap (マーカー再アクティベート) を呼ぶと RailPosition が
+            //初期値で作り直されてクライアントへ同期され、編集した形状が巻き戻る。
+            TileEntityMarker core = marker.getCoreMarker();
+            if (core == null) {
+                core = marker;
+            }
+            core.updateRailMap();
+            core.setChanged();
+            player.level().sendBlockUpdated(payload.markerPos(),
+                    player.level().getBlockState(payload.markerPos()),
+                    player.level().getBlockState(payload.markerPos()), 3);
+            if (core != marker) {
+                player.level().sendBlockUpdated(core.getBlockPos(),
+                        player.level().getBlockState(core.getBlockPos()),
+                        player.level().getBlockState(core.getBlockPos()), 3);
             }
         });
     }
