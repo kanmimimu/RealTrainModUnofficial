@@ -21,20 +21,21 @@ import org.joml.Vector3f;
 
 import javax.script.ScriptEngine;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * レール定義ごとの本家式スクリプトレンダラ (jp.ngt.rtm.render.RailPartsRenderer) の管理。
- * Phase 3 先行実装:
- * - 本物の Nashorn + 実 jp.ngt クラスでレールスクリプトを実行
- * - renderRailStatic (スクリプト自前描画) を GLRecorder に記録
- * - 本家デフォルト配置 (0.5m 毎にモデルを yaw/pitch/roll 回転して設置) を
- *   shouldRenderObject(tile, objName, len, pos) でオブジェクト毎にフィルタして記録
- * - BE ごとの記録キャッシュを PoseStack へ再生 (本家 DisplayList 相当)
+ * 本家式レール描画システム (Phase 3 先行 / レール描画の作り直し)。
+ *
+ * 本家アーキテクチャの忠実再現:
+ * - スクリプト付き: renderRailStatic(tile,x,y,z,pt,pass) をスクリプトが実行。
+ *   デフォルト配置はスクリプトが renderer.renderStaticParts(...) を呼んだ時のみ
+ *   (shouldRenderObject を位置ごとに通す = 端トリミング/枕木循環)。
+ * - スクリプト無し: renderStaticParts 相当のデフォルト配置のみ。
+ * - GL 呼び出しは GLRecorder に記録し BE ごとにキャッシュ (本家 DisplayList 相当)。
+ * - 分岐コアのみ既存パイプラインにフォールバック (トング/ポイント描画は未移植)。
  */
 public final class RailScriptRenderers {
 
@@ -47,6 +48,12 @@ public final class RailScriptRenderers {
 
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
     private static final Scripted INVALID = new Scripted(null, null);
+
+    /**
+     * スクリプト無しレール用の素の RailPartsRenderer (shouldRenderObject 常に true)。
+     */
+    private static final RailPartsRenderer PLAIN = new RailPartsRenderer();
+    private static final Map<BlockPos, GLRecorder> PLAIN_CACHE = new HashMap<>();
 
     private RailScriptRenderers() {
     }
@@ -63,11 +70,13 @@ public final class RailScriptRenderers {
         try {
             String source = RailPackLoader.readScriptContent(def);
             if (source == null || source.isBlank()) {
+                RealTrainModUnofficial.LOGGER.warn("Rail script not readable for {} ({})", def.getId(), def.getScriptPath());
                 return INVALID;
             }
             ScriptEngine se = ScriptUtil.doScript(PRELUDE + source);
             Object rcName = se.get("renderClass");
             if (rcName == null) {
+                RealTrainModUnofficial.LOGGER.warn("Rail script has no renderClass: {}", def.getId());
                 return INVALID;
             }
             Class<?> rc = Class.forName(rcName.toString(), true, ScriptUtil.class.getClassLoader());
@@ -88,11 +97,41 @@ public final class RailScriptRenderers {
         }
     }
 
+    /**
+     * スクリプト無しレールの本家デフォルト描画 (作り直し後の標準パス)。
+     *
+     * @return true = 描画を担当した
+     */
+    public static boolean renderPlain(TileEntityLargeRailCore be, RailMap[] maps, PoseStack poseStack,
+                                      MultiBufferSource buffer, int packedLight, int packedOverlay,
+                                      MqoModelLoader.MqoModel model) {
+        if (be instanceof TileEntityLargeRailSwitchCore) {
+            return false;
+        }
+        BlockPos pos = be.getBlockPos();
+        GLRecorder rec = PLAIN_CACHE.get(pos);
+        if (rec == null || be.shouldRerenderRail) {
+            rec = new GLRecorder();
+            GLRecorder.activate(rec);
+            try {
+                PLAIN.modelGroupNames = model.getOriginalGroupNames();
+                PLAIN.renderStaticParts(be, 0.0D, 0.0D, 0.0D);
+            } catch (Throwable t) {
+                RealTrainModUnofficial.LOGGER.warn("Plain rail render failed at {}", pos, t);
+            } finally {
+                GLRecorder.deactivate();
+            }
+            PLAIN_CACHE.put(pos, rec);
+            be.shouldRerenderRail = false;
+        }
+        replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
+        return true;
+    }
+
     public static final class Scripted {
         private final RailPartsRenderer renderer;
         private final ScriptEngine engine;
         private final Map<BlockPos, GLRecorder> staticCache = new HashMap<>();
-        private final Map<String, Set<String>> singleGroupCache = new HashMap<>();
 
         Scripted(RailPartsRenderer renderer, ScriptEngine engine) {
             this.renderer = renderer;
@@ -100,16 +139,15 @@ public final class RailScriptRenderers {
         }
 
         /**
-         * スクリプト静的描画 + 本家デフォルト配置 (フィルタ済) を記録し、PoseStack に再生する。
+         * スクリプト描画 (renderRailStatic → 内部で renderStaticParts) を記録・再生する。
          *
-         * @return true = このレンダラが描画を担当した (通常パイプライン不要)
+         * @return true = このレンダラが描画を担当した
          */
         public boolean render(TileEntityLargeRailCore be, RailMap[] maps, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
             if (be instanceof TileEntityLargeRailSwitchCore) {
-                //分岐は本家スクリプトも早期 return する (renderRailDynamic 側)。
-                //暫定: 既存の分岐パイプラインに任せる。
+                //分岐トング/ポイント描画は既存パイプラインへ (renderRailDynamic 未移植)
                 return false;
             }
             BlockPos pos = be.getBlockPos();
@@ -118,14 +156,12 @@ public final class RailScriptRenderers {
                 rec = new GLRecorder();
                 GLRecorder.activate(rec);
                 try {
-                    //① スクリプト自前描画 (renderRailStatic) — メイン + subRails
+                    this.renderer.modelGroupNames = model.getOriginalGroupNames();
                     int railCount = 1 + be.subRails.size();
                     for (int i = 0; i < railCount; i++) {
                         this.renderer.currentRailIndex = i;
                         this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
                     }
-                    //② 本家デフォルト配置 (shouldRenderObject でオブジェクト毎フィルタ)
-                    this.recordDefaultPlacement(be, maps, model, rec);
                 } catch (Throwable t) {
                     RealTrainModUnofficial.LOGGER.warn("Rail script render failed at {}", pos, t);
                 } finally {
@@ -135,114 +171,56 @@ public final class RailScriptRenderers {
                 this.staticCache.put(pos, rec);
                 be.shouldRerenderRail = false;
             }
-            this.replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
+            replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
             return true;
         }
+    }
 
-        /**
-         * 本家 RailPartsRenderer のデフォルトレール描画:
-         * split = length*2 (0.5m 毎)、各点でモデルを yaw/-pitch/roll 回転して設置。
-         * 各オブジェクトは shouldRenderObject(tile, objName, max, i) が true のときのみ。
-         */
-        private void recordDefaultPlacement(TileEntityLargeRailCore be, RailMap[] maps,
-                                            MqoModelLoader.MqoModel model, GLRecorder rec) {
-            BlockPos origin = be.getBlockPos();
-            Set<String> groupNames = model.getOriginalGroupNames();
-            for (RailMap map : maps) {
-                if (map == null) {
-                    continue;
+    @SuppressWarnings("unchecked")
+    private static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
+                               int packedLight, int packedOverlay, MqoModelLoader.MqoModel model) {
+        int light = packedLight;
+        int depth = 0;
+        for (GLRecorder.Cmd cmd : rec.getCommands()) {
+            switch (cmd.op) {
+                case PUSH -> {
+                    poseStack.pushPose();
+                    depth++;
                 }
-                double length = map.getLength();
-                int max = (int) Math.floor(length * 2.0D);
-                if (max < 1) {
-                    max = 1;
-                }
-                //オブジェクト毎の許可判定 (この定義のスクリプトは名前でのみ判定するのが通例。
-                //位置依存スクリプトに備え、両端 (0, max) と中央で判定して OR を取る)
-                Set<String> allowed = new LinkedHashSet<>();
-                for (String name : groupNames) {
-                    if (this.shouldRender(be, name, max, 0)
-                            || this.shouldRender(be, name, max, max / 2)
-                            || this.shouldRender(be, name, max, max)) {
-                        allowed.add(name.trim().toLowerCase(Locale.ROOT));
+                case POP -> {
+                    if (depth > 0) {
+                        poseStack.popPose();
+                        depth--;
                     }
                 }
-                if (allowed.isEmpty()) {
-                    continue;
+                case TRANSLATE -> poseStack.translate(cmd.a, cmd.b, cmd.c);
+                case ROTATE -> {
+                    Vector3f axis = new Vector3f(cmd.b, cmd.c, cmd.d);
+                    if (axis.lengthSquared() > 1.0e-6F) {
+                        axis.normalize();
+                        poseStack.mulPose(new org.joml.Quaternionf().rotationAxis(cmd.a * Mth.DEG_TO_RAD, axis));
+                    }
                 }
-                for (int i = 0; i <= max; i++) {
-                    double[] p1 = map.getRailPos(max, i);
-                    double h = map.getRailHeight(max, i);
-                    float yaw = map.getRailYaw(max, i);
-                    float pitch = map.getRailPitch(max, i);
-                    float roll = map.getRailRoll(max, i);
-
-                    float relX = (float) (p1[1] - origin.getX());
-                    float relY = (float) (h - origin.getY() - 0.0625D);
-                    float relZ = (float) (p1[0] - origin.getZ());
-
-                    rec.push();
-                    rec.translate(relX, relY, relZ);
-                    rec.rotate(yaw, 0.0F, 1.0F, 0.0F);
-                    rec.rotate(-pitch, 1.0F, 0.0F, 0.0F);
-                    rec.rotate(roll, 0.0F, 0.0F, 1.0F);
-                    rec.renderGroups(allowed);
-                    rec.pop();
+                case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
+                case BRIGHTNESS -> light = (int) cmd.a;
+                case COLOR -> {
+                    //カラーオーバーレイは現状のレールスクリプトでは未使用
+                }
+                case RENDER_PARTS -> {
+                    Set<String> names = Set.of(cmd.name.trim().toLowerCase(Locale.ROOT));
+                    model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, names, null);
+                }
+                case RENDER_GROUPS -> {
+                    if (cmd.payload instanceof Set<?> names) {
+                        model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
+                    }
                 }
             }
         }
-
-        private boolean shouldRender(TileEntityLargeRailCore be, String objName, double len, double pos) {
-            return this.renderer.shouldRenderObject(be, objName, len, pos);
-        }
-
-        @SuppressWarnings("unchecked")
-        private void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
-                            int packedLight, int packedOverlay, MqoModelLoader.MqoModel model) {
-            int light = packedLight;
-            int depth = 0;
-            for (GLRecorder.Cmd cmd : rec.getCommands()) {
-                switch (cmd.op) {
-                    case PUSH -> {
-                        poseStack.pushPose();
-                        depth++;
-                    }
-                    case POP -> {
-                        if (depth > 0) {
-                            poseStack.popPose();
-                            depth--;
-                        }
-                    }
-                    case TRANSLATE -> poseStack.translate(cmd.a, cmd.b, cmd.c);
-                    case ROTATE -> {
-                        Vector3f axis = new Vector3f(cmd.b, cmd.c, cmd.d);
-                        if (axis.lengthSquared() > 1.0e-6F) {
-                            axis.normalize();
-                            poseStack.mulPose(new org.joml.Quaternionf().rotationAxis(cmd.a * Mth.DEG_TO_RAD, axis));
-                        }
-                    }
-                    case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
-                    case BRIGHTNESS -> light = (int) cmd.a;
-                    case COLOR -> {
-                        //TODO: カラーオーバーレイ対応 (現状のレールスクリプトでは未使用)
-                    }
-                    case RENDER_PARTS -> {
-                        Set<String> names = this.singleGroupCache.computeIfAbsent(cmd.name,
-                                n -> Set.of(n.trim().toLowerCase(Locale.ROOT)));
-                        model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, names, null);
-                    }
-                    case RENDER_GROUPS -> {
-                        if (cmd.payload instanceof Set<?> names) {
-                            model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
-                        }
-                    }
-                }
-            }
-            //スクリプトの push/pop 不整合を補正
-            while (depth > 0) {
-                poseStack.popPose();
-                depth--;
-            }
+        //スクリプトの push/pop 不整合を補正
+        while (depth > 0) {
+            poseStack.popPose();
+            depth--;
         }
     }
 }

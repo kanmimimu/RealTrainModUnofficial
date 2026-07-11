@@ -79,15 +79,19 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             RailMap[] maps = be.getAllRailMaps();
             if (maps == null || maps.length == 0) return;
 
-            // 本家式レールスクリプト (jp.ngt.rtm.render.RailPartsRenderer)。
-            // スクリプト付きレールは本家挙動で描画する:
-            //  ① renderRailStatic (スクリプト自前描画: 壁・ホーム・レール本体等)
-            //  ② 本家デフォルト配置 (0.5m 毎 yaw/pitch/roll 回転) を shouldRenderObject で
-            //     オブジェクト毎にフィルタ (= 端のトリミング)
-            // 分岐コアのみ既存パイプラインへフォールバック。
+            // 本家式レール描画 (作り直し後の標準パス)。
+            //  スクリプト付き: renderRailStatic をスクリプトが実行し、デフォルト配置は
+            //  スクリプトが renderer.renderStaticParts を呼んだ時のみ (位置毎 shouldRenderObject
+            //  = 端トリミング/枕木循環)。スクリプト無し: renderStaticParts 相当のみ。
+            //  分岐コアのみ既存パイプラインへフォールバック (トング描画未移植)。
             com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
                 com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
-            if (scripted != null && scripted.render(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
+            if (scripted != null) {
+                if (scripted.render(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
+                    return;
+                }
+            } else if (com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.renderPlain(
+                    be, maps, poseStack, buffer, packedLight, packedOverlay, model)) {
                 return;
             }
             net.minecraft.world.phys.Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();

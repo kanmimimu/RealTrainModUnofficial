@@ -63,6 +63,8 @@ public final class ScriptUtil {
         try {
             return doScriptFunction(se, func, args);
         } catch (Exception e) {
+            //本家は printStackTrace のみだが、本番ログで追えるよう NGTLog にも出す
+            NGTLog.debug("[ScriptUtil] %s failed: %s", func, String.valueOf(e.getCause() != null ? e.getCause() : e));
             e.printStackTrace();
             return null;
         }

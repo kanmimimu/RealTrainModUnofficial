@@ -44,4 +44,64 @@ public class RailPartsRenderer extends PartsRenderer {
         }
         return true;
     }
+
+    /**
+     * 描画対象モデルのオブジェクト名一覧 (renderStaticParts 用)。
+     * クライアント側 (RailScriptRenderers) が呼出前に設定する。
+     */
+    public java.util.Set<String> modelGroupNames = java.util.Set.of();
+
+    /**
+     * 本家のデフォルトレール描画。スクリプトの renderRailStatic から
+     * renderer.renderStaticParts(tileEntity, x, y, z) として呼ばれる。
+     * split = length*2 (0.5m 毎)、各点でモデルを yaw/-pitch/roll 回転して設置し、
+     * 各オブジェクトは shouldRenderObject(tile, objName, max, i) を通す (位置依存可)。
+     */
+    public void renderStaticParts(Object tileObj, double x, double y, double z) {
+        if (!(tileObj instanceof TileEntityLargeRailCore tile)) {
+            return;
+        }
+        jp.ngt.ngtlib.renderer.GLRecorder rec = jp.ngt.ngtlib.renderer.GLRecorder.active();
+        if (rec == null) {
+            return;
+        }
+        jp.ngt.rtm.rail.util.RailMap map = tile.getRailMap(null);
+        if (map == null) {
+            return;
+        }
+        net.minecraft.core.BlockPos origin = tile.getBlockPos();
+        double length = map.getLength();
+        int max = (int) Math.floor(length * 2.0D);
+        if (max < 1) {
+            max = 1;
+        }
+        for (int i = 0; i <= max; i++) {
+            java.util.Set<String> allowed = new java.util.LinkedHashSet<>();
+            for (String name : this.modelGroupNames) {
+                if (this.shouldRenderObject(tile, name, max, i)) {
+                    allowed.add(name.trim().toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+            if (allowed.isEmpty()) {
+                continue;
+            }
+            double[] p1 = map.getRailPos(max, i);
+            double h = map.getRailHeight(max, i);
+            float yaw = map.getRailYaw(max, i);
+            float pitch = map.getRailPitch(max, i);
+            float roll = map.getRailRoll(max, i);
+
+            float relX = (float) (x + p1[1] - origin.getX());
+            float relY = (float) (y + h - origin.getY() - 0.0625D);
+            float relZ = (float) (z + p1[0] - origin.getZ());
+
+            rec.push();
+            rec.translate(relX, relY, relZ);
+            rec.rotate(yaw, 0.0F, 1.0F, 0.0F);
+            rec.rotate(-pitch, 1.0F, 0.0F, 0.0F);
+            rec.rotate(roll, 0.0F, 0.0F, 1.0F);
+            rec.renderGroups(allowed);
+            rec.pop();
+        }
+    }
 }
