@@ -42,8 +42,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         }
 
         //レンチの「アンカー移動」モード中のみアンカー線を表示し、線を右クリックで掴んで編集
-        //(本家は LINE1 状態で制御するが GUI 未移植のため、プレビュー確立=coreMarker で判定)
-        if (marker.getCoreMarker() != null && marker.getRailMaps() != null) {
+        //(coreMarker はクライアントで null のことがあるため RailMaps の有無で判定)
+        if (marker.getRailMaps() != null && marker.getRailMaps().length > 0 && marker.getMarkerRP() != null) {
             if (isAnchorWrenchHeld()) {
                 this.changeAnchor(marker);
                 this.updateHover(marker);
@@ -268,7 +268,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
      * カント(中央) 線: レール中央位置 {位置, ±方向ベクトル} (コアマーカー + 単一 RailMap のみ)
      */
     private net.minecraft.world.phys.Vec3[] cantCenterSegmentBase(TileEntityMarker marker, RailPosition rp) {
-        if (!marker.isCoreMarker() || marker.getRailMaps() == null || marker.getRailMaps().length != 1) {
+        if (marker.getRailMaps() == null || marker.getRailMaps().length != 1) {
             return null;
         }
         RailMap rm = marker.getRailMaps()[0];
@@ -331,7 +331,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
      * 本家 1122 changeAnchor: 掴んでいる線を毎フレーム視線に追従させる
      */
     private void changeAnchor(TileEntityMarker marker) {
-        if (editingMarker != marker || marker.editMode == 0 || marker.getCoreMarker() == null) {
+        if (editingMarker != marker || marker.editMode == 0) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();

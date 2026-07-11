@@ -42,10 +42,34 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        //コネクタはモデル固定 (本家 Input01/Output01) — 選択画面を出さない
+        if (category == InstalledObjectCategory.CONNECTOR_INPUT
+                || category == InstalledObjectCategory.CONNECTOR_OUTPUT) {
+            return InteractionResultHolder.pass(player.getItemInHand(hand));
+        }
         if (level.isClientSide) {
             ClientHooks.openInstalledObjectSelectScreen(player, player.getItemInHand(hand), category);
         }
         return InteractionResultHolder.success(player.getItemInHand(hand));
+    }
+
+    /**
+     * コネクタのデフォルト定義 (Input01/Output01 優先、無ければ同カテゴリの先頭)
+     */
+    private static InstalledObjectDefinition findDefaultConnector(InstalledObjectCategory category) {
+        String defaultName = category == InstalledObjectCategory.CONNECTOR_INPUT ? "input01" : "output01";
+        InstalledObjectDefinition fallback = null;
+        for (InstalledObjectDefinition def : InstalledObjectRegistry.getByCategory(category)) {
+            if (fallback == null) {
+                fallback = def;
+            }
+            //定義 ID は "category:pack:name" 形式のため末尾名で判定
+            String id = def.getId().toLowerCase(java.util.Locale.ROOT);
+            if (id.endsWith(":" + defaultName) || id.equals(defaultName)) {
+                return def;
+            }
+        }
+        return fallback;
     }
 
     @Override
@@ -61,16 +85,18 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         InstalledObjectDefinition definition = InstalledObjectRegistry.getById(selectedId);
         if (definition == null || definition.getCategory() != category) {
-            //コネクタは本家デフォルトモデル (Input01/Output01) で未選択でも即設置
+            //コネクタは本家デフォルトモデル (Input01/Output01) 固定 — 選択画面は出さない
             if (category == InstalledObjectCategory.CONNECTOR_INPUT
                     || category == InstalledObjectCategory.CONNECTOR_OUTPUT) {
-                String defaultName = category == InstalledObjectCategory.CONNECTOR_INPUT ? "Input01" : "Output01";
-                definition = InstalledObjectRegistry.getById(defaultName);
-                if (definition == null || definition.getCategory() != category) {
-                    definition = InstalledObjectRegistry.getByCategory(category).stream().findFirst().orElse(null);
+                definition = findDefaultConnector(category);
+                if (definition == null) {
+                    if (!level.isClientSide) {
+                        player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                                "コネクタのモデル (Input01/Output01) が見つかりません"), true);
+                    }
+                    return InteractionResult.FAIL;
                 }
-            }
-            if (definition == null) {
+            } else {
                 if (level.isClientSide) {
                     ClientHooks.openInstalledObjectSelectScreen(player, stack, category);
                 }
