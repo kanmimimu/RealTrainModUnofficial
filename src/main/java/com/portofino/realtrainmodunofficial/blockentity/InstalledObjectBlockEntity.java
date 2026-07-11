@@ -39,6 +39,9 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     private double offsetZ;
     private int signalChannel = -1;
     private int signalAspect = SignalAspect.STOP.getId();
+    //本家 electric: コネクタの信号レベル (配線網)
+    private int electricity;
+    private int prevConnectorInput = -1;
     // スピーカー: 音が聞こえる範囲(ブロック)。GUIで可変。
     private int speakerRange = 32;
     private final Map<String, String> scriptData = new HashMap<>();
@@ -65,6 +68,7 @@ public class InstalledObjectBlockEntity extends BlockEntity {
             tag.putInt("WireEndZ", wireEnd.getZ());
         }
         tag.putBoolean("Powered", powered);
+        tag.putInt("Electricity", electricity);
         tag.putInt("BarMoveCount", barMoveCount);
         tag.putInt("LightCount", lightCount);
         tag.putInt("TickCountOnActive", tickCountOnActive);
@@ -91,6 +95,7 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         wireStart = tag.contains("WireStartX") ? new BlockPos(tag.getInt("WireStartX"), tag.getInt("WireStartY"), tag.getInt("WireStartZ")) : null;
         wireEnd = tag.contains("WireEndX") ? new BlockPos(tag.getInt("WireEndX"), tag.getInt("WireEndY"), tag.getInt("WireEndZ")) : null;
         powered = tag.getBoolean("Powered");
+        electricity = tag.getInt("Electricity");
         barMoveCount = tag.getInt("BarMoveCount");
         lightCount = tag.contains("LightCount") ? tag.getInt("LightCount") : -1;
         tickCountOnActive = tag.getInt("TickCountOnActive");
@@ -169,6 +174,31 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         this.wireStart = start;
         this.wireEnd = end;
         setChanged();
+        //電気配線網に登録 (本家 WireManager)
+        if (level != null && !level.isClientSide && start != null && end != null) {
+            jp.ngt.rtm.electric.WireManager.register(level, start, end);
+        }
+    }
+
+    /**
+     * 本家 electric: コネクタの信号レベル
+     */
+    public int getElectricity() {
+        return electricity;
+    }
+
+    public void setElectricity(int levelValue) {
+        if (this.electricity != levelValue) {
+            this.electricity = levelValue;
+            setChanged();
+            if (level != null && !level.isClientSide) {
+                if (getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
+                    //レッドストーン出力の更新
+                    level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
+                }
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            }
+        }
     }
 
     public BlockPos getWireStart() {
@@ -346,6 +376,20 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         if (level instanceof ServerLevel serverLevel && isSignal()) {
             SignalNetworkSavedData.get(serverLevel).syncLoadedSignal(serverLevel, this);
         }
+        //ワイヤーは配線網 (本家 WireManager) へ登録
+        if (level != null && !level.isClientSide && getCategory() == InstalledObjectCategory.WIRE
+                && wireStart != null && wireEnd != null) {
+            jp.ngt.rtm.electric.WireManager.register(level, wireStart, wireEnd);
+        }
+    }
+
+    @Override
+    public void setRemoved() {
+        if (level != null && !level.isClientSide && getCategory() == InstalledObjectCategory.WIRE
+                && wireStart != null && wireEnd != null) {
+            jp.ngt.rtm.electric.WireManager.unregister(level, wireStart, wireEnd);
+        }
+        super.setRemoved();
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, InstalledObjectBlockEntity be) {
@@ -358,6 +402,16 @@ public class InstalledObjectBlockEntity extends BlockEntity {
                 ClientHooks.tickCrossingGateSound(be);
             } else {
                 ClientHooks.stopCrossingGateSound(level, pos);
+            }
+            return;
+        }
+        //本家 electric: 入力コネクタ = レッドストーンを監視して配線網へ伝播
+        if (be.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT) {
+            int sig = level.getBestNeighborSignal(pos);
+            if (sig != be.prevConnectorInput) {
+                be.prevConnectorInput = sig;
+                be.setElectricity(sig);
+                jp.ngt.rtm.electric.WireManager.propagate(level, pos, sig);
             }
             return;
         }

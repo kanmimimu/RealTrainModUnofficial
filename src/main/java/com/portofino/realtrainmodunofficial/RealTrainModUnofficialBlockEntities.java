@@ -41,6 +41,12 @@ public class RealTrainModUnofficialBlockEntities {
         BLOCK_ENTITY_TYPES.register("installed_object", () -> BlockEntityType.Builder.of(InstalledObjectBlockEntity::new,
             RealTrainModUnofficialBlocks.INSTALLED_OBJECT.get()).build(null));
 
+    /** 本家 electric: 信号変換器 */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.electric.TileEntitySignalConverter>> SIGNAL_CONVERTER =
+        BLOCK_ENTITY_TYPES.register("signal_converter", () -> BlockEntityType.Builder.of(
+            jp.ngt.rtm.electric.TileEntitySignalConverter::new,
+            RealTrainModUnofficialBlocks.SIGNAL_CONVERTER.get()).build(null));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SignalRemoteBlockEntity>> SIGNAL_REMOTE =
         BLOCK_ENTITY_TYPES.register("signal_remote", () -> BlockEntityType.Builder.of(SignalRemoteBlockEntity::new,
             RealTrainModUnofficialBlocks.SIGNAL_RECEIVER.get(),

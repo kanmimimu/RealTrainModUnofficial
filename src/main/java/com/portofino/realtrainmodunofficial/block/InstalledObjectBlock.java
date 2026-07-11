@@ -129,6 +129,24 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         super.onPlace(state, level, pos, oldState, isMoving);
     }
 
+    /**
+     * 本家 electric: 出力コネクタは配線網の信号レベルをレッドストーン出力する
+     */
+    @Override
+    protected boolean isSignalSource(BlockState state) {
+        return true;
+    }
+
+    @Override
+    protected int getSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos,
+                            net.minecraft.core.Direction direction) {
+        if (getter.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
+                && be.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
+            return net.minecraft.util.Mth.clamp(be.getElectricity(), 0, 15);
+        }
+        return 0;
+    }
+
     @Override
     public void neighborChanged(BlockState state, Level level, BlockPos pos, net.minecraft.world.level.block.Block block, BlockPos fromPos, boolean isMoving) {
         if (!level.isClientSide) {

@@ -171,6 +171,7 @@ public final class ClientItemHelper {
             case CROSSING -> "screen.realtrainmodunofficial.select_crossing";
             case TICKET_GATE -> "screen.realtrainmodunofficial.select_ticket_gate";
             case SPEAKER -> "screen.realtrainmodunofficial.select_speaker";
+            case CONNECTOR_INPUT, CONNECTOR_OUTPUT -> "screen.realtrainmodunofficial.select_connector";
         };
     }
 }

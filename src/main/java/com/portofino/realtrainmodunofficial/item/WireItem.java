@@ -55,11 +55,20 @@ public class WireItem extends Item implements ModelSelectableItem {
         }
 
         BlockPos clickedPos = context.getClickedPos();
-        if (!(level.getBlockEntity(clickedPos) instanceof InstalledObjectBlockEntity clicked)
-            || (clicked.getCategory() != InstalledObjectCategory.INSULATOR
-                && clicked.getCategory() != InstalledObjectCategory.OVERHEAD_LINE_POLE)) {
+        boolean connective = false;
+        if (level.getBlockEntity(clickedPos) instanceof InstalledObjectBlockEntity clicked) {
+            InstalledObjectCategory cat = clicked.getCategory();
+            connective = cat == InstalledObjectCategory.INSULATOR
+                || cat == InstalledObjectCategory.OVERHEAD_LINE_POLE
+                || cat == InstalledObjectCategory.CONNECTOR_INPUT
+                || cat == InstalledObjectCategory.CONNECTOR_OUTPUT;
+        } else if (level.getBlockEntity(clickedPos) instanceof jp.ngt.rtm.electric.TileEntitySignalConverter) {
+            //信号変換器もワイヤー接続可能 (本家 IBlockConnective)
+            connective = true;
+        }
+        if (!connective) {
             if (!level.isClientSide) {
-                player.displayClientMessage(Component.literal("ワイヤーは碍子同士でのみ設置できます"), true);
+                player.displayClientMessage(Component.literal("ワイヤーは碍子・コネクタ・信号変換器にのみ接続できます"), true);
             }
             return InteractionResult.FAIL;
         }

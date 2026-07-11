@@ -42,7 +42,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         }
 
         //レンチの「アンカー移動」モード中のみアンカー線を表示し、線を右クリックで掴んで編集
-        if (marker.getCoreMarker() != null && marker.getState(MarkerState.LINE1)) {
+        //(本家は LINE1 状態で制御するが GUI 未移植のため、プレビュー確立=coreMarker で判定)
+        if (marker.getCoreMarker() != null && marker.getRailMaps() != null) {
             if (isAnchorWrenchHeld()) {
                 this.changeAnchor(marker);
                 this.updateHover(marker);
@@ -358,7 +359,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             float cantLimit = 80.0F;
             float cant = Mth.clamp(pitchDif, -cantLimit, cantLimit);
             RailPosition neighborRP = this.getNeighborRail(marker);
-            if (neighborRP != null && marker.getState(MarkerState.FIT_NEIGHBOR)) {
+            if (neighborRP != null && marker.fitNeighbor) {
                 cant = -neighborRP.cantEdge;
             }
             rp.cantEdge = cant;
@@ -417,14 +418,14 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             float length = (float) (dx / Math.sin(dirRad));
             float yaw = (float) Math.toDegrees(dirRad);
             if (curElm == MarkerElement.HORIZONTIAL) {
-                if (neighborRP != null && marker.getState(MarkerState.FIT_NEIGHBOR)) {
+                if (neighborRP != null && marker.fitNeighbor) {
                     yaw = Mth.wrapDegrees(neighborRP.anchorYaw + 180.0F);
                 }
                 rp.anchorYaw = yaw;
                 rp.anchorLengthHorizontal = length;
             } else if (curElm == MarkerElement.VERTICAL) {
                 float pitch = Mth.wrapDegrees(yaw - rp.anchorYaw);
-                if (neighborRP != null && marker.getState(MarkerState.FIT_NEIGHBOR)) {
+                if (neighborRP != null && marker.fitNeighbor) {
                     pitch = -neighborRP.anchorPitch;
                 } else if (fitOpposite) {
                     double dy = targetVec.y - rp.posY;
@@ -704,26 +705,30 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         float baseY = (float) (rp.posY - marker.getBlockPos().getY());
         float baseZ = (float) (rp.posZ - marker.getBlockPos().getZ());
 
-        VertexConsumer lines = buffer.getBuffer(RenderType.debugLineStrip(2.0D));
-        for (RailMap rm : maps) {
-            if (rm == null) continue;
-            poseStack.pushPose();
-            poseStack.translate(baseX, baseY, baseZ);
-            float x0 = (float) (rm.getStartRP().posX - rp.posX);
-            float y0 = (float) (rm.getStartRP().posY - rp.posY);
-            float z0 = (float) (rm.getStartRP().posZ - rp.posZ);
-            poseStack.translate(x0, y0, z0);
-            Matrix4f m = poseStack.last().pose();
-            int max = (int) ((float) rm.getLength() * 2.0F);
-            if (max < 1) max = 1;
-            double[] p2 = rm.getRailPos(max, 0);
-            double h2 = rm.getRailHeight(max, 0);
-            for (int i = 0; i < max + 1; ++i) {
-                double[] p1 = rm.getRailPos(max, i);
-                lines.addVertex(m, (float) (p1[1] - p2[1]), (float) (rm.getRailHeight(max, i) - h2), (float) (p1[0] - p2[0]))
-                        .setColor(0.0F, 0.75F, 0.0F, 1.0F);
+        //緑のプレビュー曲線はユーザー要望で非表示 (マーカー設置直後から出て邪魔なため)。
+        //アンカー編集モード中のみ描画してカーブ形状の確認に使う。
+        if (isAnchorWrenchHeld()) {
+            VertexConsumer lines = buffer.getBuffer(RenderType.debugLineStrip(2.0D));
+            for (RailMap rm : maps) {
+                if (rm == null) continue;
+                poseStack.pushPose();
+                poseStack.translate(baseX, baseY, baseZ);
+                float x0 = (float) (rm.getStartRP().posX - rp.posX);
+                float y0 = (float) (rm.getStartRP().posY - rp.posY);
+                float z0 = (float) (rm.getStartRP().posZ - rp.posZ);
+                poseStack.translate(x0, y0, z0);
+                Matrix4f m = poseStack.last().pose();
+                int max = (int) ((float) rm.getLength() * 2.0F);
+                if (max < 1) max = 1;
+                double[] p2 = rm.getRailPos(max, 0);
+                double h2 = rm.getRailHeight(max, 0);
+                for (int i = 0; i < max + 1; ++i) {
+                    double[] p1 = rm.getRailPos(max, i);
+                    lines.addVertex(m, (float) (p1[1] - p2[1]), (float) (rm.getRailHeight(max, i) - h2), (float) (p1[0] - p2[0]))
+                            .setColor(0.0F, 0.75F, 0.0F, 1.0F);
+                }
+                poseStack.popPose();
             }
-            poseStack.popPose();
         }
 
         //総延長テキスト (本家: 中央、緑 0x00EE00)

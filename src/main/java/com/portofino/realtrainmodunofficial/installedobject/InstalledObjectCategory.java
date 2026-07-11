@@ -9,5 +9,13 @@ public enum InstalledObjectCategory {
     SIGNAL,
     CROSSING,
     TICKET_GATE,
-    SPEAKER
+    SPEAKER,
+    /**
+     * 本家: 入力コネクタ (レッドストーン→配線網)
+     */
+    CONNECTOR_INPUT,
+    /**
+     * 本家: 出力コネクタ (配線網→レッドストーン)
+     */
+    CONNECTOR_OUTPUT
 }

@@ -84,4 +84,15 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> SPEAKER_ITEM = ITEMS.register(
         "speaker", () -> new InstalledObjectItem(InstalledObjectCategory.SPEAKER)
     );
+    //本家 electric: 入力/出力コネクタ (配線網⇔レッドストーン)
+    public static final DeferredItem<InstalledObjectItem> CONNECTOR_INPUT_ITEM = ITEMS.register(
+        "connector_input", () -> new InstalledObjectItem(InstalledObjectCategory.CONNECTOR_INPUT)
+    );
+    public static final DeferredItem<InstalledObjectItem> CONNECTOR_OUTPUT_ITEM = ITEMS.register(
+        "connector_output", () -> new InstalledObjectItem(InstalledObjectCategory.CONNECTOR_OUTPUT)
+    );
+    //本家 electric: 信号変換器
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_CONVERTER_ITEM = ITEMS.register(
+        "signal_converter", () -> new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.SIGNAL_CONVERTER.get(), new net.minecraft.world.item.Item.Properties())
+    );
 }

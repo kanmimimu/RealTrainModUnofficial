@@ -38,6 +38,12 @@ public class RealTrainModUnofficialBlocks {
     public static final DeferredBlock<InstalledObjectBlock> INSTALLED_OBJECT
         = BLOCKS.register("installed_object", () -> new InstalledObjectBlock());
 
+    /** 本家 electric: 信号変換器 (RSIn/RSOut/Increment/Decrement) */
+    public static final DeferredBlock<jp.ngt.rtm.electric.BlockSignalConverter> SIGNAL_CONVERTER
+        = BLOCKS.register("signal_converter", () -> new jp.ngt.rtm.electric.BlockSignalConverter(
+            net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()
+                .strength(1.5F).sound(net.minecraft.world.level.block.SoundType.STONE)));
+
     public static final DeferredBlock<SignalRemoteBlock> SIGNAL_RECEIVER
         = BLOCKS.register("signal_receiver", () -> new SignalRemoteBlock(SignalRemoteBlock.Mode.RECEIVER));
 

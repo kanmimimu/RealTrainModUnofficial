@@ -50,6 +50,9 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.OVERHEAD_LINE_POLE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_GATE_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.CONNECTOR_INPUT_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.CONNECTOR_OUTPUT_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.SIGNAL_CONVERTER_ITEM.get());
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {

@@ -1,9 +1,7 @@
 {
   "itemGroup.realtrainmodunofficial": "RealTrainModUnofficial",
-
   "block.realtrainmodunofficial.example_block": "例ブロック",
   "item.realtrainmodunofficial.example_item": "例アイテム",
-
   "block.realtrainmodunofficial.crossing_gate": "踏切",
   "block.realtrainmodunofficial.overhead_line_pole": "架線",
   "block.realtrainmodunofficial.signal_receiver": "受信機",
@@ -12,7 +10,6 @@
   "block.realtrainmodunofficial.train_detector": "電車検知ブロック",
   "block.realtrainmodunofficial.signal_state": "状態(信号)ブロック",
   "block.realtrainmodunofficial.script_block": "scriptブロック",
-
   "block.realtrainmodunofficial.marker": "マーカー",
   "block.realtrainmodunofficial.marker_switch": "分岐マーカー",
   "item.realtrainmodunofficial.marker_diagonal": "マーカー(斜め)",
@@ -36,13 +33,10 @@
   "item.realtrainmodunofficial.signal_communicator": "通信機",
   "item.realtrainmodunofficial.crossing_gate": "踏切",
   "block.realtrainmodunofficial.ballast": "道床",
-
   "tooltip.realtrainmodunofficial.model.selected": "選択中: %s",
   "tooltip.realtrainmodunofficial.model.none": "モデル未選択（右クリックで選択）",
-
   "message.realtrainmodunofficial.train.must_be_on_rail": "列車はレール上にのみ設置できます",
   "message.realtrainmodunofficial.train.already_exists": "その場所には既に列車があります",
-
   "screen.realtrainmodunofficial.select_train": "列車モデル選択",
   "screen.realtrainmodunofficial.select_rail": "レール選択",
   "screen.realtrainmodunofficial.select_car": "自動車選択",
@@ -61,9 +55,7 @@
   "screen.realtrainmodunofficial.train_formation.empty": "編成が空です",
   "screen.realtrainmodunofficial.train_formation.cars": "車両数: %s",
   "screen.realtrainmodunofficial.train_formation.formation": "編成: %s",
-
   "message.realtrainmodunofficial.formation.empty": "保存された編成がありません",
-
   "tooltip.realtrainmodunofficial.selected_model": "選択モデル: %s",
   "tooltip.realtrainmodunofficial.formation.size": "編成サイズ: %s",
   "tooltip.realtrainmodunofficial.formation.vehicles": "車両: %s",
@@ -71,7 +63,6 @@
   "tooltip.realtrainmodunofficial.train_formation.cars": "車両数: %s",
   "tooltip.realtrainmodunofficial.train_formation.formation": "編成: %s",
   "tooltip.realtrainmodunofficial.train_formation.empty": "編成未設定",
-
   "key.categories.realtrainmodunofficial": "RealTrainMod Unofficial",
   "key.realtrainmodunofficial.open_control": "運転操作を開く",
   "key.realtrainmodunofficial.power_off": "力行をオフにする",
@@ -81,12 +72,15 @@
   "key.realtrainmodunofficial.play_announcement": "選択中の車内放送を再生",
   "key.realtrainmodunofficial.play_horn": "警笛を鳴らす",
   "key.realtrainmodunofficial.toggle_render_profiler": "RTMU描画プロファイラを切り替える",
-
   "realtrainmodunofficial.configuration.title": "RealTrainMod Unofficialコンフィグ",
   "realtrainmodunofficial.configuration.section.realtrainmodunofficial.common.toml": "RealTrainMod Unofficial Configs",
   "realtrainmodunofficial.configuration.section.realtrainmodunofficial.common.toml.title": "RealTrainMod Unofficial Configs",
   "realtrainmodunofficial.configuration.items": "Item List",
   "realtrainmodunofficial.configuration.logDirtBlock": "Log Dirt Block",
   "realtrainmodunofficial.configuration.magicNumberIntroduction": "Magic Number Text",
-  "realtrainmodunofficial.configuration.magicNumber": "Magic Number"
+  "realtrainmodunofficial.configuration.magicNumber": "Magic Number",
+  "item.realtrainmodunofficial.connector_input": "入力コネクタ",
+  "item.realtrainmodunofficial.connector_output": "出力コネクタ",
+  "block.realtrainmodunofficial.signal_converter": "信号変換器",
+  "screen.realtrainmodunofficial.select_connector": "コネクタモデル選択"
 }

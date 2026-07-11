@@ -406,6 +406,16 @@ public final class InstalledObjectPackLoader {
         String hay = lowerFile + " " + name + " " + machineType;
 
         // 明示プレフィックスを最優先。
+        //本家 ModelConnector_*.json の connectorType: "Input"/"Output" (入出力コネクタ)
+        String connectorType = firstNonBlank(getString(obj, "connectorType"), getString(obj, "ConnectorType"));
+        if (connectorType != null && !connectorType.isBlank()) {
+            if (connectorType.equalsIgnoreCase("Input")) {
+                return InstalledObjectCategory.CONNECTOR_INPUT;
+            }
+            if (connectorType.equalsIgnoreCase("Output")) {
+                return InstalledObjectCategory.CONNECTOR_OUTPUT;
+            }
+        }
         if (lowerFile.startsWith("modelsignal_")) {
             return InstalledObjectCategory.SIGNAL;
         }
