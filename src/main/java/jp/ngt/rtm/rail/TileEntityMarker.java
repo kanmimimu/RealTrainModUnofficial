@@ -83,6 +83,12 @@ public class TileEntityMarker extends BlockEntity {
             this.rp = RailPosition.readFromNBT(nbt.getCompound("RP"));
         }
         this.markerState = nbt.getInt("MarkerState");
+        //コアマーカー座標 (クライアントの getCoreMarker 解決に必須)
+        if (nbt.contains("StartY")) {
+            this.startX = nbt.getInt("StartX");
+            this.startY = nbt.getInt("StartY");
+            this.startZ = nbt.getInt("StartZ");
+        }
 
         //1.21: PacketMarker 代替 (同期タグ経由の markerPosList)
         if (nbt.contains("MarkerPosList")) {
@@ -105,6 +111,9 @@ public class TileEntityMarker extends BlockEntity {
             nbt.put("RP", this.rp.writeToNBT());
         }
         nbt.putInt("MarkerState", this.markerState);
+        nbt.putInt("StartX", this.startX);
+        nbt.putInt("StartY", this.startY);
+        nbt.putInt("StartZ", this.startZ);
     }
 
     @Override
@@ -254,6 +263,9 @@ public class TileEntityMarker extends BlockEntity {
         TileEntityMarker core = this.getCoreMarker();
         if (core != null) {
             core.updateRailMap();
+        } else if (!this.markerPosList.isEmpty()) {
+            //クライアントで core 未解決でも自身が RailMap を持っていれば再構築できる
+            this.updateRailMap();
         }
     }
 
