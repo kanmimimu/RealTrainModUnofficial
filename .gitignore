@@ -37,3 +37,7 @@ vehicle_packs
 tools/convert_bbmodel_to_rtmu_pack.py
 __pycache__
 *.pyc
+
+# build logs (may contain local paths)
+build_err.txt
+*.log
