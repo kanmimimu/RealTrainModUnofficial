@@ -47,6 +47,11 @@ public record MarkerAnchorPayload(BlockPos markerPos, CompoundTag railPositionTa
                 return;
             }
             RailPosition rp = RailPosition.readFromNBT(payload.railPositionTag());
+            if (rp == null) {
+                return;
+            }
+            RealTrainModUnofficial.LOGGER.info("[MarkerAnchor] apply pos={} yaw={} lenH={} pitch={}",
+                    payload.markerPos(), rp.anchorYaw, rp.anchorLengthHorizontal, rp.anchorPitch);
             marker.setMarkerRP(rp);
             marker.setChanged();
             //本家 PacketMarkerRPClient: RP 適用後は updateRailMap のみ。
@@ -58,6 +63,8 @@ public record MarkerAnchorPayload(BlockPos markerPos, CompoundTag railPositionTa
             }
             core.updateRailMap();
             core.setChanged();
+            RealTrainModUnofficial.LOGGER.info("[MarkerAnchor] after update yaw={} lenH={} (core={})",
+                    marker.getMarkerRP().anchorYaw, marker.getMarkerRP().anchorLengthHorizontal, core.getBlockPos());
             player.level().sendBlockUpdated(payload.markerPos(),
                     player.level().getBlockState(payload.markerPos()),
                     player.level().getBlockState(payload.markerPos()), 3);

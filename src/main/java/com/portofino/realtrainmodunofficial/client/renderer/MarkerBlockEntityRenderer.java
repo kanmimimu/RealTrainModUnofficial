@@ -52,6 +52,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 //モードを離れたら編集中断
                 marker.editMode = 0;
                 editingMarker = null;
+                TileEntityMarker.clientEditingMarker = null;
             }
         }
 
@@ -135,6 +136,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             TileEntityMarker marker = editingMarker;
             marker.editMode = 0;
             editingMarker = null;
+            TileEntityMarker.clientEditingMarker = null;
             if (!marker.isRemoved() && marker.getMarkerRP() != null) {
                 sendAnchor(marker.getBlockPos(), marker.getMarkerRP());
                 RailPosition opposite = getOppositeRailStatic(marker);
@@ -166,12 +168,15 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             marker.startPlayerYaw = mc.player.getYHeadRot();
             marker.startMarkerHeight = marker.getMarkerRP() != null ? marker.getMarkerRP().height : 0;
             editingMarker = marker;
+            TileEntityMarker.clientEditingMarker = marker;
             return true;
         }
         return false;
     }
 
     private static void sendAnchor(net.minecraft.core.BlockPos pos, RailPosition rp) {
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+                "[MarkerAnchor] send pos={} yaw={} lenH={} pitch={}", pos, rp.anchorYaw, rp.anchorLengthHorizontal, rp.anchorPitch);
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 new com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload(pos, rp.writeToNBT()));
     }

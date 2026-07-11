@@ -75,11 +75,17 @@ public class TileEntityMarker extends BlockEntity {
         this.markerState = MarkerState.FIT_NEIGHBOR.set(this.markerState, true);
     }
 
+    /**
+     * クライアントでアンカー編集中のマーカー (レンダラーが設定)。
+     * 編集中は同期パケットの RP で上書きしない (編集値が巻き戻るため)。サーバーでは常に null。
+     */
+    public static TileEntityMarker clientEditingMarker;
+
     @Override
     protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
         super.loadAdditional(nbt, registries);
 
-        if (nbt.contains("RP")) {
+        if (nbt.contains("RP") && this != clientEditingMarker) {
             this.rp = RailPosition.readFromNBT(nbt.getCompound("RP"));
         }
         this.markerState = nbt.getInt("MarkerState");
