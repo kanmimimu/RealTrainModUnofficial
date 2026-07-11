@@ -231,13 +231,13 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         switch (elm) {
             case HEIGHT -> out.add(new net.minecraft.world.phys.Vec3[]{base, base.add(0.0D, 1.0D, 0.0D)});
             case HORIZONTIAL -> {
-                float len = displayLen(rp.anchorLengthHorizontal);
+                float len = displayLen(rp);
                 out.add(new net.minecraft.world.phys.Vec3[]{base,
                         base.add(Mth.sin(yawRad) * len, 0.0D, Mth.cos(yawRad) * len)});
             }
             case VERTICAL -> {
                 float pitchRad = rp.anchorPitch * Mth.DEG_TO_RAD;
-                float len = displayLen(rp.anchorLengthVertical);
+                float len = rp.anchorLengthVertical < 0.0F ? -5.0F : 5.0F;
                 double h = Mth.cos(pitchRad) * len;
                 out.add(new net.minecraft.world.phys.Vec3[]{base,
                         base.add(Mth.sin(yawRad) * h, Mth.sin(pitchRad) * len, Mth.cos(yawRad) * h)});
@@ -424,6 +424,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 }
                 rp.anchorYaw = yaw;
                 rp.anchorLengthHorizontal = length;
+                rp.anchorManual = true;
             } else if (curElm == MarkerElement.VERTICAL) {
                 float pitch = Mth.wrapDegrees(yaw - rp.anchorYaw);
                 if (neighborRP != null && marker.fitNeighbor) {
@@ -496,11 +497,15 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
     }
 
     /**
-     * アンカー線の表示長: 実際の制御長に関わらずマーカーから 5 ブロック
-     * (制御長そのままだとプレビュー線と重なって見分けがつかないため)
+     * アンカー線の表示長: 未編集 (自動制御長) は 5 ブロック固定
+     * (制御長そのままだとプレビュー線と重なって見分けがつかないため)、
+     * 手動編集済み (anchorManual) は実際の制御長 — 3〜4 ブロック等の短いアンカーも見た通りに表示する。
      */
-    private static float displayLen(float len) {
-        return len < 0.0F ? -5.0F : 5.0F;
+    private static float displayLen(RailPosition rp) {
+        if (rp.anchorManual && rp.anchorLengthHorizontal > 0.0F) {
+            return rp.anchorLengthHorizontal;
+        }
+        return rp.anchorLengthHorizontal < 0.0F ? -5.0F : 5.0F;
     }
 
     /**
@@ -546,8 +551,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         double oy = rp.posY - marker.getBlockPos().getY();
         double oz = rp.posZ - marker.getBlockPos().getZ();
 
-        //掴んでいる間は制御長そのまま (視線先まで伸びる)、通常は 5 ブロック固定
-        float len = editing ? rp.anchorLengthHorizontal : displayLen(rp.anchorLengthHorizontal);
+        //掴んでいる間は制御長そのまま (視線先まで伸びる)、通常は displayLen (未編集=5固定/編集済み=実長)
+        float len = editing ? rp.anchorLengthHorizontal : displayLen(rp);
 
         poseStack.pushPose();
         poseStack.translate(ox, oy, oz);

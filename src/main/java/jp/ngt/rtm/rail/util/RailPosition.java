@@ -35,6 +35,11 @@ public final class RailPosition {
     public float cantCenter;
     public float cantEdge;
     public float cantRandom;
+    /**
+     * Remaster 拡張: アンカーを手動編集したか。
+     * 未編集はアンカー線を 5 ブロック固定表示、編集済みは実制御長で表示するための区別。
+     */
+    public boolean anchorManual;
     public float constLimitHP;
     public float constLimitHN;
     public float constLimitWP;
@@ -89,6 +94,7 @@ public final class RailPosition {
         rp.constLimitHN = nbt.getFloat("Const_Limit_HN");
         rp.constLimitWP = nbt.getFloat("Const_Limit_WP");
         rp.constLimitWN = nbt.getFloat("Const_Limit_WN");
+        rp.anchorManual = nbt.getBoolean("A_Manual");
         rp.init();
         return rp;
     }
@@ -110,6 +116,7 @@ public final class RailPosition {
         nbt.putFloat("Const_Limit_HN", this.constLimitHN);
         nbt.putFloat("Const_Limit_WP", this.constLimitWP);
         nbt.putFloat("Const_Limit_WN", this.constLimitWN);
+        nbt.putBoolean("A_Manual", this.anchorManual);
         return nbt;
     }
 
