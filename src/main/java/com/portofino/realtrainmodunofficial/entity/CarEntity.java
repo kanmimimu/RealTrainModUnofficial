@@ -315,9 +315,25 @@ public final class CarEntity extends Entity {
     ///
     /// @param player 右クリックしたプレイヤー
     /// @param hand   メインハンドまたはオフハンド
+    /**
+     * スクリプト車両 (SRB3 等) の仮想 rider。
+     * 実際に乗車させると「車=プレイヤー+2 追従」と「プレイヤー=車の座席位置」が
+     * 相互参照して毎tick上昇するループになるため、乗車せず 1tick だけ
+     * field_70153_n に見せてスクリプトのホスト登録/終了判定を成立させる。
+     */
+    private Player pendingScriptRider;
+
     /// @return 処理の完了状態
     @Override
     public @NotNull InteractionResult interact(@NotNull Player player, @NotNull InteractionHand hand) {
+        //サーバースクリプト持ち (SRB3/NGTO Builder 等) は実乗車させない
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def != null && def.hasServerScript()) {
+            if (!this.level().isClientSide) {
+                this.pendingScriptRider = player;
+            }
+            return InteractionResult.SUCCESS;
+        }
         if (this.canAddPassenger(player)) {
             player.startRiding(this);
             return InteractionResult.SUCCESS;
@@ -448,6 +464,11 @@ public final class CarEntity extends Entity {
             if (!passengers.isEmpty() && passengers.get(0) instanceof net.minecraft.world.entity.player.Player p) {
                 rider = p;
             }
+            //スクリプト車両の仮想 rider (1tick だけ見せる — 実乗車による上昇ループ回避)
+            if (rider == null && this.pendingScriptRider != null) {
+                rider = this.pendingScriptRider;
+                this.pendingScriptRider = null;
+            }
             this.field_70153_n = rider != null ? jp.ngt.mccompat.PlayerCompat.of(rider) : null;
             if (this.field_70153_n != null) {
                 this.field_70153_n.refresh();
@@ -481,7 +502,8 @@ public final class CarEntity extends Entity {
             if (hostIdS != null && !hostIdS.isEmpty()) {
                 try {
                     Entity host = this.level().getEntity((int) Double.parseDouble(hostIdS.trim()));
-                    if (host instanceof Player) {
+                    //ホストがこの車に乗っている間は追従しない (相互参照で上昇し続けるため)
+                    if (host instanceof Player && host.getVehicle() != this) {
                         this.setPos(host.getX(), host.getY() + 2.0D, host.getZ());
                     }
                 } catch (Exception ignored) {
@@ -506,7 +528,7 @@ public final class CarEntity extends Entity {
             if (hostId != null && !hostId.isEmpty()) {
                 try {
                     Entity host = this.level().getEntity((int) Double.parseDouble(hostId.trim()));
-                    if (host != null) {
+                    if (host != null && host.getVehicle() != this) {
                         this.setPos(host.getX(), host.getY() + 2.0D, host.getZ());
                         this.xOld = host.xOld;
                         this.yOld = host.yOld + 2.0D;
