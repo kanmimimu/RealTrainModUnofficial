@@ -41,10 +41,10 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             return;
         }
 
-        //本家: レンチのアンカー移動 (レール形状編集) — キー処理 + マウス追従 + アンカー描画
-        if (marker.followMouseMoving && Minecraft.getInstance().player == marker.followingPlayer) {
-            this.checkKey(marker);
+        //本家 1122: プレビュー中はアンカー線を常時表示し、線を右クリックで掴んで編集
+        if (marker.getCoreMarker() != null && marker.getState(MarkerState.LINE1)) {
             this.changeAnchor(marker);
+            this.updateHover(marker);
             this.renderAnchor(marker, poseStack, buffer);
         }
 
@@ -60,129 +60,340 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         }
     }
 
-    //---- 本家 RenderMarkerBlock1710: アンカー移動 (レール形状編集) ----
+    //---- 本家 RenderMarkerBlock1122: アンカー編集 (線を右クリックで掴んで動かす) ----
 
-    private static final double FIT_RANGE_SQ = 2.0D * 2.0D;
-
-    private enum MarkerElement {
+    /**
+     * 編集対象の要素 (ordinal = marker.editMode)。本家 1122 と同順。
+     */
+    public enum MarkerElement {
         NONE(0x000000),
         HORIZONTIAL(0x00FF20),
         VERTICAL(0xFF8800),
-        CANT(0xFF00FF);
+        CANT_EDGE(0xFF00FF),
+        CANT_CENTER(0xFF00FF),
+        HEIGHT(0xFF1E00);
 
-        final int color;
+        public final int color;
 
         MarkerElement(int color) {
             this.color = color;
         }
-
-        int getColor(MarkerElement cur) {
-            boolean flag = (cur == this) || cur == MarkerElement.NONE;
-            int r = (this.color >> 16 & 0xFF) / (flag ? 1 : 2);
-            int g = (this.color >> 8 & 0xFF) / (flag ? 1 : 2);
-            int b = (this.color & 0xFF) / (flag ? 1 : 2);
-            return (r << 16) | (g << 8) | b;
-        }
     }
 
     /**
-     * 本家 checkKey: キー 0-3 で編集対象 (なし/水平/勾配/カント) を切替
+     * 現在編集中のマーカー (クライアント)
      */
-    private void checkKey(TileEntityMarker marker) {
+    public static TileEntityMarker editingMarker;
+    /**
+     * 直近フレームでカーソルが乗っている線
+     */
+    public static TileEntityMarker hoveredMarker;
+    public static MarkerElement hoveredElement = MarkerElement.NONE;
+    private static long hoveredNanos;
+
+    /**
+     * 右クリック時に TrainControlKeyHandler から呼ばれる。
+     * 本家 1122: 編集中なら確定 (サーバー送信)、線にカーソルが乗っていれば掴む。
+     *
+     * @return true = クリックを消費した
+     */
+    public static boolean onRightClick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen != null) {
+        if (mc.player == null) {
+            return false;
+        }
+        if (editingMarker != null) {
+            //確定 → RailPosition をサーバーへ (本家 PacketMarkerRPClient)
+            TileEntityMarker marker = editingMarker;
+            marker.editMode = 0;
+            editingMarker = null;
+            if (!marker.isRemoved() && marker.getMarkerRP() != null) {
+                sendAnchor(marker.getBlockPos(), marker.getMarkerRP());
+                RailPosition opposite = getOppositeRailStatic(marker);
+                if (opposite != null) {
+                    sendAnchor(new net.minecraft.core.BlockPos(opposite.blockX, opposite.blockY, opposite.blockZ), opposite);
+                }
+            }
+            return true;
+        }
+        if (hoveredMarker != null && hoveredElement != MarkerElement.NONE
+                && System.nanoTime() - hoveredNanos < 200_000_000L && !hoveredMarker.isRemoved()) {
+            //掴む
+            TileEntityMarker marker = hoveredMarker;
+            marker.editMode = hoveredElement.ordinal();
+            marker.startPlayerPitch = mc.player.getXRot();
+            marker.startPlayerYaw = mc.player.getYHeadRot();
+            marker.startMarkerHeight = marker.getMarkerRP() != null ? marker.getMarkerRP().height : 0;
+            editingMarker = marker;
+            return true;
+        }
+        return false;
+    }
+
+    private static void sendAnchor(net.minecraft.core.BlockPos pos, RailPosition rp) {
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload(pos, rp.writeToNBT()));
+    }
+
+    /**
+     * 本家 renderAnchorLine (isPickMode): カーソルが乗っている線をレイ-線分距離で判定
+     */
+    private void updateHover(TileEntityMarker marker) {
+        if (editingMarker != null) {
             return;
         }
-        long window = mc.getWindow().getWindow();
-        for (int i = 0; i <= 3; i++) {
-            if (org.lwjgl.glfw.GLFW.glfwGetKey(window, org.lwjgl.glfw.GLFW.GLFW_KEY_0 + i) == org.lwjgl.glfw.GLFW.GLFW_PRESS) {
-                marker.editMode = i;
-                break;
+        Minecraft mc = Minecraft.getInstance();
+        RailPosition rp = marker.getMarkerRP();
+        if (mc.player == null || rp == null) {
+            return;
+        }
+        net.minecraft.world.phys.Vec3 eye = mc.player.getEyePosition();
+        net.minecraft.world.phys.Vec3 look = mc.player.getViewVector(1.0F);
+
+        MarkerElement best = MarkerElement.NONE;
+        double bestDist = Double.MAX_VALUE;
+        for (MarkerElement elm : MarkerElement.values()) {
+            if (elm == MarkerElement.NONE) {
+                continue;
             }
+            for (net.minecraft.world.phys.Vec3[] seg : anchorSegments(marker, rp, elm)) {
+                double d = raySegmentDistance(eye, look, seg[0], seg[1]);
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = elm;
+                }
+            }
+        }
+        double eyeDist = Math.sqrt(eye.distanceToSqr(rp.posX, rp.posY, rp.posZ));
+        double threshold = 0.25D + eyeDist * 0.01D;
+        if (best != MarkerElement.NONE && bestDist < threshold) {
+            hoveredMarker = marker;
+            hoveredElement = best;
+            hoveredNanos = System.nanoTime();
+        } else if (hoveredMarker == marker) {
+            hoveredMarker = null;
+            hoveredElement = MarkerElement.NONE;
         }
     }
 
     /**
-     * 本家 changeAnchor: プレイヤーの視線先にアンカーを追従させレール形状を更新
+     * 各アンカー線のワールド座標線分 (本家 renderAnchorLine の変換と一致させる)
+     */
+    private java.util.List<net.minecraft.world.phys.Vec3[]> anchorSegments(TileEntityMarker marker, RailPosition rp, MarkerElement elm) {
+        java.util.List<net.minecraft.world.phys.Vec3[]> out = new java.util.ArrayList<>(2);
+        net.minecraft.world.phys.Vec3 base = new net.minecraft.world.phys.Vec3(rp.posX, rp.posY, rp.posZ);
+        float yawRad = rp.anchorYaw * Mth.DEG_TO_RAD;
+        switch (elm) {
+            case HEIGHT -> out.add(new net.minecraft.world.phys.Vec3[]{base, base.add(0.0D, 1.0D, 0.0D)});
+            case HORIZONTIAL -> out.add(new net.minecraft.world.phys.Vec3[]{base,
+                    base.add(Mth.sin(yawRad) * rp.anchorLengthHorizontal, 0.0D, Mth.cos(yawRad) * rp.anchorLengthHorizontal)});
+            case VERTICAL -> {
+                float pitchRad = rp.anchorPitch * Mth.DEG_TO_RAD;
+                double h = Mth.cos(pitchRad) * rp.anchorLengthVertical;
+                out.add(new net.minecraft.world.phys.Vec3[]{base,
+                        base.add(Mth.sin(yawRad) * h, Mth.sin(pitchRad) * rp.anchorLengthVertical, Mth.cos(yawRad) * h)});
+            }
+            case CANT_EDGE -> {
+                float cantRad = rp.cantEdge * Mth.DEG_TO_RAD;
+                //R_Y(yaw) * R_Z(cant) * (±1,0,0)
+                double lx = Mth.cos(cantRad);
+                double ly = Mth.sin(cantRad);
+                net.minecraft.world.phys.Vec3 v = new net.minecraft.world.phys.Vec3(
+                        lx * Mth.cos(yawRad), ly, -lx * Mth.sin(yawRad));
+                out.add(new net.minecraft.world.phys.Vec3[]{base, base.add(v)});
+                out.add(new net.minecraft.world.phys.Vec3[]{base, base.subtract(v)});
+            }
+            case CANT_CENTER -> {
+                net.minecraft.world.phys.Vec3[] mid = cantCenterSegmentBase(marker, rp);
+                if (mid != null) {
+                    out.add(new net.minecraft.world.phys.Vec3[]{mid[0], mid[0].add(mid[1])});
+                    out.add(new net.minecraft.world.phys.Vec3[]{mid[0], mid[0].subtract(mid[1])});
+                }
+            }
+            default -> {
+            }
+        }
+        return out;
+    }
+
+    /**
+     * カント(中央) 線: レール中央位置 {位置, ±方向ベクトル} (コアマーカー + 単一 RailMap のみ)
+     */
+    private net.minecraft.world.phys.Vec3[] cantCenterSegmentBase(TileEntityMarker marker, RailPosition rp) {
+        if (!marker.isCoreMarker() || marker.getRailMaps() == null || marker.getRailMaps().length != 1) {
+            return null;
+        }
+        RailMap rm = marker.getRailMaps()[0];
+        int max = (int) (rm.getLength() * 2.0F);
+        if (max < 2) {
+            return null;
+        }
+        int index = max / 2;
+        double[] pos = rm.getRailPos(max, index);
+        double h = rm.getRailHeight(max, index);
+        float yawMid = rm.getRailYaw(max, index) * Mth.DEG_TO_RAD;
+        float cantRad = rp.cantCenter * Mth.DEG_TO_RAD;
+        double lx = Mth.cos(cantRad);
+        double ly = Mth.sin(cantRad);
+        return new net.minecraft.world.phys.Vec3[]{
+                new net.minecraft.world.phys.Vec3(pos[1], h, pos[0]),
+                new net.minecraft.world.phys.Vec3(lx * Mth.cos(yawMid), ly, -lx * Mth.sin(yawMid))};
+    }
+
+    /**
+     * レイと線分の最短距離
+     */
+    private static double raySegmentDistance(net.minecraft.world.phys.Vec3 origin, net.minecraft.world.phys.Vec3 dir,
+                                             net.minecraft.world.phys.Vec3 a, net.minecraft.world.phys.Vec3 b) {
+        net.minecraft.world.phys.Vec3 u = dir.normalize();
+        net.minecraft.world.phys.Vec3 v = b.subtract(a);
+        double vLen = v.length();
+        if (vLen < 1.0e-6D) {
+            return distancePointToRay(origin, u, a);
+        }
+        net.minecraft.world.phys.Vec3 vn = v.scale(1.0D / vLen);
+        net.minecraft.world.phys.Vec3 w0 = origin.subtract(a);
+        double bb = u.dot(vn);
+        double dd = u.dot(w0);
+        double ee = vn.dot(w0);
+        double denom = 1.0D - bb * bb;
+        double s;
+        double t;
+        if (Math.abs(denom) < 1.0e-8D) {
+            s = 0.0D;
+            t = ee;
+        } else {
+            s = (bb * ee - dd) / denom;
+            t = (ee - bb * dd) / denom;
+        }
+        s = Math.max(0.0D, Math.min(64.0D, s));
+        t = Math.max(0.0D, Math.min(vLen, t));
+        net.minecraft.world.phys.Vec3 p1 = origin.add(u.scale(s));
+        net.minecraft.world.phys.Vec3 p2 = a.add(vn.scale(t));
+        return p1.distanceTo(p2);
+    }
+
+    private static double distancePointToRay(net.minecraft.world.phys.Vec3 origin, net.minecraft.world.phys.Vec3 u,
+                                             net.minecraft.world.phys.Vec3 p) {
+        double t = Math.max(0.0D, p.subtract(origin).dot(u));
+        return origin.add(u.scale(t)).distanceTo(p);
+    }
+
+    /**
+     * 本家 1122 changeAnchor: 掴んでいる線を毎フレーム視線に追従させる
      */
     private void changeAnchor(TileEntityMarker marker) {
-        if (marker.getCoreMarker() == null) {
+        if (editingMarker != marker || marker.editMode == 0 || marker.getCoreMarker() == null) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             return;
         }
+        MarkerElement curElm = MarkerElement.values()[Math.min(marker.editMode, MarkerElement.values().length - 1)];
+        RailPosition rp = marker.getMarkerRP();
+        if (rp == null) {
+            return;
+        }
+        float pitchDif = mc.player.getXRot() - marker.startPlayerPitch;
+
+        if (curElm == MarkerElement.HEIGHT) {
+            int height = marker.startMarkerHeight + (int) (-pitchDif / 1.0F);
+            height = Mth.clamp(height, 0, 15);
+            if (height != rp.height) {
+                rp.height = (byte) height;
+                rp.init();
+                marker.onChangeRailShape();
+            }
+            return;
+        }
+        if (curElm == MarkerElement.CANT_EDGE) {
+            float cantLimit = 80.0F;
+            float cant = Mth.clamp(pitchDif, -cantLimit, cantLimit);
+            RailPosition neighborRP = this.getNeighborRail(marker);
+            if (neighborRP != null && marker.getState(MarkerState.FIT_NEIGHBOR)) {
+                cant = -neighborRP.cantEdge;
+            }
+            rp.cantEdge = cant;
+            RailMap[] maps = marker.getRailMaps();
+            if (maps != null && maps.length > 0) {
+                RailMap map = maps[0];
+                float cantCenter = (map.getStartRP().cantEdge + -map.getEndRP().cantEdge) * 0.5F;
+                map.getStartRP().cantCenter = map.getEndRP().cantCenter =
+                        cantCenter * ((rp.cantCenter == map.getStartRP().cantCenter) ? 1 : -1);
+            }
+            marker.onChangeRailShape();
+            return;
+        }
+        if (curElm == MarkerElement.CANT_CENTER) {
+            float cantLimit = 80.0F;
+            float cantCenter = Mth.clamp(pitchDif, -cantLimit, cantLimit);
+            RailMap[] maps = marker.getRailMaps();
+            if (maps != null && maps.length > 0) {
+                RailMap map = maps[0];
+                map.getStartRP().cantCenter = map.getEndRP().cantCenter =
+                        cantCenter * ((rp.cantCenter == map.getStartRP().cantCenter) ? 1 : -1);
+                marker.onChangeRailShape();
+            }
+            return;
+        }
+
+        //水平/勾配: 視線先のブロックへ (本家: MOP 128m)
         net.minecraft.world.phys.HitResult target = mc.player.pick(128.0D, 0.0F, true);
         if (!(target instanceof net.minecraft.world.phys.BlockHitResult)) {
             return;
         }
-
-        MarkerElement curElm = MarkerElement.values()[marker.editMode & 3];
-        RailPosition rp = marker.getMarkerRP();
-        if (rp == null || curElm == MarkerElement.NONE) {
-            return;
-        }
-        net.minecraft.world.phys.Vec3 vec3 = target.getLocation();
+        net.minecraft.world.phys.Vec3 targetVec = target.getLocation();
         boolean fitOpposite = false;
-
-        RailPosition oppositeRP = this.getOppositeRail(marker);
+        RailPosition oppositeRP = getOppositeRailStatic(marker);
         if (oppositeRP != null) {
-            double dx0 = vec3.x - oppositeRP.posX;
-            double dz0 = vec3.z - oppositeRP.posZ;
-            if (dx0 * dx0 + dz0 * dz0 <= FIT_RANGE_SQ) {
-                vec3 = new net.minecraft.world.phys.Vec3(oppositeRP.posX, oppositeRP.posY, oppositeRP.posZ);
+            double dx0 = targetVec.x - oppositeRP.posX;
+            double dz0 = targetVec.z - oppositeRP.posZ;
+            if (dx0 * dx0 + dz0 * dz0 <= 4.0D) {
+                targetVec = new net.minecraft.world.phys.Vec3(oppositeRP.posX, oppositeRP.posY, oppositeRP.posZ);
                 fitOpposite = true;
             }
         }
-
-        RailPosition neighborRP = this.getNeighborRail(marker);
-
-        double dx = vec3.x - rp.posX;
-        double dz = vec3.z - rp.posZ;
+        //ANCHOR21: 制御長を 2/3 に
+        if (marker.getState(MarkerState.ANCHOR21)) {
+            double d0 = 2.0D / 3.0D;
+            targetVec = new net.minecraft.world.phys.Vec3(
+                    (targetVec.x - rp.posX) * d0 + rp.posX,
+                    (targetVec.y - rp.posY) * d0 + rp.posY,
+                    (targetVec.z - rp.posZ) * d0 + rp.posZ);
+        }
+        double dx = targetVec.x - rp.posX;
+        double dz = targetVec.z - rp.posZ;
         if (dx != 0.0D && dz != 0.0D) {
+            RailPosition neighborRP = this.getNeighborRail(marker);
             float dirRad = (float) Math.atan2(dx, dz);
             float length = (float) (dx / Math.sin(dirRad));
             float yaw = (float) Math.toDegrees(dirRad);
-
             if (curElm == MarkerElement.HORIZONTIAL) {
-                if (neighborRP != null && marker.fitNeighbor) {
+                if (neighborRP != null && marker.getState(MarkerState.FIT_NEIGHBOR)) {
                     yaw = Mth.wrapDegrees(neighborRP.anchorYaw + 180.0F);
                 }
                 rp.anchorYaw = yaw;
                 rp.anchorLengthHorizontal = length;
             } else if (curElm == MarkerElement.VERTICAL) {
                 float pitch = Mth.wrapDegrees(yaw - rp.anchorYaw);
-                if (neighborRP != null && marker.fitNeighbor) {
+                if (neighborRP != null && marker.getState(MarkerState.FIT_NEIGHBOR)) {
                     pitch = -neighborRP.anchorPitch;
                 } else if (fitOpposite) {
-                    double dy = vec3.y - rp.posY;
+                    double dy = targetVec.y - rp.posY;
                     pitch = (float) Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)));
                 }
                 rp.anchorPitch = pitch;
                 rp.anchorLengthVertical = length;
-            } else if (curElm == MarkerElement.CANT) {
-                float cant = Mth.wrapDegrees(yaw - rp.anchorYaw);
-                if (neighborRP != null && marker.fitNeighbor) {
-                    cant = -neighborRP.cantEdge;
-                }
-                rp.cantEdge = cant;
-                RailMap[] maps = marker.getRailMaps();
-                if (maps != null && maps.length > 0) {
-                    RailMap map = maps[0];
-                    float cantAve = (map.getStartRP().cantEdge + map.getEndRP().cantEdge) * 0.5F;
-                    map.getStartRP().cantCenter = map.getEndRP().cantCenter = cantAve;
-                }
             }
-
-            marker.getCoreMarker().updateRailMap();
+            marker.onChangeRailShape();
         }
     }
 
     /**
      * 本家 getOppositeRail: プレビューの反対側マーカーの RP
      */
-    private RailPosition getOppositeRail(TileEntityMarker marker) {
+    private static RailPosition getOppositeRailStatic(TileEntityMarker marker) {
         if (marker.getRailMaps() == null) {
             return null;
         }
@@ -236,53 +447,96 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
     }
 
     /**
-     * 本家 renderAnchor: 水平(緑)/勾配(橙)/カント(桃) のアンカー線 + キー操作ガイド
+     * 本家 1122 renderAnchorLine: 高さ(赤)/水平(緑)/勾配(橙)/カント(桃) の線 + 数値表示。
+     * ホバー/編集中の線は減光ハイライト。
      */
     private void renderAnchor(TileEntityMarker marker, PoseStack poseStack, MultiBufferSource buffer) {
         RailPosition rp = marker.getMarkerRP();
         if (rp == null) {
             return;
         }
-        MarkerElement curElm = MarkerElement.values()[marker.editMode & 3];
-
-        poseStack.pushPose();
-        poseStack.translate(0.5D, 0.5D, 0.5D);
+        MarkerElement activeElm = editingMarker == marker
+                ? MarkerElement.values()[Math.min(marker.editMode, MarkerElement.values().length - 1)]
+                : (hoveredMarker == marker ? hoveredElement : MarkerElement.NONE);
 
         VertexConsumer lines = buffer.getBuffer(RenderType.debugLineStrip(2.0D));
 
-        //水平アンカー (yaw 方向に anchorLengthHorizontal)
+        //マーカーブロック原点 → RP 位置へ (レンダラは BlockPos 原点)
+        double ox = rp.posX - marker.getBlockPos().getX();
+        double oy = rp.posY - marker.getBlockPos().getY();
+        double oz = rp.posZ - marker.getBlockPos().getZ();
+
+        poseStack.pushPose();
+        poseStack.translate(ox, oy, oz);
+
+        //高さ (赤)
+        drawLine(lines, poseStack, 0, 0, 0, 0, 1, 0, colorOf(MarkerElement.HEIGHT, activeElm));
+
+        //水平 (緑) — yaw 回転下
         poseStack.pushPose();
         poseStack.mulPose(new Quaternionf().rotationY(rp.anchorYaw * Mth.DEG_TO_RAD));
-        drawLine(lines, poseStack, 0, 0, 0, 0, 0, rp.anchorLengthHorizontal, MarkerElement.HORIZONTIAL.getColor(curElm));
+        drawLine(lines, poseStack, 0, 0, 0, 0, 0, rp.anchorLengthHorizontal, colorOf(MarkerElement.HORIZONTIAL, activeElm));
 
-        //勾配アンカー
+        //勾配 (橙)
         poseStack.pushPose();
         poseStack.mulPose(new Quaternionf().rotationX(-rp.anchorPitch * Mth.DEG_TO_RAD));
-        drawLine(lines, poseStack, 0, 0, 0, 0, 0, rp.anchorLengthVertical, MarkerElement.VERTICAL.getColor(curElm));
+        drawLine(lines, poseStack, 0, 0, 0, 0, 0, rp.anchorLengthVertical, colorOf(MarkerElement.VERTICAL, activeElm));
         poseStack.popPose();
 
-        //カント
+        //カント端 (桃)
         poseStack.pushPose();
         poseStack.mulPose(new Quaternionf().rotationZ(rp.cantEdge * Mth.DEG_TO_RAD));
-        drawLine(lines, poseStack, 1, 0, 0, -1, 0, 0, MarkerElement.CANT.getColor(curElm));
+        int cantColor = colorOf(MarkerElement.CANT_EDGE, activeElm);
+        drawLine(lines, poseStack, 0, 0, 0, 1, 0, 0, cantColor);
+        drawLine(lines, poseStack, 0, 0, 0, -1, 0, 0, cantColor);
+        poseStack.popPose();
         poseStack.popPose();
         poseStack.popPose();
 
-        //キー操作ガイド (ビルボードテキスト)
+        //カント中央 (コアマーカーのみ、レール中央に描画)
+        net.minecraft.world.phys.Vec3[] mid = this.cantCenterSegmentBase(marker, rp);
+        if (mid != null) {
+            poseStack.pushPose();
+            poseStack.translate(mid[0].x - marker.getBlockPos().getX(),
+                    mid[0].y - marker.getBlockPos().getY(),
+                    mid[0].z - marker.getBlockPos().getZ());
+            int ccColor = colorOf(MarkerElement.CANT_CENTER, activeElm);
+            drawLine(lines, poseStack, 0, 0, 0, (float) mid[1].x, (float) mid[1].y, (float) mid[1].z, ccColor);
+            drawLine(lines, poseStack, 0, 0, 0, (float) -mid[1].x, (float) -mid[1].y, (float) -mid[1].z, ccColor);
+            poseStack.popPose();
+        }
+
+        //数値表示 (本家: height/yaw/pitch/cantEdge/cantCenter)
         Quaternionf cameraRot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
         poseStack.pushPose();
-        poseStack.translate(0.0D, 1.5D, 0.0D);
+        poseStack.translate(ox, oy + 1.6D, oz);
         poseStack.mulPose(cameraRot);
         poseStack.scale(0.03F, -0.03F, 0.03F);
         Matrix4f tm = poseStack.last().pose();
-        String[] labels = {"key=0 None", "key=1 Horizontial", "key=2 Vertical", "key=3 Cant"};
-        MarkerElement[] elms = {MarkerElement.NONE, MarkerElement.HORIZONTIAL, MarkerElement.VERTICAL, MarkerElement.CANT};
-        for (int i = 0; i < labels.length; i++) {
-            this.font.drawInBatch(labels[i], 0.0F, -10.0F * (i + 1), elms[i].getColor(curElm) | 0xFF000000, false,
+        String[] values = {
+                "H " + rp.height,
+                String.format("Yaw %.2f", rp.anchorYaw),
+                String.format("Pitch %.2f", rp.anchorPitch),
+                String.format("CantE %.2f", rp.cantEdge),
+                String.format("CantC %.2f", rp.cantCenter)};
+        MarkerElement[] elms = {MarkerElement.HEIGHT, MarkerElement.HORIZONTIAL, MarkerElement.VERTICAL,
+                MarkerElement.CANT_EDGE, MarkerElement.CANT_CENTER};
+        for (int i = 0; i < values.length; i++) {
+            this.font.drawInBatch(values[i], 3.0F, -34.0F + 6.0F * i, elms[i].color | 0xFF000000, false,
                     tm, buffer, Font.DisplayMode.NORMAL, 0, 0xF000F0);
         }
         poseStack.popPose();
-        poseStack.popPose();
+    }
+
+    private static int colorOf(MarkerElement elm, MarkerElement active) {
+        if (elm == active) {
+            //本家: ColorUtil.multiplicating — 減光でハイライト
+            int r = (int) (((elm.color >> 16) & 0xFF) * 0.75F);
+            int g = (int) (((elm.color >> 8) & 0xFF) * 0.75F);
+            int b = (int) ((elm.color & 0xFF) * 0.75F);
+            return (r << 16) | (g << 8) | b;
+        }
+        return elm.color;
     }
 
     private static void drawLine(VertexConsumer lines, PoseStack poseStack,
@@ -297,9 +551,6 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         lines.addVertex(m, x1, y1, z1).setColor(r, g, b, 0.0F);
     }
 
-    /**
-     * 本家 renderDistanceMark: 10m 毎の目盛り (k=-1,0,1 の3方向ファン) + 距離テキスト。
-     */
     private void renderDistanceMark(TileEntityMarker marker, BlockMarker block, BlockState state,
                                     PoseStack poseStack, MultiBufferSource buffer) {
         int color = block.markerType == 1 ? 0x0000FF : (block.markerType == 0 ? 0xFF0000 : 0xEC008C);

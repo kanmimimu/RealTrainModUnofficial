@@ -103,6 +103,24 @@ public final class TrainControlKeyHandler {
     }
 
     /**
+     * 本家 1122: マーカーのアンカー線を右クリックで掴む/確定 (レール形状編集)。
+     * 掴み/確定時はブロック・アイテムの右クリックを消費する。
+     */
+    @SubscribeEvent
+    public static void onMouseButton(InputEvent.MouseButton.Pre event) {
+        if (event.getButton() != GLFW.GLFW_MOUSE_BUTTON_RIGHT || event.getAction() != GLFW.GLFW_PRESS) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.screen != null) {
+            return;
+        }
+        if (com.portofino.realtrainmodunofficial.client.renderer.MarkerBlockEntityRenderer.onRightClick()) {
+            event.setCanceled(true);
+        }
+    }
+
+    /**
      * 本家: 運転席乗車中にインベントリキー → 運転台 GUI (通常インベントリを差し替え)。
      */
     @SubscribeEvent
