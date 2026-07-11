@@ -47,6 +47,13 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 handleRtmTrain(rtmTrain, player, payload.action(), payload.value());
                 return;
             }
+            // slotPos 座席 (EntityFloor): 降車のみ
+            if (player.getVehicle() instanceof jp.ngt.rtm.entity.train.parts.EntityFloor) {
+                if ("dismount".equals(payload.action())) {
+                    player.stopRiding();
+                }
+                return;
+            }
             if (!(player.level().getEntity(payload.trainEntityId()) instanceof TrainEntity train)) {
                 RealTrainModUnofficial.LOGGER.info("Train control ignored: train {} not found for action {}", payload.trainEntityId(), payload.action());
                 return;

@@ -73,9 +73,17 @@ public class EntityFloor extends EntityVehiclePart {
     @Override
     public void tick() {
         super.tick();
-        //親車両が消えたら追従して消える
-        if (!this.level().isClientSide && this.tickCount > 100 && this.getVehicle() == null) {
-            this.discard();
+        if (!this.level().isClientSide) {
+            //親車両が消えたら追従して消える
+            if (this.tickCount > 100 && this.getVehicle() == null) {
+                this.discard();
+            }
+            //スニークで降車 (バニラ経路が効かない場合の保険)
+            for (Entity rider : new java.util.ArrayList<>(this.getPassengers())) {
+                if (rider instanceof Player player && player.isShiftKeyDown()) {
+                    player.stopRiding();
+                }
+            }
         }
     }
 

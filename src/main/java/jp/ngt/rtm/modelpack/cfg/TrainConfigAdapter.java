@@ -64,6 +64,17 @@ public final class TrainConfigAdapter {
             if (slots != null && !slots.isEmpty()) {
                 cfg.setSlotPos(slots.toArray(new float[0][]));
             }
+
+            //運転席位置: JSON playerPos をそのまま使用 (本家と同義)
+            List<net.minecraft.world.phys.Vec3> players = def.getPlayerPositions();
+            if (players != null && !players.isEmpty()) {
+                net.minecraft.world.phys.Vec3 p0 = players.get(0);
+                net.minecraft.world.phys.Vec3 p1 = players.size() >= 2 ? players.get(1)
+                        : new net.minecraft.world.phys.Vec3(-p0.x, p0.y, -p0.z);
+                cfg.playerPos = new float[][]{
+                        {(float) p0.x, (float) p0.y, (float) p0.z},
+                        {(float) p1.x, (float) p1.y, (float) p1.z}};
+            }
         }
         cfg.init();
         return cfg;

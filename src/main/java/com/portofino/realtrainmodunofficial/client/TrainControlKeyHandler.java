@@ -48,6 +48,13 @@ public final class TrainControlKeyHandler {
             handleRtmTrainKeys(mc, rtmTrain, event);
             return;
         }
+        // slotPos 座席 (EntityFloor): スニークで降車
+        if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.parts.EntityFloor floor) {
+            if (TrainControlKeyMappings.matchesSneak(event.getKey(), event.getScanCode())) {
+                PacketDistributor.sendToServer(new TrainControlPayload(floor.getId(), "dismount", 0));
+            }
+            return;
+        }
         TrainEntity train = getControlledTrain(mc);
         if (train == null) {
             return;
@@ -92,6 +99,23 @@ public final class TrainControlKeyHandler {
         if (jumpDown && event.getKey() == GLFW.GLFW_KEY_RIGHT) {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "toggle_door_right", 0));
             doorRightChordDown = true;
+        }
+    }
+
+    /**
+     * 本家: 運転席乗車中にインベントリキー → 運転台 GUI (通常インベントリを差し替え)。
+     */
+    @SubscribeEvent
+    public static void onScreenOpening(net.neoforged.neoforge.client.event.ScreenEvent.Opening event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            return;
+        }
+        if (!(event.getNewScreen() instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen)) {
+            return;
+        }
+        if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain) {
+            event.setNewScreen(new com.portofino.realtrainmodunofficial.client.screen.RtmTrainControlScreen(rtmTrain));
         }
     }
 
