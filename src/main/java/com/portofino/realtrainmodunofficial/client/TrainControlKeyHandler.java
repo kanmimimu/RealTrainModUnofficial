@@ -353,9 +353,10 @@ public final class TrainControlKeyHandler {
     }
 
     private static void resetHoldState() {
+        //注意: rtmPowerHoldTicks/rtmBrakeHoldTicks はここでリセットしない。
+        //このメソッドはレガシー列車が null の tick (= jp.ngt 列車搭乗中) にも
+        //毎 tick 呼ばれるため、リセットすると W/S 長押しカウンタが進まなくなる。
         powerHoldTicks = -1;
         brakeHoldTicks = -1;
-        rtmPowerHoldTicks = -1;
-        rtmBrakeHoldTicks = -1;
     }
 }
