@@ -36,11 +36,19 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
     @Override
     public void render(TileEntityMarker marker, float partialTick, PoseStack poseStack, MultiBufferSource buffer,
                        int packedLight, int packedOverlay) {
-        if (!marker.displayDistance || !marker.getState(MarkerState.DISTANCE)) {
-            return;
-        }
         BlockState state = marker.getBlockState();
         if (!(state.getBlock() instanceof BlockMarker markerBlock)) {
+            return;
+        }
+
+        //本家: レンチのアンカー移動 (レール形状編集) — キー処理 + マウス追従 + アンカー描画
+        if (marker.followMouseMoving && Minecraft.getInstance().player == marker.followingPlayer) {
+            this.checkKey(marker);
+            this.changeAnchor(marker);
+            this.renderAnchor(marker, poseStack, buffer);
+        }
+
+        if (!marker.displayDistance || !marker.getState(MarkerState.DISTANCE)) {
             return;
         }
 
@@ -50,6 +58,243 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         if (maps != null && maps.length > 0) {
             this.renderLine(marker, maps, poseStack, buffer);
         }
+    }
+
+    //---- 本家 RenderMarkerBlock1710: アンカー移動 (レール形状編集) ----
+
+    private static final double FIT_RANGE_SQ = 2.0D * 2.0D;
+
+    private enum MarkerElement {
+        NONE(0x000000),
+        HORIZONTIAL(0x00FF20),
+        VERTICAL(0xFF8800),
+        CANT(0xFF00FF);
+
+        final int color;
+
+        MarkerElement(int color) {
+            this.color = color;
+        }
+
+        int getColor(MarkerElement cur) {
+            boolean flag = (cur == this) || cur == MarkerElement.NONE;
+            int r = (this.color >> 16 & 0xFF) / (flag ? 1 : 2);
+            int g = (this.color >> 8 & 0xFF) / (flag ? 1 : 2);
+            int b = (this.color & 0xFF) / (flag ? 1 : 2);
+            return (r << 16) | (g << 8) | b;
+        }
+    }
+
+    /**
+     * 本家 checkKey: キー 0-3 で編集対象 (なし/水平/勾配/カント) を切替
+     */
+    private void checkKey(TileEntityMarker marker) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen != null) {
+            return;
+        }
+        long window = mc.getWindow().getWindow();
+        for (int i = 0; i <= 3; i++) {
+            if (org.lwjgl.glfw.GLFW.glfwGetKey(window, org.lwjgl.glfw.GLFW.GLFW_KEY_0 + i) == org.lwjgl.glfw.GLFW.GLFW_PRESS) {
+                marker.editMode = i;
+                break;
+            }
+        }
+    }
+
+    /**
+     * 本家 changeAnchor: プレイヤーの視線先にアンカーを追従させレール形状を更新
+     */
+    private void changeAnchor(TileEntityMarker marker) {
+        if (marker.getCoreMarker() == null) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            return;
+        }
+        net.minecraft.world.phys.HitResult target = mc.player.pick(128.0D, 0.0F, true);
+        if (!(target instanceof net.minecraft.world.phys.BlockHitResult)) {
+            return;
+        }
+
+        MarkerElement curElm = MarkerElement.values()[marker.editMode & 3];
+        RailPosition rp = marker.getMarkerRP();
+        if (rp == null || curElm == MarkerElement.NONE) {
+            return;
+        }
+        net.minecraft.world.phys.Vec3 vec3 = target.getLocation();
+        boolean fitOpposite = false;
+
+        RailPosition oppositeRP = this.getOppositeRail(marker);
+        if (oppositeRP != null) {
+            double dx0 = vec3.x - oppositeRP.posX;
+            double dz0 = vec3.z - oppositeRP.posZ;
+            if (dx0 * dx0 + dz0 * dz0 <= FIT_RANGE_SQ) {
+                vec3 = new net.minecraft.world.phys.Vec3(oppositeRP.posX, oppositeRP.posY, oppositeRP.posZ);
+                fitOpposite = true;
+            }
+        }
+
+        RailPosition neighborRP = this.getNeighborRail(marker);
+
+        double dx = vec3.x - rp.posX;
+        double dz = vec3.z - rp.posZ;
+        if (dx != 0.0D && dz != 0.0D) {
+            float dirRad = (float) Math.atan2(dx, dz);
+            float length = (float) (dx / Math.sin(dirRad));
+            float yaw = (float) Math.toDegrees(dirRad);
+
+            if (curElm == MarkerElement.HORIZONTIAL) {
+                if (neighborRP != null && marker.fitNeighbor) {
+                    yaw = Mth.wrapDegrees(neighborRP.anchorYaw + 180.0F);
+                }
+                rp.anchorYaw = yaw;
+                rp.anchorLengthHorizontal = length;
+            } else if (curElm == MarkerElement.VERTICAL) {
+                float pitch = Mth.wrapDegrees(yaw - rp.anchorYaw);
+                if (neighborRP != null && marker.fitNeighbor) {
+                    pitch = -neighborRP.anchorPitch;
+                } else if (fitOpposite) {
+                    double dy = vec3.y - rp.posY;
+                    pitch = (float) Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)));
+                }
+                rp.anchorPitch = pitch;
+                rp.anchorLengthVertical = length;
+            } else if (curElm == MarkerElement.CANT) {
+                float cant = Mth.wrapDegrees(yaw - rp.anchorYaw);
+                if (neighborRP != null && marker.fitNeighbor) {
+                    cant = -neighborRP.cantEdge;
+                }
+                rp.cantEdge = cant;
+                RailMap[] maps = marker.getRailMaps();
+                if (maps != null && maps.length > 0) {
+                    RailMap map = maps[0];
+                    float cantAve = (map.getStartRP().cantEdge + map.getEndRP().cantEdge) * 0.5F;
+                    map.getStartRP().cantCenter = map.getEndRP().cantCenter = cantAve;
+                }
+            }
+
+            marker.getCoreMarker().updateRailMap();
+        }
+    }
+
+    /**
+     * 本家 getOppositeRail: プレビューの反対側マーカーの RP
+     */
+    private RailPosition getOppositeRail(TileEntityMarker marker) {
+        if (marker.getRailMaps() == null) {
+            return null;
+        }
+        RailPosition rp = marker.getMarkerRP();
+        for (RailMap map : marker.getRailMaps()) {
+            if (map.getStartRP().equals(rp)) {
+                return map.getEndRP();
+            } else if (map.getEndRP().equals(rp)) {
+                return map.getStartRP();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 本家 getNeighborRail: マーカー隣接位置の既設レールの最寄り RP (接続スナップ用)
+     */
+    private RailPosition getNeighborRail(TileEntityMarker marker) {
+        RailPosition markerRP = marker.getMarkerRP();
+        if (markerRP == null || marker.getLevel() == null) {
+            return null;
+        }
+        int[] pos = markerRP.getNeighborPos();
+        var tile = marker.getLevel().getBlockEntity(new net.minecraft.core.BlockPos(pos[0], pos[1], pos[2]));
+        if (!(tile instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase)) {
+            return null;
+        }
+        jp.ngt.rtm.rail.TileEntityLargeRailCore core = railBase.getRailCore();
+        if (core == null || core.getAllRailMaps() == null) {
+            return null;
+        }
+        double distanceSq = Double.MAX_VALUE;
+        RailPosition rp = null;
+        for (RailMap map : core.getAllRailMaps()) {
+            double d2 = sq(markerRP.posX - map.getStartRP().posX) + sq(markerRP.posZ - map.getStartRP().posZ);
+            if (d2 < distanceSq) {
+                distanceSq = d2;
+                rp = map.getStartRP();
+            }
+            d2 = sq(markerRP.posX - map.getEndRP().posX) + sq(markerRP.posZ - map.getEndRP().posZ);
+            if (d2 < distanceSq) {
+                distanceSq = d2;
+                rp = map.getEndRP();
+            }
+        }
+        return rp;
+    }
+
+    private static double sq(double d) {
+        return d * d;
+    }
+
+    /**
+     * 本家 renderAnchor: 水平(緑)/勾配(橙)/カント(桃) のアンカー線 + キー操作ガイド
+     */
+    private void renderAnchor(TileEntityMarker marker, PoseStack poseStack, MultiBufferSource buffer) {
+        RailPosition rp = marker.getMarkerRP();
+        if (rp == null) {
+            return;
+        }
+        MarkerElement curElm = MarkerElement.values()[marker.editMode & 3];
+
+        poseStack.pushPose();
+        poseStack.translate(0.5D, 0.5D, 0.5D);
+
+        VertexConsumer lines = buffer.getBuffer(RenderType.debugLineStrip(2.0D));
+
+        //水平アンカー (yaw 方向に anchorLengthHorizontal)
+        poseStack.pushPose();
+        poseStack.mulPose(new Quaternionf().rotationY(rp.anchorYaw * Mth.DEG_TO_RAD));
+        drawLine(lines, poseStack, 0, 0, 0, 0, 0, rp.anchorLengthHorizontal, MarkerElement.HORIZONTIAL.getColor(curElm));
+
+        //勾配アンカー
+        poseStack.pushPose();
+        poseStack.mulPose(new Quaternionf().rotationX(-rp.anchorPitch * Mth.DEG_TO_RAD));
+        drawLine(lines, poseStack, 0, 0, 0, 0, 0, rp.anchorLengthVertical, MarkerElement.VERTICAL.getColor(curElm));
+        poseStack.popPose();
+
+        //カント
+        poseStack.pushPose();
+        poseStack.mulPose(new Quaternionf().rotationZ(rp.cantEdge * Mth.DEG_TO_RAD));
+        drawLine(lines, poseStack, 1, 0, 0, -1, 0, 0, MarkerElement.CANT.getColor(curElm));
+        poseStack.popPose();
+        poseStack.popPose();
+
+        //キー操作ガイド (ビルボードテキスト)
+        Quaternionf cameraRot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
+        poseStack.pushPose();
+        poseStack.translate(0.0D, 1.5D, 0.0D);
+        poseStack.mulPose(cameraRot);
+        poseStack.scale(0.03F, -0.03F, 0.03F);
+        Matrix4f tm = poseStack.last().pose();
+        String[] labels = {"key=0 None", "key=1 Horizontial", "key=2 Vertical", "key=3 Cant"};
+        MarkerElement[] elms = {MarkerElement.NONE, MarkerElement.HORIZONTIAL, MarkerElement.VERTICAL, MarkerElement.CANT};
+        for (int i = 0; i < labels.length; i++) {
+            this.font.drawInBatch(labels[i], 0.0F, -10.0F * (i + 1), elms[i].getColor(curElm) | 0xFF000000, false,
+                    tm, buffer, Font.DisplayMode.NORMAL, 0, 0xF000F0);
+        }
+        poseStack.popPose();
+        poseStack.popPose();
+    }
+
+    private static void drawLine(VertexConsumer lines, PoseStack poseStack,
+                                 float x0, float y0, float z0, float x1, float y1, float z1, int color) {
+        Matrix4f m = poseStack.last().pose();
+        float r = ((color >> 16) & 0xFF) / 255.0F;
+        float g = ((color >> 8) & 0xFF) / 255.0F;
+        float b = (color & 0xFF) / 255.0F;
+        lines.addVertex(m, x0, y0, z0).setColor(r, g, b, 0.0F);
+        lines.addVertex(m, x0, y0, z0).setColor(r, g, b, 1.0F);
+        lines.addVertex(m, x1, y1, z1).setColor(r, g, b, 1.0F);
+        lines.addVertex(m, x1, y1, z1).setColor(r, g, b, 0.0F);
     }
 
     /**

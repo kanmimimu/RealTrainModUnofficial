@@ -37,7 +37,12 @@ import java.util.List;
  * 空中右クリック: モード切替 / スニーク+右クリック: モードロック
  */
 public class RtmWrenchItem extends Item {
-    private static final int[] MODE_CYCLE = {0, 1, 6, 7, 8, 10, 11};
+    private static final int[] MODE_CYCLE = {0, 1, 6, 7, 8, 9, 10, 11};
+
+    /**
+     * 本家: {S/C+PlayerID → 編集中マーカー}
+     */
+    private static final java.util.Map<String, TileEntityMarker> MARKER_MAP = new java.util.HashMap<>();
     /**
      * RailPosition.direction (8方位) → マーカー blockstate facing
      */
@@ -74,6 +79,7 @@ public class RtmWrenchItem extends Item {
             case 6 -> "距離表示 切替";
             case 7 -> "表示モード切替";
             case 8 -> "マーカー高さ変更";
+            case 9 -> "アンカー移動 (レール形状編集)";
             case 10 -> "隣接レール接続 切替";
             case 11 -> "レール→マーカー復元";
             default -> "mode_" + mode;
@@ -94,6 +100,10 @@ public class RtmWrenchItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
+        //本家: アンカー編集中の右クリックは編集確定を優先
+        if (this.changeMarkerAnchor(level, player)) {
+            return InteractionResultHolder.success(stack);
+        }
         if (player.isShiftKeyDown()) {
             boolean locked = isModeLocked(stack);
             setModeLocked(stack, !locked);
@@ -240,6 +250,7 @@ public class RtmWrenchItem extends Item {
             }
             case 7 -> marker.changeDisplayMode();
             case 8 -> this.changeMarkerHeight(level, player, marker);
+            case 9 -> this.changeMarkerAnchor(level, player, marker);
             case 10 -> {
                 marker.fitNeighbor ^= true;
                 if (!level.isClientSide) {
@@ -249,6 +260,49 @@ public class RtmWrenchItem extends Item {
             default -> {
             }
         }
+    }
+
+    /**
+     * 本家 changeMarkerAnchor (空中右クリック時): 編集中マーカーがあれば確定
+     */
+    private boolean changeMarkerAnchor(Level level, Player player) {
+        TileEntityMarker marker = MARKER_MAP.get(getKey(level, player));
+        if (marker != null) {
+            this.changeMarkerAnchor(level, player, marker);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 本家 changeMarkerAnchor: マウス追従の開始/確定
+     */
+    private void changeMarkerAnchor(Level level, Player player, TileEntityMarker marker) {
+        if (marker.followMouseMoving) {
+            marker.followingPlayer = null;
+            marker.followMouseMoving = false;
+            marker.editMode = 0;
+            MARKER_MAP.remove(getKey(level, player));
+            //クライアント側で編集した RailPosition をサーバーへ送信 (本家 PacketMarkerRPClient)
+            if (level.isClientSide && marker.getMarkerRP() != null) {
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload(
+                                marker.getBlockPos(), marker.getMarkerRP().writeToNBT()));
+            }
+        } else {
+            marker.setDisplayMode((byte) 2);
+            marker.followingPlayer = player;
+            marker.followMouseMoving = true;
+            MARKER_MAP.put(getKey(level, player), marker);
+            if (level.isClientSide) {
+                player.displayClientMessage(Component.literal(
+                        "アンカー編集中: キー 1=水平 2=勾配 3=カント 0=なし / 右クリックで確定"), true);
+            }
+        }
+    }
+
+    private static String getKey(Level level, Player player) {
+        return (level.isClientSide ? "C" : "S") + player.getId();
     }
 
     /**

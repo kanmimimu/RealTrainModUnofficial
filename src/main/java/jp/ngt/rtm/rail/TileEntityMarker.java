@@ -38,6 +38,10 @@ public class TileEntityMarker extends BlockEntity {
     private TileEntityMarker coreMarker;
     public int editMode;
 
+    //本家: レンチのアンカー移動モード (レール形状編集、同期不要)
+    public boolean followMouseMoving;
+    public net.minecraft.world.entity.player.Player followingPlayer;
+
     public int startX, startY = -1, startZ;
 
     private List<int[]> markerPosList = new ArrayList<>();
