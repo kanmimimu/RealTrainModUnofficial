@@ -10,6 +10,12 @@ import jp.ngt.ngtlib.renderer.model.TextureSet;
 public class ModelObject {
     public TextureSet[] textures;
 
+    /**
+     * 本家 IModelNGT 相当 (スクリプトは modelObj.model を Parts.getObjects に渡す)。
+     * 実体は jp.ngt.ngtlib.renderer.model.PolygonModel。
+     */
+    public jp.ngt.ngtlib.renderer.model.PolygonModel model;
+
     public ModelObject(TextureSet[] textures) {
         this.textures = textures != null ? textures : new TextureSet[0];
     }

@@ -71,6 +71,11 @@ public class EntityBogie extends Entity {
     public float rotationRoll;
     public float prevRotationRoll;
 
+    //パックスクリプト互換 (1.7.10 SRG フィールド、tick 毎更新)
+    public float field_70177_z;
+    public float field_70125_A;
+    public int field_70173_aa;
+
     //クライアント補間
     private int carPosRotationInc;
     private float carYaw, carPitch, carRoll;
@@ -362,6 +367,23 @@ public class EntityBogie extends Entity {
                 this.resetRailObj(this.getX(), this.getY(), this.getZ());
             }
         }
+
+        //パックスクリプト互換 SRG フィールドの更新
+        this.field_70177_z = this.getYRot();
+        this.field_70125_A = this.getXRot();
+        this.field_70173_aa = this.tickCount;
+    }
+
+    /**
+     * getBrightnessForRender 互換 (スクリプト用)
+     */
+    public int func_70070_b() {
+        net.minecraft.core.BlockPos pos = net.minecraft.core.BlockPos.containing(this.getX(), this.getY() + 0.5D, this.getZ());
+        return net.minecraft.client.renderer.LevelRenderer.getLightColor(this.level(), pos);
+    }
+
+    public int func_70070_b(float partialTick) {
+        return this.func_70070_b();
     }
 
     private void checkUnloadTrain() {

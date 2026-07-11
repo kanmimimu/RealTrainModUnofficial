@@ -42,6 +42,11 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<String> DATA_MODEL_NAME =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.STRING);
+    /**
+     * 本家 PacketVehicleMovement (setRollAndSpeed) 代替: 振子ロールの同期
+     */
+    private static final EntityDataAccessor<Float> DATA_ROLL =
+            SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.FLOAT);
 
     public static final short MAX_AIR_COUNT = 2880;
     public static final short MIN_AIR_COUNT = 2480;
@@ -82,6 +87,83 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return this.entityData.get(DATA_MODEL_NAME);
     }
 
+    @Override
+    protected String getResourceName() {
+        return this.getModelName();
+    }
+
+    /**
+     * 本家 getModelSet() 互換 (スクリプトが getConfig() を参照)。
+     * TODO(Phase 4): ModelSetTrainClient の本実装。
+     */
+    public jp.ngt.rtm.modelpack.modelset.ModelSetCompat getModelSet() {
+        return new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(this.getConfig());
+    }
+
+    @Override
+    public float getVehicleSpeed() {
+        return this.getSpeed();
+    }
+
+    @Override
+    protected float getMoveDir() {
+        int i = this.getTrainDirection();
+        if (this.getBogie(i) != null) {
+            boolean b0 = this.getBogie(i).isFront();
+            return ((i == 0 && b0) || (i == 1 && !b0)) ? 1.0F : -1.0F;
+        }
+        return 1.0F;
+    }
+
+    /**
+     * 本家 updateAnimation (Client): 座席/ドア/パンタのアニメカウンタ。
+     */
+    @Override
+    protected void updateAnimation() {
+        super.updateAnimation();
+
+        if (this.getTrainDirection() == 0 && this.seatRotation > -MAX_SEAT_ROTATION) {
+            --this.seatRotation;
+        }
+        if (this.getTrainDirection() == 1 && this.seatRotation < MAX_SEAT_ROTATION) {
+            ++this.seatRotation;
+        }
+
+        int doorState = this.getTrainStateData(TrainStateType.State_Door.id);
+        if ((doorState & 1) == 1) {
+            if (this.doorMoveR < MAX_DOOR_MOVE) {
+                ++this.doorMoveR;
+            }
+        } else if (this.doorMoveR > 0) {
+            --this.doorMoveR;
+        }
+        if ((doorState & 2) == 2) {
+            if (this.doorMoveL < MAX_DOOR_MOVE) {
+                ++this.doorMoveL;
+            }
+        } else if (this.doorMoveL > 0) {
+            --this.doorMoveL;
+        }
+
+        int pantoState = this.getTrainStateData(TrainStateType.State_Pantograph.id);
+        if (pantoState == TrainState.Pantograph_Down.data) {
+            if (this.pantograph_F < MAX_PANTOGRAPH_MOVE) {
+                ++this.pantograph_F;
+            }
+            if (this.pantograph_B < MAX_PANTOGRAPH_MOVE) {
+                ++this.pantograph_B;
+            }
+        } else {
+            //TODO 本家は架線高さで停止位置を決める (getPantographMaxHeight)
+            if (this.pantograph_F > 0) {
+                --this.pantograph_F;
+            }
+            if (this.pantograph_B > 0) {
+                --this.pantograph_B;
+            }
+        }
+    }
+
     public void setModelName(String name) {
         this.entityData.set(DATA_MODEL_NAME, name == null ? "" : name);
         this.configCache = null;
@@ -104,6 +186,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         builder.define(DATA_SPEED, 0.0F);
         builder.define(DATA_CAB_DIR, (byte) 0);
         builder.define(DATA_MODEL_NAME, "");
+        builder.define(DATA_ROLL, 0.0F);
     }
 
     @Override
@@ -236,6 +319,10 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.wave = (float) ((this.wave + this.trainSpeed * cfg.rollSpeedCoefficient) % (2.0D * Math.PI));
         float sw = (NGTMath.getSin(this.wave) + NGTMath.getSin(this.wave * cfg.rollVariationCoefficient)) * 0.5F;
         this.rotationRoll = roll + sw * cfg.rollWidthCoefficient;
+        if (!this.level().isClientSide) {
+            //本家 PacketVehicleMovement 代替: クライアントは vehicleRoll へ補間
+            this.entityData.set(DATA_ROLL, this.rotationRoll);
+        }
     }
 
     protected void updateSpeed() {
@@ -327,9 +414,11 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             v31 = v31.rotateAroundZ(-this.rotationRoll);
             v31 = v31.rotateAroundX(this.getXRot());
             v31 = v31.rotateAroundY(this.getYRot());
+            //座位: playerPos は本家で搭乗者の腰位置。1.21 は渡した Y がほぼ腰になるため
+            //追加リフトはせず、モデル床に合うよう少し下げる。
             move.accept(rider,
                     this.getX() + v31.getX(),
-                    this.getY() + v31.getY() + (this.getBbHeight() - 0.93F),
+                    this.getY() + v31.getY() - 0.35D,
                     this.getZ() + v31.getZ());
         }
     }
@@ -633,6 +722,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         super.onSyncedDataUpdated(key);
         if (DATA_SPEED.equals(key) && this.level().isClientSide) {
             this.trainSpeed = this.entityData.get(DATA_SPEED);
+        }
+        if (DATA_ROLL.equals(key) && this.level().isClientSide) {
+            this.vehicleRoll = this.entityData.get(DATA_ROLL);
         }
         if (DATA_MODEL_NAME.equals(key)) {
             this.configCache = null;

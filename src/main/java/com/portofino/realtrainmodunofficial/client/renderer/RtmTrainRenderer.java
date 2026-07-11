@@ -72,6 +72,14 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
             poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
 
+            //本家式スクリプト描画 (Nashorn): 成功したらベイクドパスはスキップ
+            com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.Scripted scripted =
+                    com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
+            if (scripted != null && scripted.render(entity, partialTicks, poseStack, buffer, packedLight,
+                    net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, model)) {
+                return;
+            }
+
             MqoModelLoader.GroupPredicate filter =
                     groupName -> shouldRenderGroup(groupName, hasSeparateBogieModel);
             MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, filter);

@@ -195,10 +195,9 @@ public final class RailScriptRenderers {
                 }
                 case TRANSLATE -> poseStack.translate(cmd.a, cmd.b, cmd.c);
                 case ROTATE -> {
-                    Vector3f axis = new Vector3f(cmd.b, cmd.c, cmd.d);
-                    if (axis.lengthSquared() > 1.0e-6F) {
-                        axis.normalize();
-                        poseStack.mulPose(new org.joml.Quaternionf().rotationAxis(cmd.a * Mth.DEG_TO_RAD, axis));
+                    //Quaternion は記録時に確定済み (payload)
+                    if (cmd.payload instanceof org.joml.Quaternionf quat) {
+                        poseStack.mulPose(quat);
                     }
                 }
                 case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
@@ -207,8 +206,11 @@ public final class RailScriptRenderers {
                     //カラーオーバーレイは現状のレールスクリプトでは未使用
                 }
                 case RENDER_PARTS -> {
-                    Set<String> names = Set.of(cmd.name.trim().toLowerCase(Locale.ROOT));
-                    model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, names, null);
+                    //正規化 Set は記録時に確定済み (payload) — 同一インスタンスで
+                    //renderNamedGroups の IdentityHashMap キャッシュにヒットさせる
+                    if (cmd.payload instanceof Set<?> names) {
+                        model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
+                    }
                 }
                 case RENDER_GROUPS -> {
                     if (cmd.payload instanceof Set<?> names) {

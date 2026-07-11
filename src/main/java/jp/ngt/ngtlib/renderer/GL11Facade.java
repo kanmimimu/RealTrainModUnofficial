@@ -84,6 +84,11 @@ public final class GL11Facade {
     }
 
     public static void glBindTexture(int target, int tex) {
+        //mccompat.TextureUtil の疑似ハンドル → 動的テクスチャ RL に解決して記録
+        GLRecorder r = rec();
+        if (r != null) {
+            r.bindTexture(jp.ngt.mccompat.TextureUtil.getTexture(tex));
+        }
     }
 
     public static void glNormal3f(double x, double y, double z) {

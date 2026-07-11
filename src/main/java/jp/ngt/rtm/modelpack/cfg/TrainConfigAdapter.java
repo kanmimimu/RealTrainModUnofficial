@@ -54,6 +54,11 @@ public final class TrainConfigAdapter {
             if (def.getAcceleration() > 0.0F) {
                 cfg.accelerateion = def.getAcceleration();
             }
+
+            List<String> rollsigns = def.getRollsignNames();
+            if (rollsigns != null && !rollsigns.isEmpty()) {
+                cfg.rollsignNames = rollsigns.toArray(new String[0]);
+            }
         }
         cfg.init();
         return cfg;

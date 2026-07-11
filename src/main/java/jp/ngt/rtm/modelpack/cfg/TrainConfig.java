@@ -33,6 +33,10 @@ public class TrainConfig {
     public Object[][] smoke;
     public float[][] playerPos;
 
+    public String[] rollsignNames = new String[0];
+    public boolean isSingleTrain;
+    public float wheelRotationSpeed = 1.0F;
+
     public String sound_Joint;
     public String sound_JointReverb;
     public String sound_Notch;

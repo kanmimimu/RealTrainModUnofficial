@@ -14,6 +14,7 @@ import java.util.Set;
 public class Parts {
     private final String[] names;
     private final Set<String> nameSet;
+    private jp.ngt.ngtlib.renderer.model.GroupObject[] objs;
 
     public Parts(String... names) {
         this.names = names != null ? names : new String[0];
@@ -22,6 +23,39 @@ public class Parts {
 
     public String[] getNames() {
         return this.names;
+    }
+
+    /**
+     * 本家 objNames フィールド互換 (スクリプトが直接参照する)。
+     */
+    public String[] getObjNames() {
+        return this.names;
+    }
+
+    public void init(PartsRenderer renderer) {
+    }
+
+    /**
+     * 本家 getObjects(IModelNGT) 互換 — PolygonModel からグループ取得 (CustomAnimator 等)。
+     */
+    public jp.ngt.ngtlib.renderer.model.GroupObject[] getObjects(Object model) {
+        if (this.objs == null) {
+            if (model instanceof jp.ngt.ngtlib.renderer.model.PolygonModel pm) {
+                java.util.List<jp.ngt.ngtlib.renderer.model.GroupObject> found = new java.util.ArrayList<>();
+                for (String name : this.names) {
+                    for (jp.ngt.ngtlib.renderer.model.GroupObject obj : pm.groupObjects) {
+                        if (name.equals(obj.name)) {
+                            found.add(obj);
+                            break;
+                        }
+                    }
+                }
+                this.objs = found.toArray(new jp.ngt.ngtlib.renderer.model.GroupObject[0]);
+            } else {
+                this.objs = new jp.ngt.ngtlib.renderer.model.GroupObject[0];
+            }
+        }
+        return this.objs;
     }
 
     public boolean containsName(String objName) {

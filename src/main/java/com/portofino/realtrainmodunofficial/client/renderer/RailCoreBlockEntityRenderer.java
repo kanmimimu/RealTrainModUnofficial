@@ -760,11 +760,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     @Override
     public boolean shouldRenderOffScreen(TileEntityLargeRailCore blockEntity) {
-        return true;
+        //false にして getRenderBoundingBox (レール全長 AABB) によるフラスタムカリングを効かせる。
+        //true だと画面外・背後のレールも毎フレーム全描画されて負荷が跳ね上がる。
+        return false;
     }
 
     @Override
     public int getViewDistance() {
-        return 160;
+        return 128;
     }
 }

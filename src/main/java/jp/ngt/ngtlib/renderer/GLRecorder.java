@@ -10,7 +10,32 @@ import java.util.List;
 public final class GLRecorder {
 
     public enum Op {
-        PUSH, POP, TRANSLATE, ROTATE, SCALE, COLOR, BRIGHTNESS, RENDER_PARTS, RENDER_GROUPS
+        PUSH, POP, TRANSLATE, ROTATE, SCALE, COLOR, BRIGHTNESS, RENDER_PARTS, RENDER_GROUPS,
+        /**
+         * テクスチャ差し替え (payload: ResourceLocation, null=デフォルトに戻す)
+         */
+        BIND_TEXTURE,
+        /**
+         * NGTTessellator の即時描画 (payload: TessDraw)
+         */
+        DRAW_TESS,
+        /**
+         * ModelLoader で読んだ PolygonModel のグループ描画 (payload: Object[]{PolygonModel, groupName})
+         */
+        DRAW_MODEL_GROUP
+    }
+
+    /**
+     * NGTTessellator.draw() の記録データ。verts は {x,y,z,u,v,r,g,b,a} × n。
+     */
+    public static final class TessDraw {
+        public final int mode;
+        public final float[] verts;
+
+        public TessDraw(int mode, float[] verts) {
+            this.mode = mode;
+            this.verts = verts;
+        }
     }
 
     public static final class Cmd {
@@ -75,7 +100,14 @@ public final class GLRecorder {
     }
 
     public void rotate(float deg, float x, float y, float z) {
-        this.cmds.add(new Cmd(Op.ROTATE, deg, x, y, z, null));
+        //再生毎の Quaternion 生成を避けるため記録時に確定させる (payload)
+        org.joml.Quaternionf quat = null;
+        org.joml.Vector3f axis = new org.joml.Vector3f(x, y, z);
+        if (axis.lengthSquared() > 1.0e-6F) {
+            axis.normalize();
+            quat = new org.joml.Quaternionf().rotationAxis(deg * ((float) Math.PI / 180.0F), axis);
+        }
+        this.cmds.add(new Cmd(Op.ROTATE, deg, x, y, z, null, quat));
     }
 
     public void scale(float x, float y, float z) {
@@ -91,7 +123,11 @@ public final class GLRecorder {
     }
 
     public void renderParts(String objName) {
-        this.cmds.add(new Cmd(Op.RENDER_PARTS, 0, 0, 0, 0, objName));
+        //再生毎の Set 生成を避け、renderNamedGroups の IdentityHashMap キャッシュに
+        //同一インスタンスでヒットさせるため、正規化 Set を記録時に確定させる (payload)
+        java.util.Set<String> names = java.util.Set.of(
+                objName.trim().toLowerCase(java.util.Locale.ROOT));
+        this.cmds.add(new Cmd(Op.RENDER_PARTS, 0, 0, 0, 0, objName, names));
     }
 
     /**
@@ -99,5 +135,20 @@ public final class GLRecorder {
      */
     public void renderGroups(java.util.Set<String> normalizedNames) {
         this.cmds.add(new Cmd(Op.RENDER_GROUPS, 0, 0, 0, 0, null, normalizedNames));
+    }
+
+    /**
+     * テクスチャ差し替え (null でデフォルトへ復帰)。
+     */
+    public void bindTexture(net.minecraft.resources.ResourceLocation texture) {
+        this.cmds.add(new Cmd(Op.BIND_TEXTURE, 0, 0, 0, 0, null, texture));
+    }
+
+    public void drawTess(TessDraw draw) {
+        this.cmds.add(new Cmd(Op.DRAW_TESS, 0, 0, 0, 0, null, draw));
+    }
+
+    public void drawModelGroup(Object model, String groupName) {
+        this.cmds.add(new Cmd(Op.DRAW_MODEL_GROUP, 0, 0, 0, 0, groupName, model));
     }
 }
