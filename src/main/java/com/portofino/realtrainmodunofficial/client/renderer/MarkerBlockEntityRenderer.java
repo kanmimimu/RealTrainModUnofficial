@@ -90,6 +90,10 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
     public static TileEntityMarker hoveredMarker;
     public static MarkerElement hoveredElement = MarkerElement.NONE;
     private static long hoveredNanos;
+    /**
+     * ホバー中の線上最近点までの視点距離 (ブロック優先判定用)
+     */
+    private static double hoveredEyeDist = Double.MAX_VALUE;
 
     /**
      * 右クリック時に TrainControlKeyHandler から呼ばれる。
@@ -115,6 +119,19 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 }
             }
             return true;
+        }
+        //マーカーブロック自体を狙っている場合はブロック操作 (レンチのマーカー操作等) を優先。
+        //その他のブロックは「線より手前」にある場合のみ優先 (背景の地面越しには掴める)。
+        if (mc.hitResult instanceof net.minecraft.world.phys.BlockHitResult bhr
+                && mc.hitResult.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK
+                && mc.level != null) {
+            if (mc.level.getBlockState(bhr.getBlockPos()).getBlock() instanceof jp.ngt.rtm.rail.BlockMarker) {
+                return false;
+            }
+            double blockDist = mc.player.getEyePosition().distanceTo(bhr.getLocation());
+            if (blockDist < hoveredEyeDist - 0.5D) {
+                return false;
+            }
         }
         if (hoveredMarker != null && hoveredElement != MarkerElement.NONE
                 && System.nanoTime() - hoveredNanos < 200_000_000L && !hoveredMarker.isRemoved()) {
@@ -152,27 +169,30 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
 
         MarkerElement best = MarkerElement.NONE;
         double bestDist = Double.MAX_VALUE;
+        double bestEyeDist = Double.MAX_VALUE;
         for (MarkerElement elm : MarkerElement.values()) {
             if (elm == MarkerElement.NONE) {
                 continue;
             }
             for (net.minecraft.world.phys.Vec3[] seg : anchorSegments(marker, rp, elm)) {
-                double d = raySegmentDistance(eye, look, seg[0], seg[1]);
-                if (d < bestDist) {
-                    bestDist = d;
+                double[] d = raySegmentDistance(eye, look, seg[0], seg[1]);
+                if (d[0] < bestDist) {
+                    bestDist = d[0];
+                    bestEyeDist = d[1];
                     best = elm;
                 }
             }
         }
-        double eyeDist = Math.sqrt(eye.distanceToSqr(rp.posX, rp.posY, rp.posZ));
-        double threshold = 0.25D + eyeDist * 0.01D;
+        double threshold = 0.2D + bestEyeDist * 0.01D;
         if (best != MarkerElement.NONE && bestDist < threshold) {
             hoveredMarker = marker;
             hoveredElement = best;
             hoveredNanos = System.nanoTime();
+            hoveredEyeDist = bestEyeDist;
         } else if (hoveredMarker == marker) {
             hoveredMarker = null;
             hoveredElement = MarkerElement.NONE;
+            hoveredEyeDist = Double.MAX_VALUE;
         }
     }
 
@@ -241,15 +261,15 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
     }
 
     /**
-     * レイと線分の最短距離
+     * レイと線分の最短距離 {距離, 線分側最近点までの視点距離}
      */
-    private static double raySegmentDistance(net.minecraft.world.phys.Vec3 origin, net.minecraft.world.phys.Vec3 dir,
-                                             net.minecraft.world.phys.Vec3 a, net.minecraft.world.phys.Vec3 b) {
+    private static double[] raySegmentDistance(net.minecraft.world.phys.Vec3 origin, net.minecraft.world.phys.Vec3 dir,
+                                               net.minecraft.world.phys.Vec3 a, net.minecraft.world.phys.Vec3 b) {
         net.minecraft.world.phys.Vec3 u = dir.normalize();
         net.minecraft.world.phys.Vec3 v = b.subtract(a);
         double vLen = v.length();
         if (vLen < 1.0e-6D) {
-            return distancePointToRay(origin, u, a);
+            return new double[]{distancePointToRay(origin, u, a), origin.distanceTo(a)};
         }
         net.minecraft.world.phys.Vec3 vn = v.scale(1.0D / vLen);
         net.minecraft.world.phys.Vec3 w0 = origin.subtract(a);
@@ -270,7 +290,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         t = Math.max(0.0D, Math.min(vLen, t));
         net.minecraft.world.phys.Vec3 p1 = origin.add(u.scale(s));
         net.minecraft.world.phys.Vec3 p2 = a.add(vn.scale(t));
-        return p1.distanceTo(p2);
+        return new double[]{p1.distanceTo(p2), origin.distanceTo(p2)};
     }
 
     private static double distancePointToRay(net.minecraft.world.phys.Vec3 origin, net.minecraft.world.phys.Vec3 u,
