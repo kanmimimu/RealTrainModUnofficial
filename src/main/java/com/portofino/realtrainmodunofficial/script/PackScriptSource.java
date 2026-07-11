@@ -45,7 +45,46 @@ public final class PackScriptSource {
             "var ItemBlock = Java.type('net.minecraft.world.item.BlockItem');\n" +
             //1.7.10 NBT
             "var NBTTagCompound = Java.type('jp.ngt.mccompat.nbt.NBTTagCompound');\n" +
-            "var NBTTagList = Java.type('jp.ngt.mccompat.nbt.NBTTagList');\n";
+            "var NBTTagList = Java.type('jp.ngt.mccompat.nbt.NBTTagList');\n" +
+            //jp.ngt 系の確定バインド — importPackage 経由の遅延解決が実行時に
+            //"is not defined" になるケース (SRB3 の RTMItem 等) があるため、
+            //スクリプトが未修飾名で使うクラスはここで直接束縛する。
+            //(存在しないクラスでエンジンごと死なないよう個別 try)
+            bindOpt("RTMCore", "jp.ngt.rtm.RTMCore") +
+            bindOpt("RTMItem", "jp.ngt.rtm.RTMItem") +
+            bindOpt("RTMBlock", "jp.ngt.rtm.RTMBlock") +
+            bindOpt("RTMRail", "jp.ngt.rtm.RTMRail") +
+            bindOpt("ItemRail", "jp.ngt.rtm.item.ItemRail") +
+            bindOpt("RailPosition", "jp.ngt.rtm.rail.util.RailPosition") +
+            bindOpt("RailMapBasic", "jp.ngt.rtm.rail.util.RailMapBasic") +
+            bindOpt("RailMaker", "jp.ngt.rtm.rail.util.RailMaker") +
+            bindOpt("RailDir", "jp.ngt.rtm.rail.util.RailDir") +
+            bindOpt("TileEntityLargeRailBase", "jp.ngt.rtm.rail.TileEntityLargeRailBase") +
+            bindOpt("TileEntityLargeRailCore", "jp.ngt.rtm.rail.TileEntityLargeRailCore") +
+            bindOpt("NGTLog", "jp.ngt.ngtlib.io.NGTLog") +
+            bindOpt("NGTMath", "jp.ngt.ngtlib.math.NGTMath") +
+            bindOpt("Vec3", "jp.ngt.ngtlib.math.Vec3") +
+            bindOpt("NGTUtil", "jp.ngt.ngtlib.util.NGTUtil") +
+            bindOpt("NGTUtilClient", "jp.ngt.ngtlib.util.NGTUtilClient") +
+            bindOpt("MCWrapper", "jp.ngt.ngtlib.util.MCWrapper") +
+            bindOpt("MCWrapperClient", "jp.ngt.ngtlib.util.MCWrapperClient") +
+            bindOpt("BlockUtil", "jp.ngt.ngtlib.block.BlockUtil") +
+            bindOpt("TileEntityCustom", "jp.ngt.ngtlib.block.TileEntityCustom") +
+            bindOpt("NGTObject", "jp.ngt.ngtlib.block.NGTObject") +
+            bindOpt("BlockSet", "jp.ngt.ngtlib.block.BlockSet") +
+            bindOpt("GLHelper", "jp.ngt.ngtlib.renderer.GLHelper") +
+            bindOpt("NGTRenderer", "jp.ngt.ngtlib.renderer.NGTRenderer") +
+            bindOpt("NGTRenderHelper", "jp.ngt.ngtlib.renderer.NGTRenderHelper") +
+            bindOpt("NGTObjectRenderer", "jp.ngt.ngtlib.renderer.NGTObjectRenderer") +
+            bindOpt("MCTE", "jp.ngt.mcte.MCTE") +
+            bindOpt("ItemMiniature", "jp.ngt.mcte.item.ItemMiniature");
+
+    private static String bindOpt(String name, String fqn) {
+        //失敗したクラス名は __bindFails に集約 (ScriptUtil.doScript がログに出す)
+        return "try { var " + name + " = Java.type('" + fqn + "'); } catch (__e) { "
+                + "if (typeof __bindFails === 'undefined') { __bindFails = ''; } "
+                + "__bindFails += '" + name + " '; }\n";
+    }
 
     private static final Pattern INCLUDE_PATTERN = Pattern.compile("^\\s*//include\\s*<([^>]+)>", Pattern.MULTILINE);
 

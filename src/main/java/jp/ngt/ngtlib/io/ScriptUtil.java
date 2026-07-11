@@ -45,6 +45,10 @@ public final class ScriptUtil {
             }
 
             se.eval(s);
+            Object bindFails = se.get("__bindFails");
+            if (bindFails != null && !bindFails.toString().isBlank()) {
+                NGTLog.debug("[ScriptUtil] prelude bind failed: %s", bindFails.toString());
+            }
             return se;
         } catch (ScriptException e) {
             throw new RuntimeException("Script exec error" + "\n" + s, e);
