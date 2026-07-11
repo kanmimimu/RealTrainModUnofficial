@@ -45,8 +45,9 @@ public final class TrainHudOverlay {
         if (train != null && train.isDriverPassenger(mc.player)) {
             return new HudData(train.getNotch(), train.getSpeed(), train.getMaxBrakeNotch(), train.getVehicleId());
         }
-        // Phase 2: 本家忠実列車 — 乗車位置は運転台 (playerPos) なので搭乗中は常に表示
-        if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain) {
+        // Phase 2: 本家忠実列車 — 運転士のみ表示 (客席 = 座席オフセット搭乗は非表示)
+        if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain
+                && !rtmTrain.hasSeat(mc.player)) {
             return new HudData(
                 rtmTrain.getNotch(),
                 rtmTrain.getSpeed(),

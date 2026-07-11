@@ -56,6 +56,13 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_PITCH =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.FLOAT);
+    /**
+     * 客席 (slotPos): 列車に直接乗せて座席オフセットで配置する方式。
+     * EntityFloor に乗せる旧方式は視点固定バグの温床だったため作り直し。
+     * "uuid|x|y|z;..." 形式で同期し、クライアントの positionRider でも使う。
+     */
+    private static final EntityDataAccessor<String> DATA_SEATS =
+            SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.STRING);
 
     public static final short MAX_AIR_COUNT = 2880;
     public static final short MIN_AIR_COUNT = 2480;
@@ -198,6 +205,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         builder.define(DATA_ROLL, 0.0F);
         builder.define(DATA_YAW, 0.0F);
         builder.define(DATA_PITCH, 0.0F);
+        builder.define(DATA_SEATS, "");
     }
 
     @Override
@@ -421,9 +429,108 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return this.distanceToSqr(par1) <= d0 * d0;
     }
 
+    // ===== 客席 (座席オフセット搭乗) =====
+
+    /**
+     * 乗客 UUID → 座席オフセット。サーバーが正、DATA_SEATS でクライアントへ同期。
+     */
+    private final java.util.Map<java.util.UUID, float[]> seatOffsets = new java.util.HashMap<>();
+
+    public boolean hasSeat(Entity rider) {
+        return rider != null && this.seatOffsets.containsKey(rider.getUUID());
+    }
+
+    public boolean isSeatOccupied(float[] pos) {
+        for (float[] p : this.seatOffsets.values()) {
+            if (Math.abs(p[0] - pos[0]) < 0.01F && Math.abs(p[1] - pos[1]) < 0.01F && Math.abs(p[2] - pos[2]) < 0.01F) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 客席への着席 (Server Only)。座席オフセット (slotPos) で列車本体に直接乗せる。
+     */
+    public boolean mountToSeat(Player player, float[] partPos) {
+        if (this.level().isClientSide || this.isSeatOccupied(partPos) || this.hasPassenger(player)) {
+            return false;
+        }
+        this.seatOffsets.put(player.getUUID(), partPos.clone());
+        this.syncSeats();
+        boolean ok = player.startRiding(this, true);
+        if (!ok) {
+            this.seatOffsets.remove(player.getUUID());
+            this.syncSeats();
+        }
+        return ok;
+    }
+
+    private void syncSeats() {
+        if (this.level().isClientSide) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        this.seatOffsets.forEach((id, p) -> {
+            if (sb.length() > 0) {
+                sb.append(';');
+            }
+            sb.append(id).append('|').append(p[0]).append('|').append(p[1]).append('|').append(p[2]);
+        });
+        this.entityData.set(DATA_SEATS, sb.toString());
+    }
+
+    private void readSeats(String s) {
+        this.seatOffsets.clear();
+        if (s == null || s.isEmpty()) {
+            return;
+        }
+        for (String entry : s.split(";")) {
+            String[] t = entry.split("\\|");
+            if (t.length == 4) {
+                try {
+                    this.seatOffsets.put(java.util.UUID.fromString(t[0]),
+                            new float[]{Float.parseFloat(t[1]), Float.parseFloat(t[2]), Float.parseFloat(t[3])});
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    @Override
+    protected boolean canAddPassenger(Entity passenger) {
+        if (this.seatOffsets.containsKey(passenger.getUUID())) {
+            return true;
+        }
+        //運転士 (座席なし乗車) は 1 人のみ
+        return this.getPassengers().stream().allMatch(p -> this.seatOffsets.containsKey(p.getUUID()));
+    }
+
+    @Override
+    protected void removePassenger(Entity passenger) {
+        super.removePassenger(passenger);
+        if (!this.level().isClientSide && this.seatOffsets.remove(passenger.getUUID()) != null) {
+            this.syncSeats();
+        }
+    }
+
     @Override
     protected void positionRider(Entity rider, Entity.MoveFunction move) {
         if (this.hasPassenger(rider)) {
+            //客席 (座席オフセット): EntityVehiclePart.updatePartPos と同じ回転
+            float[] seat = this.seatOffsets.get(rider.getUUID());
+            if (seat != null) {
+                Vec3 sv = new Vec3(seat[0], seat[1], seat[2]);
+                sv = sv.rotateAroundZ(-this.rotationRoll);
+                sv = sv.rotateAroundX(this.getXRot());
+                sv = sv.rotateAroundY(this.getYRot());
+                //旧 EntityFloor 搭乗時の実効高さ (floorY + 0.15) に合わせる
+                move.accept(rider,
+                        this.getX() + sv.getX(),
+                        this.getY() + sv.getY() + 0.15D,
+                        this.getZ() + sv.getZ());
+                return;
+            }
             float[][] pos = this.getConfig().getPlayerPos();
             int dir = this.entityData.get(DATA_CAB_DIR);
             Vec3 v31 = new Vec3(pos[dir][0], pos[dir][1], pos[dir][2]);
@@ -750,6 +857,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
         if (DATA_MODEL_NAME.equals(key)) {
             this.configCache = null;
+        }
+        if (DATA_SEATS.equals(key) && this.level().isClientSide) {
+            this.readSeats(this.entityData.get(DATA_SEATS));
         }
     }
 }

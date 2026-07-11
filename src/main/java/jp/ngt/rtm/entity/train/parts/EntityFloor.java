@@ -92,10 +92,21 @@ public class EntityFloor extends EntityVehiclePart {
         if (this.level().isClientSide) {
             return InteractionResult.SUCCESS;
         }
-        if (!this.getPassengers().isEmpty()) {
+        if (this.getSeatType() == 0 || player.isShiftKeyDown()) {
             return InteractionResult.PASS;
         }
-        if (this.getSeatType() != 0 && !player.isShiftKeyDown()) {
+        //作り直し: EntityFloor に乗せる旧方式は視点固定バグの温床だったため、
+        //列車本体へ座席オフセット付きで直接乗せる (運転席と同じ経路 = 視点フリー)。
+        EntityVehicleBase<?> vehicle = this.getVehicle();
+        if (vehicle instanceof jp.ngt.rtm.entity.train.EntityTrainBase train) {
+            jp.ngt.ngtlib.math.Vec3 pv = this.getPartVec();
+            if (train.mountToSeat(player, new float[]{(float) pv.getX(), (float) pv.getY(), (float) pv.getZ()})) {
+                return InteractionResult.CONSUME;
+            }
+            return InteractionResult.PASS;
+        }
+        //列車以外の親 (保険): 従来方式
+        if (this.getPassengers().isEmpty()) {
             player.startRiding(this);
             return InteractionResult.CONSUME;
         }

@@ -65,11 +65,31 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
     public RailCoreBlockEntityRenderer(BlockEntityRendererProvider.Context ctx) {
     }
 
+    /**
+     * packedLight (block/sky 各 16bit) を成分ごとに max 合成
+     */
+    private static int maxPackedLight(int a, int b) {
+        int blockA = a & 0xFFFF;
+        int blockB = b & 0xFFFF;
+        int skyA = (a >> 16) & 0xFFFF;
+        int skyB = (b >> 16) & 0xFFFF;
+        return (Math.max(skyA, skyB) << 16) | Math.max(blockA, blockB);
+    }
+
     @Override
     public void render(TileEntityLargeRailCore be, float partialTick, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
         long profilerStart = ClientRenderProfiler.begin();
         try {
             if (!be.isLoaded()) return;
+            // レールがたまに真っ暗になる対策: ディスパッチャの packedLight はコア BE の
+            // ブロック位置でサンプリングされるが、コアは道床/地面の中にあることが多く
+            // 光量 0 になる。レール上面 (コアの 1〜2 ブロック上) で取り直して明るい方を使う。
+            if (be.getLevel() != null) {
+                net.minecraft.core.BlockPos bp = be.getBlockPos();
+                int above1 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above());
+                int above2 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above(2));
+                packedLight = maxPackedLight(packedLight, maxPackedLight(above1, above2));
+            }
             RailDefinition def = RailRegistry.getById(be.getRailDefinitionId());
             if (def == null) def = RailRegistry.getSelected();
             if (def == null) return;

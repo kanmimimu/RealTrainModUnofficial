@@ -132,7 +132,8 @@ public final class TrainControlKeyHandler {
         if (!(event.getNewScreen() instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen)) {
             return;
         }
-        if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain) {
+        if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain
+                && !rtmTrain.hasSeat(mc.player)) {
             event.setNewScreen(new com.portofino.realtrainmodunofficial.client.screen.RtmTrainControlScreen(rtmTrain));
         }
     }
@@ -145,6 +146,10 @@ public final class TrainControlKeyHandler {
         int id = train.getId();
         if (TrainControlKeyMappings.matchesSneak(event.getKey(), event.getScanCode())) {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "dismount", 0));
+            return;
+        }
+        //客席 (座席オフセット搭乗) は降車のみ — マスコン/ドア等の運転操作は不可
+        if (train.hasSeat(mc.player)) {
             return;
         }
         if (TrainControlKeyMappings.TOGGLE_CAB.matches(event.getKey(), event.getScanCode())) {
