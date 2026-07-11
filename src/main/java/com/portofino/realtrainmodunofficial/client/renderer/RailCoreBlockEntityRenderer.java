@@ -77,7 +77,19 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             if (model == null) return;
             boolean compatibilityHeavy = shouldUseCompatibilityRendering(def, model);
             RailMap[] maps = be.getAllRailMaps();
-            if (maps.length == 0) return;
+            if (maps == null || maps.length == 0) return;
+
+            // 本家式レールスクリプト (jp.ngt.rtm.render.RailPartsRenderer)。
+            // renderRailStatic で自前描画するパック (Advanced Rails 等) は
+            // shouldRenderObject=false で通常パイプラインを止め、記録済み GL を再生する。
+            com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
+                com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
+            if (scripted != null) {
+                scripted.renderStatic(be, partialTick, poseStack, buffer, packedLight, packedOverlay, model);
+                if (scripted.skipsNormalPipeline(be)) {
+                    return;
+                }
+            }
             net.minecraft.world.phys.Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
             double cameraDistanceSq = cameraPos.distanceToSqr(be.getBlockPos().getX() + 0.5, be.getBlockPos().getY() + 0.5, be.getBlockPos().getZ() + 0.5);
 
