@@ -244,7 +244,7 @@ public final class VehicleScriptRenderers {
     }
 
     @SuppressWarnings("unchecked")
-    private static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
+    static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                                int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
                                PolygonModel bodyGraph) {
         int light = packedLight;

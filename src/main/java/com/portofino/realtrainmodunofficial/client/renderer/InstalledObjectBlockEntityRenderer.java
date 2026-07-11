@@ -111,6 +111,19 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     }
                     poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
                     poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
+                    //踏切: 本家式スクリプト描画 (MachinePartsRenderer + Nashorn)。成功時は旧近似パスをスキップ。
+                    if (blockEntity.getCategory() == InstalledObjectCategory.CROSSING
+                            && definition.getScriptPath() != null && !definition.getScriptPath().isBlank()) {
+                        com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.Scripted machineScripted =
+                            com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(definition);
+                        if (machineScripted != null
+                                && machineScripted.render(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
+                            poseStack.popPose();
+                            pushed = false;
+                            ClientRenderProfiler.endInstalledObject(profilerStart);
+                            return;
+                        }
+                    }
                     MqoModelLoader.GroupPredicate filter = groupName ->
                         shouldRenderDefinedObjectGroup(groupName, definition)
                             && (!(far || compatibilityHeavy || customCrossingGateRendering)

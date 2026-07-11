@@ -1,0 +1,23 @@
+package jp.ngt.rtm.render;
+
+import net.minecraft.world.level.block.entity.BlockEntity;
+
+/**
+ * 本家 jp.ngt.rtm.render.TileEntityPartsRenderer の移植。
+ */
+public abstract class TileEntityPartsRenderer extends PartsRenderer {
+
+    public TileEntityPartsRenderer(String... par1) {
+        super(par1);
+    }
+
+    /**
+     * 本家: TileEntityMachineBase.tick — ワールド時間で代替
+     */
+    public int getTick(Object tile) {
+        if (tile instanceof BlockEntity be && be.getLevel() != null) {
+            return (int) be.getLevel().getGameTime();
+        }
+        return 0;
+    }
+}
