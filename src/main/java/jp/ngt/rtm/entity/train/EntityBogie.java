@@ -142,6 +142,8 @@ public class EntityBogie extends Entity {
         return !this.isRemoved();
     }
 
+    private static long lastRailLostLog;
+
     /**
      * @return 位置更新が成功したらtrue
      */
@@ -159,6 +161,13 @@ public class EntityBogie extends Entity {
         if (!this.resetRailObj(px, py, pz)) {
             if (this.getTrain() != null) {
                 this.getTrain().stopTrain(true);
+            }
+            //診断: カーブ脱線報告の切り分け (毎秒 1 回まで)
+            long now = System.currentTimeMillis();
+            if (now - lastRailLostLog > 1000L) {
+                lastRailLostLog = now;
+                jp.ngt.ngtlib.io.NGTLog.debug("[Bogie] rail lost at %.2f, %.2f, %.2f movYaw=%.1f speed=%.3f front=%s",
+                        px, py, pz, this.movingYaw, speed, String.valueOf(this.isFront()));
             }
             return false;
         }

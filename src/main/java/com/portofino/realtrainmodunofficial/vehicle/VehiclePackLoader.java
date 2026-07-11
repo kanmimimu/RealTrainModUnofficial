@@ -38,6 +38,28 @@ public class VehiclePackLoader {
         loadFromGameDirectories();
         VehicleRegistry.setDefinitions(LOADED);
         RealTrainModUnofficial.LOGGER.info("Loaded {} vehicle definition(s)", LOADED.size());
+        dumpLoadedList();
+    }
+
+    /**
+     * 診断: ロード済み車両の一覧をファイルへ出力
+     * (「一部の車両が読み込まれない」報告の切り分け用 — 一覧に有る=登録済み/表示側、無い=パース段階)
+     */
+    private static void dumpLoadedList() {
+        try {
+            Path out = FMLPaths.GAMEDIR.get().resolve("config").resolve("realtrainmodunofficial").resolve("loaded_vehicles.txt");
+            Files.createDirectories(out.getParent());
+            List<String> lines = LOADED.stream()
+                .map(d -> String.format("%s :: %s :: type=%s bogies=%d model=%s",
+                    d.getPackName(), d.getId(), d.getVehicleType(),
+                    d.getBogies() == null ? 0 : d.getBogies().size(),
+                    d.getModelFile()))
+                .sorted()
+                .collect(java.util.stream.Collectors.toList());
+            Files.write(out, lines, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            RealTrainModUnofficial.LOGGER.debug("Could not write loaded_vehicles.txt: {}", e.toString());
+        }
     }
 
     private static void loadFromModJar() {
