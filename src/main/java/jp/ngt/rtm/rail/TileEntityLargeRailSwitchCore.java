@@ -77,14 +77,17 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
     }
 
     /**
-     * ブロック更新時
+     * ブロック更新時。
+     * 注意: ここでフル NBT 再同期 (markBlockForUpdate) を行うとクライアントの
+     * SwitchType/Point が再生成され moveCount=0 にリセットされて転てつアニメが
+     * 破綻する (OFF 時に即戻り)。クライアントは自前の tick + RS 参照でアニメする
+     * ため、サーバー側の開通状態更新のみ行う。
      */
     public void onBlockChanged() {
         if (this.getSwitch() != null && this.level != null) {
             this.getSwitch().onBlockChanged(this.level);
             if (!this.level.isClientSide) {
                 this.setChanged();
-                this.markBlockForUpdate();
             }
         }
     }
