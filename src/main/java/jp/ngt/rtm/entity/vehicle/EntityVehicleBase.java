@@ -33,7 +33,8 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public float wheelRotationL;
 
     //パックスクリプト互換 (1.7.10 SRG 名を直接参照するスクリプトのため tick 毎に更新)
-    public Level field_70170_p;
+    //field_70170_p は World の SRG メソッド (func_72929_e 等) を委譲する WorldCompat
+    public jp.ngt.mccompat.WorldCompat field_70170_p;
     public int field_70173_aa;
     public float field_70177_z;
     public float field_70125_A;
@@ -58,7 +59,7 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         super(type, level);
         this.noPhysics = true;
         //スクリプトは初回 tick 前 (スポーン直後の描画) にも参照する
-        this.field_70170_p = level;
+        this.field_70170_p = new jp.ngt.mccompat.WorldCompat(level);
     }
 
     /**
@@ -91,7 +92,9 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         this.applyPhysicalEffect();
 
         //パックスクリプト互換 SRG フィールドの更新
-        this.field_70170_p = this.level();
+        if (this.field_70170_p == null || this.field_70170_p.level != this.level()) {
+            this.field_70170_p = new jp.ngt.mccompat.WorldCompat(this.level());
+        }
         this.field_70173_aa = this.tickCount;
         this.field_70177_z = this.getYRot();
         this.field_70125_A = this.getXRot();

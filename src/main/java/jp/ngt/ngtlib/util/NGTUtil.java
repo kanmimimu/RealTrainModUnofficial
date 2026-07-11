@@ -31,6 +31,21 @@ public final class NGTUtil {
     }
 
     /**
+     * 本家: クライアントプレイヤー (Client Only, スクリプト用)
+     */
+    public static net.minecraft.world.entity.player.Player getClientPlayer() {
+        return net.minecraft.client.Minecraft.getInstance().player;
+    }
+
+    /**
+     * 本家: クライアントワールド (Client Only, スクリプト用)
+     */
+    public static Object getClientWorld() {
+        net.minecraft.world.level.Level level = net.minecraft.client.Minecraft.getInstance().level;
+        return level != null ? new jp.ngt.mccompat.WorldCompat(level) : null;
+    }
+
+    /**
      * 本家 NGTUtil.reverse : 配列を逆順に
      */
     public static <T> void reverse(T[] array) {

@@ -760,9 +760,10 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     @Override
     public boolean shouldRenderOffScreen(TileEntityLargeRailCore blockEntity) {
-        //false にして getRenderBoundingBox (レール全長 AABB) によるフラスタムカリングを効かせる。
-        //true だと画面外・背後のレールも毎フレーム全描画されて負荷が跳ね上がる。
-        return false;
+        //true 必須: false だとコアブロックのあるチャンクセクションが視界から外れた瞬間に
+        //レール全体が消える (BE はセクション単位でカリングされるため)。本家 1.7.10 も
+        //ignoreFrustumCheck 相当で常時描画 (「レールはその場にある」)。
+        return true;
     }
 
     @Override

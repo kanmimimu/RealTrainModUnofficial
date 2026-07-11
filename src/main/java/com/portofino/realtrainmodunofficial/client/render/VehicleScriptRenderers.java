@@ -51,7 +51,8 @@ public final class VehicleScriptRenderers {
 
     private static final String PRELUDE =
             "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n" +
-            "var GL12 = GL11;\n";
+            "var GL12 = GL11;\n" +
+            "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n";
 
     private static final Pattern INCLUDE_PATTERN = Pattern.compile("^\\s*//include\\s*<([^>]+)>", Pattern.MULTILINE);
 
@@ -60,6 +61,10 @@ public final class VehicleScriptRenderers {
             {"Packages.net.minecraft.client.renderer.texture.TextureUtil", "Packages.jp.ngt.mccompat.TextureUtil"},
             {"Packages.net.minecraft.client.renderer.texture.DynamicTexture", "Packages.jp.ngt.mccompat.DynamicTexture"},
             {"Packages.net.minecraft.client.Minecraft", "Packages.jp.ngt.mccompat.Minecraft"},
+            {"Packages.net.minecraft.util.math.BlockPos", "Packages.net.minecraft.core.BlockPos"},
+            {"Packages.net.minecraft.world.EnumSkyBlock", "Packages.jp.ngt.mccompat.EnumSkyBlock"},
+            {"Packages.net.minecraft.util.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
+            {"Packages.net.minecraft.util.math.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
     };
 
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
