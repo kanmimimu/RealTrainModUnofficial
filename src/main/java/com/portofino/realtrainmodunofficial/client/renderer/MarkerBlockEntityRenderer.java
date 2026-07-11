@@ -91,7 +91,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             for (int k = -1; k <= 1; k++) {
                 float moveX = moveZ * k;
                 poseStack.pushPose();
-                poseStack.translate(moveX, 0.5F, moveZ);
+                poseStack.translate(moveX, 1.6F, moveZ);
                 //親の向き回転を打ち消してからカメラビルボード (バニラのネームタグ方式)
                 poseStack.mulPose(new Quaternionf().rotationY(-dir * Mth.DEG_TO_RAD));
                 poseStack.mulPose(cameraRot);
@@ -152,7 +152,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             float x0 = (float) (pos[1] - rp.posX);
             float y0 = (float) ((rm.getStartRP().posY + rm.getEndRP().posY) / 2 - rp.posY);
             float z0 = (float) (pos[0] - rp.posZ);
-            poseStack.translate(x0, y0 + 0.75F, z0);
+            poseStack.translate(x0, y0 + 2.2F, z0);
             poseStack.mulPose(cameraRot);
             //本家は 0.05 だが視認性向上のため少し大きめ + "m" 付き (バニラのネームタグ方式)
             poseStack.scale(0.1F, -0.1F, 0.1F);

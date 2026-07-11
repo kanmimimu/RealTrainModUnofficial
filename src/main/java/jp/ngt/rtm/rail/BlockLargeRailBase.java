@@ -158,7 +158,9 @@ public class BlockLargeRailBase extends BaseEntityBlock {
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        if (!level.isClientSide && this.isCore()) {
+        //クライアントでも tick する: 分岐の Point.moveCount (転てつアニメーション) は
+        //クライアント側 SwitchType.onUpdate で進む (本家 updateEntity は両側で動く)。
+        if (this.isCore()) {
             return (lvl, pos, st, be) -> {
                 if (be instanceof TileEntityLargeRailCore core) {
                     core.tick();
@@ -166,5 +168,17 @@ public class BlockLargeRailBase extends BaseEntityBlock {
             };
         }
         return null;
+    }
+
+    @Override
+    protected void neighborChanged(BlockState state, Level world, BlockPos pos, net.minecraft.world.level.block.Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
+        super.neighborChanged(state, world, pos, neighborBlock, neighborPos, movedByPiston);
+        //RS 変化で分岐の開通状態 (isOpen/activeRails) を更新
+        if (!world.isClientSide) {
+            BlockEntity be = world.getBlockEntity(pos);
+            if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore switchCore) {
+                switchCore.onBlockChanged();
+            }
+        }
     }
 }
