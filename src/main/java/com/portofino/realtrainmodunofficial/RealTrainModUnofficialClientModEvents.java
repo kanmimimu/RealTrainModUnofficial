@@ -1,6 +1,8 @@
 package com.portofino.realtrainmodunofficial;
 
 import com.portofino.realtrainmodunofficial.client.renderer.RailCoreBlockEntityRenderer;
+import com.portofino.realtrainmodunofficial.client.renderer.RtmBogieRenderer;
+import com.portofino.realtrainmodunofficial.client.renderer.RtmTrainRenderer;
 import com.portofino.realtrainmodunofficial.client.renderer.TrainBogieEntityRenderer;
 import com.portofino.realtrainmodunofficial.client.renderer.TrainEntityRenderer;
 import com.portofino.realtrainmodunofficial.client.renderer.TrainSeatEntityRenderer;
@@ -49,6 +51,15 @@ public final class RealTrainModUnofficialClientModEvents {
         event.registerBlockEntityRenderer(
             RealTrainModUnofficialBlockEntities.INSTALLED_OBJECT.get(),
             InstalledObjectBlockEntityRenderer::new
+        );
+        // jp.ngt.rtm.entity: 本家忠実移植の列車/台車 (Phase 2 フリップ)
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.TRAIN.get(),
+            RtmTrainRenderer::new
+        );
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.BOGIE.get(),
+            RtmBogieRenderer::new
         );
         if (RealTrainModUnofficialEntities.TRAIN.isBound()) {
             event.registerEntityRenderer(

@@ -82,22 +82,47 @@ public class TrainItem extends Item {
         if (def == null) {
             return InteractionResult.PASS;
         }
-        Vec3 clickedPoint = context.getClickLocation();
-        RailSpawnData spawnData = findNearestRailSpawn(level, context.getClickedPos(), clickedPoint, player.getYRot());
-        if (spawnData == null) {
+        // 本家 ItemTrain.onItemUse 準拠 (Phase 2: jp.ngt.rtm.entity.train.EntityTrain をスポーン)
+        BlockPos cp = context.getClickedPos();
+        RailMap rm0 = jp.ngt.rtm.rail.TileEntityLargeRailBase.getRailMapFromCoordinates(
+                level, player, cp.getX(), cp.getY(), cp.getZ());
+        if (rm0 == null) {
             player.displayClientMessage(Component.translatable("message.realtrainmodunofficial.train.must_be_on_rail"), true);
             return InteractionResult.FAIL;
         }
-        if (isOccupiedSpawnArea(level, spawnData.x(), spawnData.y() + 0.25D, spawnData.z(), spawnData.yaw(), def, spawnData.map())) {
-            player.displayClientMessage(Component.translatable("message.realtrainmodunofficial.train.already_exists"), true);
-            return InteractionResult.FAIL;
+
+        //本家: 半径16の既存車両との干渉チェック
+        int r = 16;
+        List<net.minecraft.world.entity.Entity> list = level.getEntities(player,
+                new net.minecraft.world.phys.AABB(cp.getX() - r, cp.getY() - 4, cp.getZ() - r,
+                        cp.getX() + r + 1, cp.getY() + 8, cp.getZ() + r + 1));
+        for (net.minecraft.world.entity.Entity entity : list) {
+            if (entity instanceof jp.ngt.rtm.entity.train.EntityTrainBase
+                    || entity instanceof jp.ngt.rtm.entity.train.EntityBogie) {
+                double distanceSq = entity.distanceToSqr(cp.getX(), cp.getY(), cp.getZ());
+                float f0 = jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.get(def.getId()).trainDistance + 4.0F;
+                RailMap rm1 = jp.ngt.rtm.rail.TileEntityLargeRailBase.getRailMapFromCoordinates(
+                        level, player, entity.getX(), entity.getY(), entity.getZ());
+                if (distanceSq < f0 * f0 && rm0.equals(rm1)) {
+                    player.displayClientMessage(Component.translatable("message.realtrainmodunofficial.train.already_exists"), true);
+                    return InteractionResult.FAIL;
+                }
+            }
         }
-        TrainEntity train = TrainEntity.create(level, def.getId(), spawnData.x(), spawnData.y(), spawnData.z(), spawnData.yaw(), def.getTrainDistance());
-        if (train == null) {
-            return InteractionResult.PASS;
-        }
-        train.initializeOnRail(spawnData.map(), spawnData.split(), spawnData.index());
-        level.addFreshEntity(train);
+
+        int i0 = rm0.getNearlestPoint(128, cp.getX() + 0.5D, cp.getZ() + 0.5D);
+        float yw0 = Mth.wrapDegrees(rm0.getRailYaw(128, i0));
+        float yaw = jp.ngt.rtm.entity.train.EntityBogie.fixBogieYaw(-player.getYRot(), yw0);
+        float pitch = jp.ngt.rtm.entity.train.EntityBogie.fixBogiePitch(rm0.getRailPitch(128, i0), yw0, yaw);
+        double posX = rm0.getRailPos(128, i0)[1];
+        double posY = rm0.getRailHeight(128, i0) + jp.ngt.rtm.entity.train.EntityTrainBase.TRAIN_HEIGHT;
+        double posZ = rm0.getRailPos(128, i0)[0];
+
+        jp.ngt.rtm.entity.train.EntityTrain train =
+                new jp.ngt.rtm.entity.train.EntityTrain(jp.ngt.rtm.entity.RTMEntities.TRAIN.get(), level);
+        train.moveTo(posX, posY, posZ, yaw, pitch);
+        train.setModelName(def.getId());
+        train.spawnTrain(level);
         // クールダウン付与（サーバー側。クライアントにも自動同期される）
         player.getCooldowns().addCooldown(this, SPAWN_COOLDOWN_TICKS);
         return InteractionResult.sidedSuccess(false);

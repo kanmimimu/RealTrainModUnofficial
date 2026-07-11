@@ -43,6 +43,11 @@ public final class TrainControlKeyHandler {
         if (mc.player == null || mc.screen != null) {
             return;
         }
+        // Phase 2: 本家忠実列車 (jp.ngt) — マスコン/降車/ドアのみ先行対応
+        if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain) {
+            handleRtmTrainKeys(mc, rtmTrain, event);
+            return;
+        }
         TrainEntity train = getControlledTrain(mc);
         if (train == null) {
             return;
@@ -87,6 +92,38 @@ public final class TrainControlKeyHandler {
         if (jumpDown && event.getKey() == GLFW.GLFW_KEY_RIGHT) {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "toggle_door_right", 0));
             doorRightChordDown = true;
+        }
+    }
+
+    /**
+     * jp.ngt.rtm.entity.train.EntityTrainBase 用のキー処理 (Phase 2 先行版)。
+     */
+    private static void handleRtmTrainKeys(Minecraft mc, jp.ngt.rtm.entity.train.EntityTrainBase train,
+                                           InputEvent.Key event) {
+        int id = train.getId();
+        if (TrainControlKeyMappings.matchesSneak(event.getKey(), event.getScanCode())) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "dismount", 0));
+            return;
+        }
+        if (TrainControlKeyMappings.POWER_OFF.matches(event.getKey(), event.getScanCode())) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "mascon_power", 0));
+            return;
+        }
+        if (TrainControlKeyMappings.BRAKE_OFF.matches(event.getKey(), event.getScanCode())) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "mascon_brake", 0));
+            return;
+        }
+        if (TrainControlKeyMappings.NEUTRAL.matches(event.getKey(), event.getScanCode())) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "mascon_neutral", 0));
+            return;
+        }
+        boolean jumpDown = mc.options.keyJump.isDown();
+        if (jumpDown && event.getKey() == GLFW.GLFW_KEY_LEFT) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "toggle_door_left", 0));
+            return;
+        }
+        if (jumpDown && event.getKey() == GLFW.GLFW_KEY_RIGHT) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "toggle_door_right", 0));
         }
     }
 

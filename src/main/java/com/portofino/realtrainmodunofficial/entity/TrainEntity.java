@@ -168,7 +168,7 @@ public class TrainEntity extends Entity {
     private UUID coupledLeaderUuid;
     private int coupledFollowerThisSide = -1;
     private int coupledFollowerOtherSide = 1;
-    private jp.ngt.rtm.entity.train.util.Formation formation;
+    private com.portofino.realtrainmodunofficial.entity.legacyformation.Formation formation;
     private int travelStallTicks = 0;
     private long lastTravelStallLogTick = Long.MIN_VALUE;
     private int railGuidanceFailureTicks = 0;
@@ -1179,7 +1179,7 @@ public class TrainEntity extends Entity {
 
     public TrainEntity getFormationHead() {
         if (formation != null) {
-            jp.ngt.rtm.entity.train.util.FormationEntry front = formation.getFrontEntry();
+            com.portofino.realtrainmodunofficial.entity.legacyformation.FormationEntry front = formation.getFrontEntry();
             if (front != null && front.train != null && front.train.isAlive()) {
                 return front.train;
             }
@@ -5009,7 +5009,7 @@ public class TrainEntity extends Entity {
             TrainEntity entryTrain = trains.get(index);
             int dir = 0;
             if (train.formation != null) {
-                jp.ngt.rtm.entity.train.util.FormationEntry entry = train.formation.getEntry(entryTrain);
+                com.portofino.realtrainmodunofficial.entity.legacyformation.FormationEntry entry = train.formation.getEntry(entryTrain);
                 if (entry != null) {
                     dir = entry.dir;
                 }
@@ -5047,7 +5047,7 @@ public class TrainEntity extends Entity {
             int index = trains.indexOf(resolved);
             int dir = 0;
             if (train.formation != null) {
-                jp.ngt.rtm.entity.train.util.FormationEntry entry = train.formation.getEntry(resolved);
+                com.portofino.realtrainmodunofficial.entity.legacyformation.FormationEntry entry = train.formation.getEntry(resolved);
                 if (entry != null) {
                     dir = entry.dir;
                 }
@@ -5071,7 +5071,7 @@ public class TrainEntity extends Entity {
 
         private TrainEntity frontTrain() {
             if (train.formation != null) {
-                jp.ngt.rtm.entity.train.util.FormationEntry front = train.formation.getFrontEntry();
+                com.portofino.realtrainmodunofficial.entity.legacyformation.FormationEntry front = train.formation.getFrontEntry();
                 if (front != null && front.train != null) {
                     return front.train;
                 }
@@ -6535,7 +6535,7 @@ public class TrainEntity extends Entity {
 
     // ---- Formation field setters/methods ----
 
-    public void setFormation(jp.ngt.rtm.entity.train.util.Formation f) {
+    public void setFormation(com.portofino.realtrainmodunofficial.entity.legacyformation.Formation f) {
         this.formation = f;
     }
 
@@ -6547,18 +6547,18 @@ public class TrainEntity extends Entity {
         if (level().isClientSide()) return;
         List<TrainEntity> chain = getFormationTrainsInOrder();
         if (chain.isEmpty()) {
-            jp.ngt.rtm.entity.train.util.FormationManager.getInstance().createNewFormation(this);
+            com.portofino.realtrainmodunofficial.entity.legacyformation.FormationManager.getInstance().createNewFormation(this);
             return;
         }
         if (chain.size() == 1) {
             if (formation == null) {
-                jp.ngt.rtm.entity.train.util.FormationManager.getInstance().createNewFormation(this);
+                com.portofino.realtrainmodunofficial.entity.legacyformation.FormationManager.getInstance().createNewFormation(this);
             }
             return;
         }
-        long fid = jp.ngt.rtm.entity.train.util.FormationManager.getInstance().getNewId();
-        jp.ngt.rtm.entity.train.util.Formation f =
-            new jp.ngt.rtm.entity.train.util.Formation(fid, chain.size());
+        long fid = com.portofino.realtrainmodunofficial.entity.legacyformation.FormationManager.getInstance().getNewId();
+        com.portofino.realtrainmodunofficial.entity.legacyformation.Formation f =
+            new com.portofino.realtrainmodunofficial.entity.legacyformation.Formation(fid, chain.size());
         for (int i = 0; i < chain.size(); i++) {
             TrainEntity t = chain.get(i);
             int leaderSide = -1;
@@ -6568,7 +6568,7 @@ public class TrainEntity extends Entity {
                 leaderSide = normalizeCouplerSide(prev.coupledFollowerThisSide);
                 followerSide = normalizeCouplerSide(prev.coupledFollowerOtherSide);
             }
-            f.entries[i] = new jp.ngt.rtm.entity.train.util.FormationEntry(t, i, 0, leaderSide, followerSide);
+            f.entries[i] = new com.portofino.realtrainmodunofficial.entity.legacyformation.FormationEntry(t, i, 0, leaderSide, followerSide);
             t.formation = f;
         }
     }

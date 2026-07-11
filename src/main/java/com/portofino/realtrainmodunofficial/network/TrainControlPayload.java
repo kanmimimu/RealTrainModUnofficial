@@ -42,6 +42,11 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
+            // Phase 2: 本家忠実列車 (jp.ngt) — 乗車中の車両を TrainState 系で直接操作
+            if (player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain) {
+                handleRtmTrain(rtmTrain, player, payload.action(), payload.value());
+                return;
+            }
             if (!(player.level().getEntity(payload.trainEntityId()) instanceof TrainEntity train)) {
                 RealTrainModUnofficial.LOGGER.info("Train control ignored: train {} not found for action {}", payload.trainEntityId(), payload.action());
                 return;
@@ -170,6 +175,56 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 }
             }
         });
+    }
+
+    /**
+     * jp.ngt.rtm.entity.train.EntityTrainBase 用の操作処理 (Phase 2 先行版)。
+     * 本家の TrainState 系 API で処理する。
+     */
+    private static void handleRtmTrain(jp.ngt.rtm.entity.train.EntityTrainBase train,
+                                       ServerPlayer player, String action, int value) {
+        var doorType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Door;
+        var lightType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Light;
+        var pantoType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Pantograph;
+        var interiorType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_InteriorLight;
+        switch (action) {
+            case "mascon_power" -> train.addNotch(player, 1);
+            case "mascon_brake" -> train.addNotch(player, -1);
+            case "mascon_neutral" -> train.setNotch(0);
+            case "dismount" -> player.stopRiding();
+            case "toggle_reverse" -> {
+                if (train.getNotch() == 0) {
+                    train.setTrainDirection(1 - train.getTrainDirection());
+                }
+            }
+            case "toggle_door" -> {
+                byte data = train.getTrainStateData(doorType.id);
+                train.setTrainStateData(doorType.id, (byte) (data == 0 ? 3 : 0));
+            }
+            case "toggle_door_left" -> {
+                byte data = train.getTrainStateData(doorType.id);
+                train.setTrainStateData(doorType.id, (byte) (data ^ 2));
+            }
+            case "toggle_door_right" -> {
+                byte data = train.getTrainStateData(doorType.id);
+                train.setTrainStateData(doorType.id, (byte) (data ^ 1));
+            }
+            case "toggle_headlight" -> {
+                byte data = train.getTrainStateData(lightType.id);
+                train.setTrainStateData(lightType.id, (byte) (data == 0 ? 1 : 0));
+            }
+            case "set_light_mode" -> train.setTrainStateData(lightType.id, (byte) value);
+            case "toggle_interior_light" -> {
+                byte data = train.getTrainStateData(interiorType.id);
+                train.setTrainStateData(interiorType.id, (byte) (data == 0 ? 1 : 0));
+            }
+            case "toggle_pantograph" -> {
+                byte data = train.getTrainStateData(pantoType.id);
+                train.setTrainStateData(pantoType.id, (byte) (data == 0 ? 1 : 0));
+            }
+            default -> {
+            }
+        }
     }
 
     private static int resolveNextSoundIndex(TrainEntity controlTrain, int delta) {

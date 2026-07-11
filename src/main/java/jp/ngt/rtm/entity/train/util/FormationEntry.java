@@ -1,27 +1,56 @@
 package jp.ngt.rtm.entity.train.util;
 
-import com.portofino.realtrainmodunofficial.entity.TrainEntity;
+import jp.ngt.rtm.entity.train.EntityTrainBase;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 
-public class FormationEntry {
-    public final TrainEntity train;
-    public int entryId;      // position in Formation.entries[]
-    public int dir;          // 0 or 1 — which bogie faces "beginning" of formation (RTM faithful)
-    public int leaderSide;   // side on the previous car that connects here (for movement)
-    public int followerSide; // side on THIS car that connects to leader (for movement)
+/**
+ * 本家 jp.ngt.rtm.entity.train.util.FormationEntry (KaizPatchX) の忠実移植。
+ */
+public class FormationEntry implements Comparable<FormationEntry> {
+    public final EntityTrainBase train;
+    public byte entryId;
+    public byte dir;
 
-    public FormationEntry(TrainEntity train, int entryId, int dir) {
-        this.train = train;
-        this.entryId = entryId;
-        this.dir = dir;
-        this.leaderSide = -1;
-        this.followerSide = 1;
+    /**
+     * @param par1 車両
+     * @param par2 位置
+     * @param par3 向き
+     */
+    public FormationEntry(EntityTrainBase par1, int par2, int par3) {
+        this.train = par1;
+        this.entryId = (byte) par2;
+        this.dir = (byte) par3;
     }
 
-    public FormationEntry(TrainEntity train, int entryId, int dir, int leaderSide, int followerSide) {
-        this.train = train;
-        this.entryId = entryId;
-        this.dir = dir;
-        this.leaderSide = leaderSide;
-        this.followerSide = followerSide;
+    public static FormationEntry readFromNBT(CompoundTag nbt, Level world) {
+        int trainId = nbt.getInt("TrainId");
+        byte pos = nbt.getByte("EntryPos");
+        byte dir = nbt.getByte("EntryDir");
+        Entity entity = world.getEntity(trainId);
+        if (!(entity instanceof EntityTrainBase train)) {
+            return null;
+        }
+        return new FormationEntry(train, pos, dir);
+    }
+
+    public void writeToNBT(CompoundTag nbt) {
+        nbt.putInt("TrainId", this.train.getId());
+        nbt.putByte("EntryPos", this.entryId);
+        nbt.putByte("EntryDir", this.dir);
+    }
+
+    /**
+     * 編成データ更新(Entity側も)
+     */
+    public void updateFormationData(Formation par1, int i) {
+        this.entryId = (byte) i;
+        this.train.setFormation(par1);
+    }
+
+    @Override
+    public int compareTo(FormationEntry obj) {
+        return this.entryId - obj.entryId;
     }
 }
