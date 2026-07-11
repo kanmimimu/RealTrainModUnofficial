@@ -217,13 +217,15 @@ public final class TrainControlKeyHandler {
                 rtmPowerHoldTicks = Math.max(0, rtmPowerHoldTicks + 1);
                 rtmBrakeHoldTicks = -1;
                 if (rtmPowerHoldTicks == 1 || shouldSendRepeat(rtmPowerHoldTicks)) {
-                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_power", 0));
+                    //W = 力行側 (ユーザー確認でこちらが mascon_brake 相当だった)
+                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_brake", 0));
                 }
             } else if (down && !up) {
                 rtmBrakeHoldTicks = Math.max(0, rtmBrakeHoldTicks + 1);
                 rtmPowerHoldTicks = -1;
                 if (rtmBrakeHoldTicks == 1 || shouldSendRepeat(rtmBrakeHoldTicks)) {
-                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_brake", 0));
+                    //S = ブレーキ側
+                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_power", 0));
                 }
             } else {
                 rtmPowerHoldTicks = -1;
