@@ -173,14 +173,52 @@ public final class TrainControlKeyHandler {
         }
     }
 
+    /**
+     * 座席追従用: 前 tick の車両ヨー (NaN = 未着席)
+     */
+    private static float lastSeatVehicleYaw = Float.NaN;
+
+    /**
+     * 本家: 座席 (客席/運転席) に座っている間、車両のヨー変化を乗員の視点にも適用する。
+     * これが無いと列車がカーブしても体がワールド方向に固定されたままになり、
+     * 気づくと横や後ろを向いている状態になる。マウスでの視点操作は自由なまま。
+     */
+    private static void followSeatRotation(Minecraft mc) {
+        net.minecraft.world.entity.Entity vehicle = mc.player.getVehicle();
+        jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> base = null;
+        if (vehicle instanceof jp.ngt.rtm.entity.train.parts.EntityVehiclePart part) {
+            base = part.getVehicle();
+        } else if (vehicle instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> v) {
+            base = v;
+        }
+        if (base == null) {
+            lastSeatVehicleYaw = Float.NaN;
+            return;
+        }
+        float yaw = base.getYRot();
+        if (!Float.isNaN(lastSeatVehicleYaw)) {
+            float delta = net.minecraft.util.Mth.wrapDegrees(yaw - lastSeatVehicleYaw);
+            if (delta != 0.0F) {
+                //yRotO は触らない — フレーム補間で滑らかに回るように
+                mc.player.setYRot(mc.player.getYRot() + delta);
+                mc.player.setYBodyRot(mc.player.yBodyRot + delta);
+                mc.player.setYHeadRot(mc.player.getYHeadRot() + delta);
+            }
+        }
+        lastSeatVehicleYaw = yaw;
+    }
+
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             shiftWasDown = false;
+            lastSeatVehicleYaw = Float.NaN;
             resetHoldState();
             return;
         }
+
+        followSeatRotation(mc);
 
         if (TrainControlKeyMappings.TOGGLE_RENDER_PROFILER.consumeClick()) {
             ClientRenderProfiler.toggleOverlay();
