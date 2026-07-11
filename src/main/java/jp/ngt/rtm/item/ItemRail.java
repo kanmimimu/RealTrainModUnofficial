@@ -135,7 +135,11 @@ public class ItemRail extends Item {
         }
         if (stack.getItem() instanceof ItemRail) {
             RailProperty prop = getProperty(stack);
-            return prop != null ? prop : RailProperty.getDefaultProperty();
+            if (prop != null) {
+                jp.ngt.rtm.rail.BlockMarker.setLastUsedProperty(prop);
+                return prop;
+            }
+            return RailProperty.getDefaultProperty();
         }
         if (stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.RailItem) {
             String model = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
@@ -144,8 +148,10 @@ public class ItemRail extends Item {
                         com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
                 model = def != null ? def.getId() : "";
             }
-            return new RailProperty(model == null ? "" : model,
+            RailProperty prop = new RailProperty(model == null ? "" : model,
                     net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+            jp.ngt.rtm.rail.BlockMarker.setLastUsedProperty(prop);
+            return prop;
         }
         return null;
     }

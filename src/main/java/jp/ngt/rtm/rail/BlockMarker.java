@@ -428,6 +428,22 @@ public class BlockMarker extends BaseEntityBlock {
     }
 
     /**
+     * 最後にレールアイテムから使われた RailProperty。
+     * 素手でマーカーを右クリックしてレールを敷く際に再利用する (ユーザー要望)。
+     */
+    private static RailProperty lastUsedProperty;
+
+    public static void setLastUsedProperty(RailProperty prop) {
+        if (prop != null && prop.railModel != null && !prop.railModel.isEmpty()) {
+            lastUsedProperty = prop;
+        }
+    }
+
+    public static RailProperty getLastUsedProperty() {
+        return lastUsedProperty;
+    }
+
+    /**
      * 本家: 手持ちの ItemRail から RailProperty を取得。
      * TODO(Phase 4): ItemRail 移植後に接続。暫定: Remaster の RailItem 選択中モデルを反映。
      */
@@ -440,7 +456,11 @@ public class BlockMarker extends BaseEntityBlock {
         //本家 ItemRail (Property NBT 保持)
         if (!item.isEmpty() && item.getItem() instanceof jp.ngt.rtm.item.ItemRail) {
             RailProperty prop = jp.ngt.rtm.item.ItemRail.getProperty(item);
-            return prop != null ? prop : RailProperty.getDefaultProperty();
+            if (prop != null) {
+                setLastUsedProperty(prop);
+                return prop;
+            }
+            return RailProperty.getDefaultProperty();
         }
         //Remaster RailItem: アイテム自身の選択モデル ID を最優先 (本家 ItemRail.getProperty(item) 相当)
         if (!item.isEmpty() && item.getItem() instanceof com.portofino.realtrainmodunofficial.item.RailItem) {
@@ -450,11 +470,18 @@ public class BlockMarker extends BaseEntityBlock {
                         com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
                 model = def != null ? def.getId() : "";
             }
-            return new RailProperty(model == null ? "" : model, net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+            RailProperty prop = new RailProperty(model == null ? "" : model,
+                    net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+            setLastUsedProperty(prop);
+            return prop;
         }
 
         if (player.getAbilities().instabuild || !par2) {
-            //空手 (クリエイティブ): 選択中 or 先頭のレール定義をデフォルトに (railModel="" だと描画もスクリプトも無い)
+            //空手: 最後に使ったレールを最優先 (ユーザー要望)、
+            //無ければ 選択中 or 先頭のレール定義 (railModel="" だと描画もスクリプトも無い)
+            if (lastUsedProperty != null) {
+                return lastUsedProperty;
+            }
             com.portofino.realtrainmodunofficial.rail.RailDefinition def =
                     com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
             if (def == null) {
