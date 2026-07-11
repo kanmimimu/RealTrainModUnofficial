@@ -57,6 +57,8 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public EntityVehicleBase(EntityType<?> type, Level level) {
         super(type, level);
         this.noPhysics = true;
+        //スクリプトは初回 tick 前 (スポーン直後の描画) にも参照する
+        this.field_70170_p = level;
     }
 
     /**

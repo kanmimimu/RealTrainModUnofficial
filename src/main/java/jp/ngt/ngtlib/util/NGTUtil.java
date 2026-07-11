@@ -24,6 +24,13 @@ public final class NGTUtil {
     }
 
     /**
+     * 本家: システム時間を使用
+     */
+    public static long getUniqueId() {
+        return System.currentTimeMillis();
+    }
+
+    /**
      * 本家 NGTUtil.reverse : 配列を逆順に
      */
     public static <T> void reverse(T[] array) {
