@@ -229,6 +229,22 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 byte data = train.getTrainStateData(pantoType.id);
                 train.setTrainStateData(pantoType.id, (byte) (data == 0 ? 1 : 0));
             }
+            case "set_direction" -> train.setTrainStateData(
+                    jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction.id, (byte) value);
+            case "set_destination" -> train.setTrainStateData(
+                    jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id, (byte) value);
+            case "set_announcement" -> train.setTrainStateData(
+                    jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Announcement.id, (byte) value);
+            case "cycle_custom_button" -> {
+                int index = (value >>> 8) & 0xFF;
+                int currentValue = value & 0xFF;
+                VehicleDefinition definition = VehicleRegistry.getById(train.getModelName());
+                List<List<String>> options = definition != null ? definition.getCustomButtonOptions() : List.of();
+                int next = (index < options.size() && !options.get(index).isEmpty())
+                        ? (currentValue + 1) % options.get(index).size()
+                        : (currentValue == 0 ? 1 : 0);
+                train.getResourceState().getDataMap().setInt("Button" + index, next, 1);
+            }
             default -> {
             }
         }

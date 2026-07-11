@@ -179,7 +179,11 @@ public final class ModelLoader {
         } catch (Exception e) {
             return;
         }
-        group.faces.add(new Face(faceVerts, uvs, matId));
+        Face face = new Face(faceVerts, uvs, matId);
+        //本家はロード時に法線計算済み — スクリプト (CustomAnimator 等) は
+        //face.faceNormal が非 null である前提で toVec() を呼ぶ
+        face.calculateFaceNormal(VecAccuracy.LOW);
+        group.faces.add(face);
     }
 
     private static String extractMqoText(byte[] bytes, String name) throws IOException {

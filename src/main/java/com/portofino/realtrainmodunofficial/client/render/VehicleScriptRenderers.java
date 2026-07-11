@@ -129,7 +129,11 @@ public final class VehicleScriptRenderers {
         Map<String, String> texMap = def.getTextureOverrides();
         if (texMap != null) {
             for (String path : texMap.values()) {
-                sets.add(new TextureSet(new Material(new jp.ngt.mccompat.ResourceLocation("minecraft", path))));
+                //ローダ内部メタ ("|ptmeta=alphablend" 等) を除去 — スクリプトは
+                //このパスから "_headLight.png" 等の発光テクスチャ名を合成する
+                int meta = path.indexOf("|ptmeta=");
+                String clean = meta >= 0 ? path.substring(0, meta) : path;
+                sets.add(new TextureSet(new Material(new jp.ngt.mccompat.ResourceLocation("minecraft", clean))));
             }
         }
         if (sets.isEmpty()) {
