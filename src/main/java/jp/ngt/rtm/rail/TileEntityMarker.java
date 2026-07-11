@@ -270,13 +270,17 @@ public class TileEntityMarker extends BlockEntity {
     }
 
     public void updateRailMap() {
-        this.setMarkersPos(this.markerPosList);
+        //自身のリストを渡すとイテレート中の差し替えで CME になるため防御コピー
+        this.setMarkersPos(new ArrayList<>(this.markerPosList));
     }
 
     /**
      * マーカーのグリッド表示用RailMap生成
      */
     public void setMarkersPos(List<int[]> list) {
+        //loadAdditional (同期パケット) が markerPosList を差し替えても
+        //イテレーションが壊れないよう防御コピーで処理する
+        list = new ArrayList<>(list);
         if (list.size() == 2) {
             RailPosition rp0 = this.getMarkerRP(list.get(0));
             RailPosition rp1 = this.getMarkerRP(list.get(1));
