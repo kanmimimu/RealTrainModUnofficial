@@ -198,6 +198,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.bogieController.spawnBogies(world, this);
         world.addFreshEntity(this);
         this.formation = FormationManager.getInstance(world.isClientSide).createNewFormation(this);
+        //カーブ上スポーン対策: setupBogiePos は直線配置 (弦) のため、カーブでは
+        //台車が線路から浮いて脱線して見える。forceMove でレール吸着を 1 回実行し、
+        //台車をレールへ、車体を台車間へ整列させる (走り出しと同じ経路)。
+        if (!world.isClientSide) {
+            this.bogieController.moveTrainWithBogie(this, null, 0.0F, true);
+        }
     }
 
     @Override
