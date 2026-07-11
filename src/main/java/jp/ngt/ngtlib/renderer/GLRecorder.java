@@ -10,21 +10,27 @@ import java.util.List;
 public final class GLRecorder {
 
     public enum Op {
-        PUSH, POP, TRANSLATE, ROTATE, SCALE, COLOR, BRIGHTNESS, RENDER_PARTS
+        PUSH, POP, TRANSLATE, ROTATE, SCALE, COLOR, BRIGHTNESS, RENDER_PARTS, RENDER_GROUPS
     }
 
     public static final class Cmd {
         public final Op op;
         public final float a, b, c, d;
         public final String name;
+        public final Object payload;
 
         Cmd(Op op, float a, float b, float c, float d, String name) {
+            this(op, a, b, c, d, name, null);
+        }
+
+        Cmd(Op op, float a, float b, float c, float d, String name, Object payload) {
             this.op = op;
             this.a = a;
             this.b = b;
             this.c = c;
             this.d = d;
             this.name = name;
+            this.payload = payload;
         }
     }
 
@@ -86,5 +92,12 @@ public final class GLRecorder {
 
     public void renderParts(String objName) {
         this.cmds.add(new Cmd(Op.RENDER_PARTS, 0, 0, 0, 0, objName));
+    }
+
+    /**
+     * 正規化済みグループ名 Set を一括描画 (デフォルトレール配置用)。
+     */
+    public void renderGroups(java.util.Set<String> normalizedNames) {
+        this.cmds.add(new Cmd(Op.RENDER_GROUPS, 0, 0, 0, 0, null, normalizedNames));
     }
 }

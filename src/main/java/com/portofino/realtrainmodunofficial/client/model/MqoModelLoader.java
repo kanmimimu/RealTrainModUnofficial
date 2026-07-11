@@ -2923,6 +2923,17 @@ public final class MqoModelLoader {
             this.scriptModel = new ScriptModel(materialTextures);
         }
 
+        /** 元の (正規化前の) グループ名一覧。レールスクリプトの shouldRenderObject 判定用。 */
+        public java.util.Set<String> getOriginalGroupNames() {
+            java.util.Set<String> names = new LinkedHashSet<>();
+            for (Batch batch : this.batches) {
+                if (batch.groupName != null && !batch.groupName.isBlank()) {
+                    names.add(batch.groupName);
+                }
+            }
+            return names;
+        }
+
         /** 台車・車輪・パンタ等(車体シェルでない)グループ名か。床下蓋のAABB計算から除外する。 */
         private static boolean isUnderTruckGroup(String lowerGroupName) {
             if (lowerGroupName == null || lowerGroupName.isBlank()) return true;

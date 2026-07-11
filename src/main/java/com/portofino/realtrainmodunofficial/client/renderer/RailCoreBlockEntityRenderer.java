@@ -80,15 +80,15 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             if (maps == null || maps.length == 0) return;
 
             // 本家式レールスクリプト (jp.ngt.rtm.render.RailPartsRenderer)。
-            // renderRailStatic で自前描画するパック (Advanced Rails 等) は
-            // shouldRenderObject=false で通常パイプラインを止め、記録済み GL を再生する。
+            // スクリプト付きレールは本家挙動で描画する:
+            //  ① renderRailStatic (スクリプト自前描画: 壁・ホーム・レール本体等)
+            //  ② 本家デフォルト配置 (0.5m 毎 yaw/pitch/roll 回転) を shouldRenderObject で
+            //     オブジェクト毎にフィルタ (= 端のトリミング)
+            // 分岐コアのみ既存パイプラインへフォールバック。
             com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
                 com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
-            if (scripted != null) {
-                scripted.renderStatic(be, partialTick, poseStack, buffer, packedLight, packedOverlay, model);
-                if (scripted.skipsNormalPipeline(be)) {
-                    return;
-                }
+            if (scripted != null && scripted.render(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
+                return;
             }
             net.minecraft.world.phys.Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
             double cameraDistanceSq = cameraPos.distanceToSqr(be.getBlockPos().getX() + 0.5, be.getBlockPos().getY() + 0.5, be.getBlockPos().getZ() + 0.5);
