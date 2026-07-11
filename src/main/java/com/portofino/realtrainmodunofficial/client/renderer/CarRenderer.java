@@ -52,23 +52,24 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
 
         // 本家式: rendererPath スクリプトを Nashorn (VehicleScriptRenderers) で実行。
         // SRB3/NGTO Builder の GUI・マーカー・入力処理はこの render() 内で動く。
-        boolean scriptRendered = false;
+        // 重要: 新パイプラインのレンダラーが存在する車両では旧パイプライン (レガシー
+        // GraalJS スクリプト) を絶対に走らせない — DataMap/入力の二重処理や
+        // __SRB__ クライアント敷設の誤発動を起こすため。
         var scripted = com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
         if (scripted != null) {
             poseStack.pushPose();
             try {
                 poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
-                MqoModelLoader.MqoModel bodyModel = MqoModelLoader.loadModelForVehicle(def);
-                scriptRendered = scripted.render(entity, partialTick, poseStack, bufferSource,
+                //ボディモデルはスクリプト無しロード (レガシースクリプトを起動させない)
+                MqoModelLoader.MqoModel bodyModel = MqoModelLoader.loadModelForVehicleNoScript(def);
+                scripted.render(entity, partialTick, poseStack, bufferSource,
                         packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, bodyModel);
             } catch (Throwable ignored) {
             } finally {
                 poseStack.popPose();
             }
-        }
-
-        if (!scriptRendered) {
-            //フォールバック: 旧 MQO パイプライン (ベイクドモデル)
+        } else {
+            //新パイプラインが無い車両のみ: 旧 MQO パイプライン (ベイクドモデル+レガシースクリプト)
             MqoModelLoader.MqoModel model = MqoModelLoader.loadModelForVehicle(def);
             if (model != null) {
                 poseStack.pushPose();

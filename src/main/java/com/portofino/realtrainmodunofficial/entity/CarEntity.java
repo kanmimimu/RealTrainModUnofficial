@@ -298,16 +298,17 @@ public final class CarEntity extends Entity {
     public void func_70107_b(double x, double y, double z) {
         this.setPos(x, y, z);
     }
-    /** func_70078_a = mountEntity (1.7.10)。SRB3 は車をホストプレイヤーに乗せて追従させる。 */
+    /**
+     * func_70078_a = mountEntity (1.7.10)。SRB3 は車をホストプレイヤーに乗せて追従させるが、
+     * 1.21 でプレイヤーの乗客にすると「スニークで振り落とされて編集終了」等の
+     * バニラ挙動を踏むため、実際には騎乗させずサーバー側 tick の追従
+     * (hostPlayerEntityId → setPos) で 1.12 の doFollowing と同じ動きにする。
+     */
     public void func_70078_a(Object target) {
         if (target == null) {
             this.stopRiding();
-        } else {
-            net.minecraft.world.entity.Entity e = jp.ngt.mccompat.EntityCompatUtil.unwrapEntity(target);
-            if (e != null) {
-                this.startRiding(e, true);
-            }
         }
+        //騎乗はしない (追従は tick 側で処理)
     }
 
     /// 右クリックされた時の処理
@@ -473,6 +474,19 @@ public final class CarEntity extends Entity {
                 this.yRotO = this.field_70177_z;
                 this.xRotO = this.field_70125_A;
             }
+            // ホストプレイヤー追従 (1.12 doFollowing 相当)。騎乗方式はスニークで
+            // 振り落とされるため使わず、サーバー側で位置を直接ミラーする。
+            // トラッキング範囲切れ (クライアントに描画されなくなる) の防止も兼ねる。
+            String hostIdS = getScriptDataValue("hostPlayerEntityId");
+            if (hostIdS != null && !hostIdS.isEmpty()) {
+                try {
+                    Entity host = this.level().getEntity((int) Double.parseDouble(hostIdS.trim()));
+                    if (host instanceof Player) {
+                        this.setPos(host.getX(), host.getY() + 2.0D, host.getZ());
+                    }
+                } catch (Exception ignored) {
+                }
+            }
             // サーバ→クライアント scriptData 同期。SRB3 の render(クライアント)は
             // hostPlayerEntityId 等のサーバ設定値を読んで GUI を起動するため必須。
             if (scriptDataDirty && !scriptData.isEmpty()) {
@@ -491,7 +505,7 @@ public final class CarEntity extends Entity {
             String hostId = getScriptDataValue("hostPlayerEntityId");
             if (hostId != null && !hostId.isEmpty()) {
                 try {
-                    Entity host = this.level().getEntity(Integer.parseInt(hostId));
+                    Entity host = this.level().getEntity((int) Double.parseDouble(hostId.trim()));
                     if (host != null) {
                         this.setPos(host.getX(), host.getY() + 2.0D, host.getZ());
                         this.xOld = host.xOld;

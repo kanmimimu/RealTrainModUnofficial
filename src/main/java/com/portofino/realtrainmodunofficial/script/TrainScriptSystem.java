@@ -155,6 +155,10 @@ public class TrainScriptSystem {
         "NGTMath = { toRadians: function(d) { return d * Math.PI / 180.0; }, toDegrees: function(r) { return r * 180.0 / Math.PI; }, sin: Math.sin, cos: Math.cos, tan: Math.tan, atan2: Math.atan2, sqrt: Math.sqrt, floor: Math.floor, ceil: Math.ceil, clamp: function(v,a,b) { return Math.max(a, Math.min(b, v)); }, normalizeAngle: function(a) { while(a>=180)a-=360; while(a<-180)a+=360; return a; } };\n" +
         // ModelPackManager: スクリプトの sound lib include で頻出するので空 stub
         "if (typeof ModelPackManager === 'undefined') ModelPackManager = { INSTANCE: { getResource: function() { return null; }, getModel: function() { return null; } } };\n" +
+        // MCTE (ミニチュア) — NGTO Builder 系がロード時に参照する。レガシー環境 (モデル
+        // 選択画面のプレビュー等) では実体不要 — 未定義エラーでスクリプト全体が死ぬのを防ぐ。
+        "if (typeof MCTE === 'undefined') MCTE = { itemMiniature: null };\n" +
+        "if (typeof ItemMiniature === 'undefined') ItemMiniature = { getNGTObject: function() { return null; } };\n" +
         // RTM 拡張パックで使われる TrainControllerManager (ATO/ATC など) のスタブ。
         // 実装は無いので getController は空オブジェクトを返し、null チェックが効くようにする。
         "var __ptCtl = function() { return { isActive: false, stopDistance: 0, targetSpeed: 0, mode: 0, value: 0, isEnable: function() { return false; }, isEnabled: function() { return false; }, isWorking: function() { return false; }, isValid: function() { return false; }, getMode: function() { return 0; }, getState: function() { return 0; }, getTargetSpeed: function() { return 0; }, getTargetDistance: function() { return 0; }, getDistance: function() { return 0; }, getStopDistance: function() { return 0; }, getSpeed: function() { return 0; }, getValue: function() { return 0; }, setTarget: function() {}, setEnable: function() {}, setEnabled: function() {}, enable: function() {}, disable: function() {}, update: function() {}, reset: function() {} }; };\n" +

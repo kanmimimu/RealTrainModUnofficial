@@ -191,6 +191,36 @@ public final class MqoModelLoader {
         return model;
     }
 
+    /**
+     * レガシースクリプトを一切ロード/実行しない版 (新 Nashorn パイプライン用のボディモデル)。
+     * 旧パイプラインのスクリプトが並走すると DataMap/入力が二重処理されるため、
+     * 新パイプラインで描画する車両はこちらを使う。
+     */
+    public static MqoModel loadModelForVehicleNoScript(VehicleDefinition def) {
+        if (def == null) {
+            return null;
+        }
+        Path packPath = RailPackLoader.resolvePackPath(def.getPackName());
+        if (packPath == null) {
+            return null;
+        }
+        String key = "vns|" + def.getId() + "|" + def.getPackName() + "|" + def.getModelFile() + "|" + def.getTextureOverrides().hashCode();
+        if (FAILED_MODEL_KEYS.contains(key)) {
+            return null;
+        }
+        MqoModel cached = getCachedModel(key);
+        if (cached != null) {
+            return cached;
+        }
+        MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), true);
+        if (model != null) {
+            cacheModel(key, model);
+        } else {
+            FAILED_MODEL_KEYS.add(key);
+        }
+        return model;
+    }
+
     private static String resolveVehicleRenderScriptPath(Path packPath, VehicleDefinition def) {
         if (def == null) {
             return "";
