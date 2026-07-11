@@ -50,9 +50,8 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.OVERHEAD_LINE_POLE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_GATE_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.CONNECTOR_INPUT_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.CONNECTOR_OUTPUT_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.SIGNAL_CONVERTER_ITEM.get());
+                //入力コネクタ/出力コネクタ/信号変換器 はユーザー要望で削除
+                //(信号機とワイヤーのみ残す。登録は既存ワールド互換のため残置)
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
