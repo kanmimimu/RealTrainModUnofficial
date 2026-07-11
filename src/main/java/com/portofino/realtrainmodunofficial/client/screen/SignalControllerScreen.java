@@ -5,15 +5,25 @@ import jp.masa.signalcontrollermod.SignalType;
 import jp.masa.signalcontrollermod.TileEntitySignalController;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Checkbox;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * SignalControllerMod (作者: masa300) の GUISignalController 1.21.1 移植。
- * 原作同様: SignalType 切替 / last / repeat / Reduced Speed / above の設定と
- * nextSignal / displayPos 一覧の表示 (追加は Pos Setting Tool で行う)。
+ * SignalControllerMod (作者: masa300, https://github.com/masa300/SignalControllerMod)
+ * の GUISignalController 1.21.1 移植。ボタン配置は 1.7.10 原作と同じ:
+ *   SignalType [切替ボタン]
+ *   Option     [x]last [ ]repeat [ ]Reduced Speed
+ *                x      y      z
+ *   nextSignal0 [___] [___] [___] [+]
+ *   displayPos0 [___] [___] [___] [+]
+ * 座標は直接編集可能、[+] で行を追加。閉じた時にサーバーへ反映。
  */
 public class SignalControllerScreen extends Screen {
     private final TileEntitySignalController controller;
@@ -22,12 +32,15 @@ public class SignalControllerScreen extends Screen {
     private boolean last;
     private boolean repeat;
     private boolean reducedSpeed;
+    private final List<int[]> nextRows = new ArrayList<>();
+    private final List<int[]> displayRows = new ArrayList<>();
 
-    private Button typeButton;
-    private Button lastButton;
-    private Button repeatButton;
-    private Button reducedButton;
-    private Button aboveButton;
+    private final List<EditBox[]> nextBoxes = new ArrayList<>();
+    private final List<EditBox[]> displayBoxes = new ArrayList<>();
+    private Checkbox lastBox;
+    private Checkbox repeatBox;
+    private Checkbox reducedBox;
+    private Checkbox aboveBox;
 
     public SignalControllerScreen(TileEntitySignalController controller) {
         super(Component.literal("SignalController"));
@@ -37,68 +50,134 @@ public class SignalControllerScreen extends Screen {
         this.last = controller.isLast();
         this.repeat = controller.isRepeat();
         this.reducedSpeed = controller.isReducedSpeed();
+        for (BlockPos p : controller.getNextSignal()) {
+            this.nextRows.add(new int[]{p.getX(), p.getY(), p.getZ()});
+        }
+        for (BlockPos p : controller.getDisplayPos()) {
+            this.displayRows.add(new int[]{p.getX(), p.getY(), p.getZ()});
+        }
+        if (this.nextRows.isEmpty()) {
+            this.nextRows.add(new int[]{0, 0, 0});
+        }
+        if (this.displayRows.isEmpty()) {
+            this.displayRows.add(new int[]{0, 0, 0});
+        }
     }
 
     @Override
     protected void init() {
         int cx = this.width / 2;
         int cy = this.height / 2;
-        this.typeButton = addRenderableWidget(Button.builder(typeLabel(), b -> {
+
+        //SignalType 切替 (原作: 中央の大ボタン)
+        addRenderableWidget(Button.builder(typeLabel(), b -> {
             SignalType[] values = SignalType.values();
             this.signalType = values[(this.signalType.ordinal() + 1) % values.length];
             b.setMessage(typeLabel());
-            send();
-        }).bounds(cx - 40, cy - 80, 110, 20).build());
+        }).bounds(cx - 40, cy - 82, 150, 20).build());
 
-        this.lastButton = addRenderableWidget(Button.builder(toggleLabel("last", last), b -> {
-            this.last = !this.last;
-            b.setMessage(toggleLabel("last", last));
-            send();
-        }).bounds(cx - 130, cy - 50, 80, 20).build());
+        //Option チェックボックス (原作: last / repeat / Reduced Speed 並び)
+        this.lastBox = addRenderableWidget(Checkbox.builder(Component.literal("last"), this.font)
+                .pos(cx - 40, cy - 55).selected(this.last)
+                .onValueChange((box, value) -> this.last = value).build());
+        this.repeatBox = addRenderableWidget(Checkbox.builder(Component.literal("repeat"), this.font)
+                .pos(cx + 15, cy - 55).selected(this.repeat)
+                .onValueChange((box, value) -> this.repeat = value).build());
+        this.reducedBox = addRenderableWidget(Checkbox.builder(Component.literal("Reduced Speed"), this.font)
+                .pos(cx + 85, cy - 55).selected(this.reducedSpeed)
+                .onValueChange((box, value) -> this.reducedSpeed = value).build());
+        this.aboveBox = addRenderableWidget(Checkbox.builder(Component.literal("above"), this.font)
+                .pos(cx + 205, cy - 55).selected(this.above)
+                .onValueChange((box, value) -> this.above = value).build());
 
-        this.repeatButton = addRenderableWidget(Button.builder(toggleLabel("repeat", repeat), b -> {
-            this.repeat = !this.repeat;
-            b.setMessage(toggleLabel("repeat", repeat));
-            send();
-        }).bounds(cx - 45, cy - 50, 80, 20).build());
+        //座標行 (x/y/z の EditBox ×3 + 最終行の "+" 追加ボタン)
+        this.nextBoxes.clear();
+        this.displayBoxes.clear();
+        int y = cy - 5;
+        for (int i = 0; i < this.nextRows.size(); i++) {
+            addPosRow(this.nextRows.get(i), this.nextBoxes, cx, y);
+            if (i == this.nextRows.size() - 1) {
+                addPlusButton(cx, y, true);
+            }
+            y += 25;
+        }
+        for (int i = 0; i < this.displayRows.size(); i++) {
+            addPosRow(this.displayRows.get(i), this.displayBoxes, cx, y);
+            if (i == this.displayRows.size() - 1) {
+                addPlusButton(cx, y, false);
+            }
+            y += 25;
+        }
+    }
 
-        this.reducedButton = addRenderableWidget(Button.builder(toggleLabel("Reduced Speed", reducedSpeed), b -> {
-            this.reducedSpeed = !this.reducedSpeed;
-            b.setMessage(toggleLabel("Reduced Speed", reducedSpeed));
-            send();
-        }).bounds(cx + 40, cy - 50, 110, 20).build());
+    private void addPosRow(int[] row, List<EditBox[]> boxes, int cx, int y) {
+        EditBox[] triple = new EditBox[3];
+        for (int c = 0; c < 3; c++) {
+            EditBox box = new EditBox(this.font, cx - 40 + c * 55, y, 50, 18, Component.empty());
+            box.setValue(String.valueOf(row[c]));
+            box.setFilter(s -> s.isEmpty() || s.equals("-") || s.matches("-?\\d{1,8}"));
+            triple[c] = addRenderableWidget(box);
+        }
+        boxes.add(triple);
+    }
 
-        this.aboveButton = addRenderableWidget(Button.builder(toggleLabel("above", above), b -> {
-            this.above = !this.above;
-            b.setMessage(toggleLabel("above", above));
-            send();
-        }).bounds(cx - 130, cy - 25, 80, 20).build());
-
-        addRenderableWidget(Button.builder(Component.literal("NextSignal クリア"), b ->
-                PacketDistributor.sendToServer(new SignalControllerPayload(
-                        controller.getBlockPos(), 1, signalType.toString(), above, last, repeat, reducedSpeed))
-        ).bounds(cx - 45, cy - 25, 95, 20).build());
-
-        addRenderableWidget(Button.builder(Component.literal("DisplayPos クリア"), b ->
-                PacketDistributor.sendToServer(new SignalControllerPayload(
-                        controller.getBlockPos(), 2, signalType.toString(), above, last, repeat, reducedSpeed))
-        ).bounds(cx + 55, cy - 25, 95, 20).build());
-
-        addRenderableWidget(Button.builder(Component.literal("閉じる"), b -> onClose())
-                .bounds(cx - 40, this.height - 30, 80, 20).build());
+    private void addPlusButton(int cx, int y, boolean nextList) {
+        addRenderableWidget(Button.builder(Component.literal("+"), b -> {
+            applyEdits();
+            if (nextList) {
+                this.nextRows.add(new int[]{0, 0, 0});
+            } else {
+                this.displayRows.add(new int[]{0, 0, 0});
+            }
+            this.rebuildWidgets();
+        }).bounds(cx + 130, y, 18, 18).build());
     }
 
     private Component typeLabel() {
         return Component.translatable("SignalControllerMod.gui.signalType." + this.signalType.toString());
     }
 
-    private static Component toggleLabel(String name, boolean value) {
-        return Component.literal(name + ": " + (value ? "ON" : "OFF"));
+    /**
+     * EditBox の現在値を rows に反映
+     */
+    private void applyEdits() {
+        readBoxes(this.nextBoxes, this.nextRows);
+        readBoxes(this.displayBoxes, this.displayRows);
     }
 
-    private void send() {
+    private static void readBoxes(List<EditBox[]> boxes, List<int[]> rows) {
+        for (int i = 0; i < boxes.size() && i < rows.size(); i++) {
+            for (int c = 0; c < 3; c++) {
+                try {
+                    rows.get(i)[c] = Integer.parseInt(boxes.get(i)[c].getValue().trim());
+                } catch (Exception e) {
+                    rows.get(i)[c] = 0;
+                }
+            }
+        }
+    }
+
+    /**
+     * 閉じる時にサーバーへ一括反映 (原作もパケットで反映)
+     */
+    @Override
+    public void onClose() {
+        applyEdits();
+        List<BlockPos> next = new ArrayList<>();
+        for (int[] r : this.nextRows) {
+            if (!(r[0] == 0 && r[1] == 0 && r[2] == 0)) {
+                next.add(new BlockPos(r[0], r[1], r[2]));
+            }
+        }
+        List<BlockPos> disp = new ArrayList<>();
+        for (int[] r : this.displayRows) {
+            if (!(r[0] == 0 && r[1] == 0 && r[2] == 0)) {
+                disp.add(new BlockPos(r[0], r[1], r[2]));
+            }
+        }
         PacketDistributor.sendToServer(new SignalControllerPayload(
-                controller.getBlockPos(), 0, signalType.toString(), above, last, repeat, reducedSpeed));
+                controller.getBlockPos(), signalType.toString(), above, last, repeat, reducedSpeed, next, disp));
+        super.onClose();
     }
 
     @Override
@@ -106,23 +185,21 @@ public class SignalControllerScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         int cx = this.width / 2;
         int cy = this.height / 2;
-        graphics.drawString(this.font, "SignalController", cx - 130, 20, 0xFFFFFF);
-        graphics.drawString(this.font, "SignalType", cx - 130, cy - 74, 0xFFFFFF);
-        int y = cy;
-        for (int i = 0; i < controller.getNextSignal().size(); i++) {
-            BlockPos p = controller.getNextSignal().get(i);
-            graphics.drawString(this.font, "nextSignal" + i + ": " + p.getX() + ", " + p.getY() + ", " + p.getZ(),
-                    cx - 130, y, 0xFFFFFF);
-            y += 12;
+        //原作の文字配置
+        graphics.drawString(this.font, "SignalController", 20, 20, 0xFFFFFF);
+        graphics.drawString(this.font, "SignalType", cx - 120, cy - 76, 0xFFFFFF);
+        graphics.drawString(this.font, "Option", cx - 120, cy - 50, 0xFFFFFF);
+        graphics.drawString(this.font, "x", cx - 17, cy - 20, 0xFFFFFF);
+        graphics.drawString(this.font, "y", cx + 38, cy - 20, 0xFFFFFF);
+        graphics.drawString(this.font, "z", cx + 93, cy - 20, 0xFFFFFF);
+        int y = cy - 5;
+        for (int i = 0; i < this.nextRows.size(); i++) {
+            graphics.drawString(this.font, "nextSignal" + i, cx - 120, y + 5, 0xFFFFFF);
+            y += 25;
         }
-        for (int i = 0; i < controller.getDisplayPos().size(); i++) {
-            BlockPos p = controller.getDisplayPos().get(i);
-            graphics.drawString(this.font, "displayPos" + i + ": " + p.getX() + ", " + p.getY() + ", " + p.getZ(),
-                    cx - 130, y, 0xFFFFFF);
-            y += 12;
-        }
-        if (this.above) {
-            graphics.drawString(this.font, "above", cx - 130, y, 0xFFFFFF);
+        for (int i = 0; i < this.displayRows.size(); i++) {
+            graphics.drawString(this.font, "displayPos" + i, cx - 120, y + 5, 0xFFFFFF);
+            y += 25;
         }
     }
 

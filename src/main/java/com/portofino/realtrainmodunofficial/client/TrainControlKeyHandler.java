@@ -30,6 +30,9 @@ public final class TrainControlKeyHandler {
     private static boolean shiftWasDown;
     private static int powerHoldTicks = -1;
     private static int brakeHoldTicks = -1;
+    //jp.ngt 列車の W/S 長押しノッチ用
+    private static int rtmPowerHoldTicks = -1;
+    private static int rtmBrakeHoldTicks = -1;
 
     private TrainControlKeyHandler() {
     }
@@ -204,6 +207,33 @@ public final class TrainControlKeyHandler {
             return;
         }
 
+        //jp.ngt 本家忠実列車: W/S 長押しでノッチ増減 (KaizPatchX 同様)。
+        //押した瞬間に 1 段、押しっぱなしで一定間隔ごとにさらに 1 段ずつ。
+        if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain
+                && !rtmTrain.hasSeat(mc.player)) {
+            boolean up = mc.options.keyUp.isDown();
+            boolean down = mc.options.keyDown.isDown();
+            if (up && !down) {
+                rtmPowerHoldTicks = Math.max(0, rtmPowerHoldTicks + 1);
+                rtmBrakeHoldTicks = -1;
+                if (rtmPowerHoldTicks == 1 || shouldSendRepeat(rtmPowerHoldTicks)) {
+                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_power", 0));
+                }
+            } else if (down && !up) {
+                rtmBrakeHoldTicks = Math.max(0, rtmBrakeHoldTicks + 1);
+                rtmPowerHoldTicks = -1;
+                if (rtmBrakeHoldTicks == 1 || shouldSendRepeat(rtmBrakeHoldTicks)) {
+                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_brake", 0));
+                }
+            } else {
+                rtmPowerHoldTicks = -1;
+                rtmBrakeHoldTicks = -1;
+            }
+        } else {
+            rtmPowerHoldTicks = -1;
+            rtmBrakeHoldTicks = -1;
+        }
+
         TrainEntity train = getControlledTrain(mc);
         if (train == null) {
             shiftWasDown = false;
@@ -325,5 +355,7 @@ public final class TrainControlKeyHandler {
     private static void resetHoldState() {
         powerHoldTicks = -1;
         brakeHoldTicks = -1;
+        rtmPowerHoldTicks = -1;
+        rtmBrakeHoldTicks = -1;
     }
 }
