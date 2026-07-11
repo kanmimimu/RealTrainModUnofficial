@@ -126,6 +126,20 @@ public class BlockMarker extends BaseEntityBlock {
         return this.defaultBlockState().setValue(META, playerFacing);
     }
 
+    @Override
+    public void setPlacedBy(Level world, BlockPos pos, BlockState state, LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(world, pos, state, placer, stack);
+        //設置直後に自動プレビュー (距離表示のため)。本家は右クリックで作るが、
+        //旧 Remaster 同様「2本目を置いた瞬間に距離が出る」体感に合わせる。
+        if (!world.isClientSide && placer instanceof Player player && (this.markerType == 0 || this.markerType == 1)) {
+            BlockEntity be = world.getBlockEntity(pos);
+            if (be instanceof TileEntityMarker marker) {
+                marker.tick();//rp 初期化
+                this.onMarkerActivated(world, pos.getX(), pos.getY(), pos.getZ(), player, false);
+            }
+        }
+    }
+
     /**
      * 本家 getMarkerDir(Block, meta) 相当。
      */

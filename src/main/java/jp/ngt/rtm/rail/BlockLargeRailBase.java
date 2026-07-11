@@ -1,6 +1,7 @@
 package jp.ngt.rtm.rail;
 
 import com.mojang.serialization.MapCodec;
+import jp.ngt.rtm.rail.util.RailMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.BlockGetter;
@@ -131,10 +132,24 @@ public class BlockLargeRailBase extends BaseEntityBlock {
             BlockEntity be = world.getBlockEntity(pos);
             if (be instanceof TileEntityLargeRailBase tile0) {
                 TileEntityLargeRailCore core = tile0.getRailCore();
-                if (!world.isClientSide && core != null && !core.breaking) {
-                    core.breaking = true;
-                    Arrays.stream(core.getAllRailMaps()).forEach(rm -> rm.breakRail(world, core.getProperty(), core));
+                if (!world.isClientSide) {
+                    if (core != null && !core.breaking) {
+                        core.breaking = true;
+                        RailMap[] maps = core.getAllRailMaps();
+                        if (maps != null) {
+                            Arrays.stream(maps).filter(java.util.Objects::nonNull)
+                                    .forEach(rm -> rm.breakRail(world, core.getProperty(), core));
+                        } else {
+                            //RailMap 不明でもコアは撤去する
+                            world.removeBlock(core.getBlockPos(), false);
+                        }
+                    } else if (core == null) {
+                        jp.ngt.ngtlib.io.NGTLog.debug("[Rail] break at %s: core not found (startPoint=%d,%d,%d)",
+                                pos.toShortString(), tile0.getStartPoint()[0], tile0.getStartPoint()[1], tile0.getStartPoint()[2]);
+                    }
                 }
+            } else if (!world.isClientSide) {
+                jp.ngt.ngtlib.io.NGTLog.debug("[Rail] break at %s: no rail BE (%s)", pos.toShortString(), String.valueOf(be));
             }
         }
         super.onRemove(state, world, pos, newState, movedByPiston);

@@ -184,6 +184,9 @@ public abstract class RailMap {
                 BlockEntity be = world.getBlockEntity(pos);
                 if (be instanceof TileEntityLargeRailBase railBase) {
                     railBase.setStartPoint(x0, y0, z0);
+                    railBase.setChanged();
+                } else {
+                    jp.ngt.ngtlib.io.NGTLog.debug("[RailMap] setRail: no rail BE at %d,%d,%d (block=%s)", x, y, z, String.valueOf(be));
                 }
             }
         });
@@ -234,18 +237,21 @@ public abstract class RailMap {
         this.createRailList(prop);
         List<BlockPos> posList = new ArrayList<>();
         this.rails.forEach(anInt -> {
-            BlockPos pos = new BlockPos(anInt[0], anInt[1], anInt[2]);
-            BlockEntity rail = world.getBlockEntity(pos);
-            if (rail instanceof TileEntityLargeRailBase) {
-                if (rail == core) {
-                    return;
-                }
+            //ベッド行の算出オフセットがビルド間で変わっても連鎖するよう ±1 行も確認する
+            for (int dy = -1; dy <= 1; dy++) {
+                BlockPos pos = new BlockPos(anInt[0], anInt[1] + dy, anInt[2]);
+                BlockEntity rail = world.getBlockEntity(pos);
+                if (rail instanceof TileEntityLargeRailBase) {
+                    if (rail == core) {
+                        continue;
+                    }
 
-                //重なっている他レールを破壊しないように
-                //coreが既に破壊さている場合は続行
-                TileEntityLargeRailCore core2 = ((TileEntityLargeRailBase) rail).getRailCore();
-                if (core2 == null || core2 == core) {
-                    posList.add(pos);
+                    //重なっている他レールを破壊しないように
+                    //coreが既に破壊さている場合は続行
+                    TileEntityLargeRailCore core2 = ((TileEntityLargeRailBase) rail).getRailCore();
+                    if (core2 == null || core2 == core) {
+                        posList.add(pos);
+                    }
                 }
             }
         });
