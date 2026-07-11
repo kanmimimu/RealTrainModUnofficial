@@ -100,4 +100,15 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_CONVERTER_ITEM = ITEMS.register(
         "signal_converter", () -> new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.SIGNAL_CONVERTER.get(), new net.minecraft.world.item.Item.Properties())
     );
+
+    //SignalControllerMod (masa300) 移植: 信号制御器 + 位置設定ツール×2
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_CONTROLLER_ITEM = ITEMS.register(
+        "signal_controller", () -> new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.SIGNAL_CONTROLLER.get(), new net.minecraft.world.item.Item.Properties())
+    );
+    public static final DeferredItem<jp.masa.signalcontrollermod.ItemPosSettingTool> POS_SETTING_TOOL_0 = ITEMS.register(
+        "pos_setting_tool_0", () -> new jp.masa.signalcontrollermod.ItemPosSettingTool(0)
+    );
+    public static final DeferredItem<jp.masa.signalcontrollermod.ItemPosSettingTool> POS_SETTING_TOOL_1 = ITEMS.register(
+        "pos_setting_tool_1", () -> new jp.masa.signalcontrollermod.ItemPosSettingTool(1)
+    );
 }

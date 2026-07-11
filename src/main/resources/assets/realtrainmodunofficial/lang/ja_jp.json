@@ -83,5 +83,16 @@
     "item.realtrainmodunofficial.connector_output":  "出力コネクタ",
     "block.realtrainmodunofficial.signal_converter":  "信号変換器",
     "screen.realtrainmodunofficial.select_connector":  "コネクタモデル選択",
-    "item.realtrainmodunofficial.miniature":  "ミニチュア"
+    "item.realtrainmodunofficial.miniature":  "ミニチュア",
+    "item.realtrainmodunofficial.pos_setting_tool_1":  "Pos Setting Tool(DisplayPos)",
+    "block.realtrainmodunofficial.signal_controller":  "SignalControllerBlock",
+    "SignalControllerMod.gui.signalType.signal2a":  "2灯式A",
+    "SignalControllerMod.gui.signalType.signal4b":  "4灯式B",
+    "SignalControllerMod.gui.signalType.signal5a":  "5灯式A",
+    "SignalControllerMod.gui.signalType.signal6":  "6灯式",
+    "SignalControllerMod.gui.signalType.signal3":  "3灯式",
+    "SignalControllerMod.gui.signalType.signal5b":  "5灯式B",
+    "SignalControllerMod.gui.signalType.signal4a":  "4灯式A",
+    "item.realtrainmodunofficial.pos_setting_tool_0":  "Pos Setting Tool(NextSignal)",
+    "SignalControllerMod.gui.signalType.signal2b":  "2灯式B"
 }

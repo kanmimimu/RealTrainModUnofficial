@@ -83,5 +83,16 @@
     "item.realtrainmodunofficial.connector_output":  "Output Connector",
     "block.realtrainmodunofficial.signal_converter":  "Signal Converter",
     "screen.realtrainmodunofficial.select_connector":  "Select Connector Model",
-    "item.realtrainmodunofficial.miniature":  "Miniature"
+    "item.realtrainmodunofficial.miniature":  "Miniature",
+    "item.realtrainmodunofficial.pos_setting_tool_1":  "Pos Setting Tool(DisplayPos)",
+    "block.realtrainmodunofficial.signal_controller":  "SignalControllerBlock",
+    "SignalControllerMod.gui.signalType.signal2a":  "2 Signals A",
+    "SignalControllerMod.gui.signalType.signal4b":  "4 Signals B",
+    "SignalControllerMod.gui.signalType.signal5a":  "5 Signals A",
+    "SignalControllerMod.gui.signalType.signal6":  "6 Signals",
+    "SignalControllerMod.gui.signalType.signal3":  "3 Signals",
+    "SignalControllerMod.gui.signalType.signal5b":  "5 Signals B",
+    "SignalControllerMod.gui.signalType.signal4a":  "4 Signals A",
+    "item.realtrainmodunofficial.pos_setting_tool_0":  "Pos Setting Tool(NextSignal)",
+    "SignalControllerMod.gui.signalType.signal2b":  "2 Signals B"
 }

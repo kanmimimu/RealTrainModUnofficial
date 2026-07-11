@@ -47,6 +47,14 @@ public final class ClientHooksClient {
         ClientItemHelper.openInstalledObjectSelectScreen(player, stack, category);
     }
 
+    /** SignalControllerMod (masa300) 移植: 設定 GUI */
+    public static void openSignalControllerScreen(Object controller) {
+        if (controller instanceof jp.masa.signalcontrollermod.TileEntitySignalController te) {
+            Minecraft.getInstance().setScreen(
+                new com.portofino.realtrainmodunofficial.client.screen.SignalControllerScreen(te));
+        }
+    }
+
     public static void openSignalChangerScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(new SignalChangerScreen(pos));
     }

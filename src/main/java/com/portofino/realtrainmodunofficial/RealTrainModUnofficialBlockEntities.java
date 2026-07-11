@@ -47,6 +47,12 @@ public class RealTrainModUnofficialBlockEntities {
             jp.ngt.rtm.electric.TileEntitySignalConverter::new,
             RealTrainModUnofficialBlocks.SIGNAL_CONVERTER.get()).build(null));
 
+    /** SignalControllerMod (masa300) 移植: 信号制御器 */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.masa.signalcontrollermod.TileEntitySignalController>> SIGNAL_CONTROLLER =
+        BLOCK_ENTITY_TYPES.register("signal_controller", () -> BlockEntityType.Builder.of(
+            jp.masa.signalcontrollermod.TileEntitySignalController::new,
+            RealTrainModUnofficialBlocks.SIGNAL_CONTROLLER.get()).build(null));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SignalRemoteBlockEntity>> SIGNAL_REMOTE =
         BLOCK_ENTITY_TYPES.register("signal_remote", () -> BlockEntityType.Builder.of(SignalRemoteBlockEntity::new,
             RealTrainModUnofficialBlocks.SIGNAL_RECEIVER.get(),

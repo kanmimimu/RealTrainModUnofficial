@@ -39,6 +39,11 @@ public final class ClientHooks {
         invokeClient("openInstalledObjectSelectScreen", new Class<?>[]{Player.class, ItemStack.class, InstalledObjectCategory.class}, player, stack, category);
     }
 
+    /** SignalControllerMod (masa300) 移植: 設定 GUI */
+    public static void openSignalControllerScreen(Object controller) {
+        invokeClient("openSignalControllerScreen", new Class<?>[]{Object.class}, controller);
+    }
+
     public static void openSignalChangerScreen(BlockPos pos) {
         invokeClient("openSignalChangerScreen", new Class<?>[]{BlockPos.class}, pos);
     }

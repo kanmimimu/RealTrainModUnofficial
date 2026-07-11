@@ -321,10 +321,16 @@ public class Formation {
         {
             int stateR = data & 1;
             int stateL = data >> 1;
-            this.getTrainStream().forEach(train -> {
-                int data2 = (train.getTrainDirection() == 0) ? (stateL << 1 | stateR) : (stateR << 1 | stateL);
-                train.setTrainStateData_NoSync(id, (byte) data2);
-            });
+            //本家は getTrainDirection で反転するが、連結時に車両ごとの
+            //trainDirection が揃わずドアの開く物理側がバラバラになるため、
+            //編成内の物理向き (FormationEntry.dir) を基準に反転して統一する。
+            for (FormationEntry e : this.entries) {
+                if (e == null || e.train == null) {
+                    continue;
+                }
+                int data2 = (e.dir == 0) ? (stateL << 1 | stateR) : (stateR << 1 | stateL);
+                e.train.setTrainStateData_NoSync(id, (byte) data2);
+            }
         } else {
             this.getTrainStream().forEach(train -> train.setTrainStateData_NoSync(id, data));
         }

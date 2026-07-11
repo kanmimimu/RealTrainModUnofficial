@@ -54,6 +54,10 @@ public class RealTrainModUnofficial {
                 //(信号機とワイヤーのみ残す。登録は既存ワールド互換のため残置)
                 //ミニチュアもユーザー要望でタブから削除 (登録は残置 — NGTO Builder は
                 //コマンド入手や既存アイテムで引き続き使用可能)
+                //SignalControllerMod (masa300) 移植
+                output.accept(RealTrainModUnofficialItems.SIGNAL_CONTROLLER_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_0.get());
+                output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_1.get());
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
