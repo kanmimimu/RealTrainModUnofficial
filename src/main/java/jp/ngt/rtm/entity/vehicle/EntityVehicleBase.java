@@ -220,7 +220,9 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
     /**
      * 本家 updatePosAndRotationClient の忠実移植 (クライアント補間)。
-     * 回転は毎tick float 同期値へ滑らかに追従する (量子化パケット非依存)。
+     * 回転: float 同期値 (DATA_YAW/PITCH/ROLL) を毎 tick そのまま採用し、
+     * フレーム間は yRotO との描画補間で滑らかにする (バニラと同じ方式)。
+     * 漸近補間 (t=1/3) は回転がワンテンポ遅れて見えるため廃止。
      */
     protected void updatePosAndRotationClient() {
         if (!this.clientRotInit) {
@@ -228,6 +230,8 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
             this.setRot(this.vehicleYaw, this.vehiclePitch);
             this.yRotO = this.vehicleYaw;
             this.xRotO = this.vehiclePitch;
+            this.rotationRoll = this.vehicleRoll;
+            this.prevRotationRoll = this.vehicleRoll;
         }
         if (this.vehiclePosRotationInc > 0) {
             float d0 = 1.0F / (float) this.vehiclePosRotationInc;
@@ -237,12 +241,10 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
             --this.vehiclePosRotationInc;
             this.setPos(x, y, z);
         }
-        //回転補間 (本家 d0=1/inc 相当。パケットが来ない tick も追従を続ける)
-        float t = 1.0F / 3.0F;
-        float yaw = this.getYRot() + Mth.wrapDegrees(this.vehicleYaw - this.getYRot()) * t;
-        float pitch = this.getXRot() + (this.vehiclePitch - this.getXRot()) * t;
-        this.rotationRoll = this.rotationRoll + (this.vehicleRoll - this.rotationRoll) * t;
-        this.setRot(yaw, pitch);
+        //ラップ跨ぎ (179→-179 等) でフレーム補間が逆回りしないよう、現在値の近傍へ展開
+        float yaw = this.getYRot() + Mth.wrapDegrees(this.vehicleYaw - this.getYRot());
+        this.setRot(yaw, this.vehiclePitch);
+        this.rotationRoll = this.vehicleRoll;
     }
 
     protected void onVehicleUpdate() {

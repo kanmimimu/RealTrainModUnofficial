@@ -186,6 +186,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     }
 
     public void spawnTrain(Level world) {
+        //DATA_YAW/PITCH の初期値を実姿勢に (デフォルト 0 のまま初期同期されると
+        //クライアントが一瞬ヨー 0 にスナップしてから回転して見える)
+        if (!world.isClientSide) {
+            this.entityData.set(DATA_YAW, this.getYRot());
+            this.entityData.set(DATA_PITCH, this.getXRot());
+        }
         //spawnの順番は「先に台車」
         this.bogieController.createBogie(world, this);
         this.bogieController.setupBogiePos(this);
@@ -240,6 +246,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.entityData.set(DATA_BYTE_ARRAY, nbt.getString("byteArray"));
         this.entityData.set(DATA_CAB_DIR, nbt.getByte("cabDir"));
         this.setModelName(nbt.getString("modelName"));
+        //セーブからのロードでも初期同期のヨー/ピッチを実姿勢に合わせる
+        this.entityData.set(DATA_YAW, this.getYRot());
+        this.entityData.set(DATA_PITCH, this.getXRot());
     }
 
     private void readFormationData(CompoundTag nbt) {
