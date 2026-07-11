@@ -49,6 +49,9 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         this.startPoint[0] = nbt.getInt("spX");
         this.startPoint[1] = nbt.getInt("spY");
         this.startPoint[2] = nbt.getInt("spZ");
+        //同期/再読込時に高さキャッシュを無効化 (当たり判定が古い値に固着しないように)
+        this.blockHeights = null;
+        this.finishSetupBlockBounds = false;
     }
 
     @Override

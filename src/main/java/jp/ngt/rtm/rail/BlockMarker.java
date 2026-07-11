@@ -427,15 +427,29 @@ public class BlockMarker extends BaseEntityBlock {
             RailProperty prop = jp.ngt.rtm.item.ItemRail.getProperty(item);
             return prop != null ? prop : RailProperty.getDefaultProperty();
         }
-        //Remaster RailItem (選択中モデル)
+        //Remaster RailItem: アイテム自身の選択モデル ID を最優先 (本家 ItemRail.getProperty(item) 相当)
         if (!item.isEmpty() && item.getItem() instanceof com.portofino.realtrainmodunofficial.item.RailItem) {
-            com.portofino.realtrainmodunofficial.rail.RailDefinition def =
-                    com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
-            String model = def != null ? def.getId() : "";
-            return new RailProperty(model, net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+            String model = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(item);
+            if (model == null || model.isEmpty()) {
+                com.portofino.realtrainmodunofficial.rail.RailDefinition def =
+                        com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
+                model = def != null ? def.getId() : "";
+            }
+            return new RailProperty(model == null ? "" : model, net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
         }
 
         if (player.getAbilities().instabuild || !par2) {
+            //空手 (クリエイティブ): 選択中 or 先頭のレール定義をデフォルトに (railModel="" だと描画もスクリプトも無い)
+            com.portofino.realtrainmodunofficial.rail.RailDefinition def =
+                    com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
+            if (def == null) {
+                java.util.List<com.portofino.realtrainmodunofficial.rail.RailDefinition> all =
+                        com.portofino.realtrainmodunofficial.rail.RailRegistry.getAll();
+                def = all.isEmpty() ? null : all.get(0);
+            }
+            if (def != null) {
+                return new RailProperty(def.getId(), net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+            }
             return RailProperty.getDefaultProperty();
         }
 

@@ -103,9 +103,10 @@ dependencies {
     jsRuntime "org.graalvm.js:js-scriptengine:24.2.2"
     jsRuntime "org.graalvm.polyglot:js:24.2.2"
     // 本家 RTM/NGTLib と同一のスクリプトエンジン (jp.ngt.ngtlib.io.ScriptUtil が使用)。
-    // GraalJS は Phase 3 完了時に撤去予定。
-    implementation "org.openjdk.nashorn:nashorn-core:15.6"
-    jsRuntime "org.openjdk.nashorn:nashorn-core:15.6"
+    // NeoForge 21.1 が nashorn-core 15.4 をプラットフォームライブラリとして同梱しているため
+    // jar への同梱 (jsRuntime) は不可 (org.openjdk.nashorn モジュールと二重エクスポート衝突)。
+    // コンパイル参照のみ。GraalJS は Phase 3 完了時に撤去予定。
+    implementation "org.openjdk.nashorn:nashorn-core:15.4"
     // Bundled add-on ATSAssistMod+ uses Jackson for IFTTT rule serialization.
     implementation "com.fasterxml.jackson.core:jackson-databind:2.15.2"
     jsRuntime "com.fasterxml.jackson.core:jackson-databind:2.15.2"
@@ -141,6 +142,9 @@ tasks.named('jar', Jar).configure {
                 .collect { it.isDirectory() ? it : zipTree(it) }
     } {
         exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'module-info.class', '**/module-info.class'
+        // ASM は NeoForge がモジュールパスで提供済み。同梱すると本番で
+        // ResolutionException (org.objectweb.asm.tree の二重エクスポート) になる。
+        exclude 'org/objectweb/**'
     }
 }
 
