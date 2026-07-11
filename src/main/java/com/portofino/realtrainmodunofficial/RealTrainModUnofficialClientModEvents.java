@@ -41,6 +41,11 @@ public final class RealTrainModUnofficialClientModEvents {
             jp.ngt.rtm.rail.RTMRailBlockEntities.TURNTABLE_CORE.get(),
             RailCoreBlockEntityRenderer::new
         );
+        // マーカーの距離 (メートル) 表示
+        event.registerBlockEntityRenderer(
+            jp.ngt.rtm.rail.RTMRailBlockEntities.MARKER.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.MarkerBlockEntityRenderer::new
+        );
         event.registerBlockEntityRenderer(
             RealTrainModUnofficialBlockEntities.INSTALLED_OBJECT.get(),
             InstalledObjectBlockEntityRenderer::new

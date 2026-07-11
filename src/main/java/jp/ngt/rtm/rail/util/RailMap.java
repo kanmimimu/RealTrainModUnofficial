@@ -122,7 +122,9 @@ public abstract class RailMap {
             double z = point[0];
             double slope = Math.toRadians(this.getRailYaw(split, j));
             double height = this.getRailHeight(split, j);
-            int y = (int) height;
+            //Remaster 調整: 本家は (int)height だが、道床ブロックをレール面の1ブロック下に
+            //埋めて敷く (地形をトリミングし、当たり判定の天面がレール面に一致する)。
+            int y = (int) height - 1;
             int x0 = Mth.floor(x);
             int z0 = Mth.floor(z);
 
@@ -262,7 +264,8 @@ public abstract class RailMap {
         this.createRailList(prop);
         boolean flag = true;
         for (int[] rail : this.rails) {
-            BlockPos pos = new BlockPos(rail[0], rail[1], rail[2]);
+            //道床は地面に埋めるため、障害物判定はレール面 (ベッド行の1つ上) で行う
+            BlockPos pos = new BlockPos(rail[0], rail[1] + 1, rail[2]);
             BlockState state = world.getBlockState(pos);
             Block block = state.getBlock();
             boolean b0 = state.isAir()
