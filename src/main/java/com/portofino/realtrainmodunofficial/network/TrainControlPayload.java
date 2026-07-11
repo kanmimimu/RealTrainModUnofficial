@@ -208,13 +208,18 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 byte data = train.getTrainStateData(doorType.id);
                 train.setTrainStateData(doorType.id, (byte) (data == 0 ? 3 : 0));
             }
+            //本家 GuiTrainControlPanel: ドアボタンの左右は trainDir ^ cabDir で入れ替わる
+            //(逆向き運転台から操作しても運転士から見た左右が正しくなる)。
+            //ユーザー報告「右を開けたら左が出る」対応で基本マッピングも反転。
             case "toggle_door_left" -> {
                 byte data = train.getTrainStateData(doorType.id);
-                train.setTrainStateData(doorType.id, (byte) (data ^ 2));
+                boolean dir = ((train.getTrainDirection() ^ train.getCabDirection()) & 1) == 0;
+                train.setTrainStateData(doorType.id, (byte) (data ^ (dir ? 1 : 2)));
             }
             case "toggle_door_right" -> {
                 byte data = train.getTrainStateData(doorType.id);
-                train.setTrainStateData(doorType.id, (byte) (data ^ 1));
+                boolean dir = ((train.getTrainDirection() ^ train.getCabDirection()) & 1) == 0;
+                train.setTrainStateData(doorType.id, (byte) (data ^ (dir ? 2 : 1)));
             }
             case "toggle_headlight" -> {
                 byte data = train.getTrainStateData(lightType.id);

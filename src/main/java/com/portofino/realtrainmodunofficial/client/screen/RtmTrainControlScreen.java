@@ -338,7 +338,10 @@ public class RtmTrainControlScreen extends Screen {
         @Override
         protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             int doorState = train.getTrainStateData(TrainStateType.State_Door.id);
-            boolean opened = leftDoor ? (doorState & 2) == 2 : (doorState & 1) == 1;
+            //本家: trainDir ^ cabDir で表示側も入れ替える (サーバー側トグルと同じマッピング)
+            boolean dir = ((train.getTrainDirection() ^ train.getCabDirection()) & 1) == 0;
+            int bit = leftDoor ? (dir ? 1 : 2) : (dir ? 2 : 1);
+            boolean opened = (doorState & bit) == bit;
             int sliderOffset = opened ? -10 : -4;
             graphics.blit(TAB_INVENTORY_TEXTURE, getX() + 25, getY() + sliderOffset, 242, 80, 14, 100, 256, 256);
             graphics.blit(TAB_INVENTORY_TEXTURE, getX(), getY(), 192, 0, 64, 80, 256, 256);

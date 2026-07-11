@@ -112,7 +112,9 @@ public class TrainItem extends Item {
 
         int i0 = rm0.getNearlestPoint(128, cp.getX() + 0.5D, cp.getZ() + 0.5D);
         float yw0 = Mth.wrapDegrees(rm0.getRailYaw(128, i0));
-        float yaw = jp.ngt.rtm.entity.train.EntityBogie.fixBogieYaw(-player.getYRot(), yw0);
+        //本家 ItemTrain は -rotationYaw だが、当実装では本家と逆向きに置かれる
+        //(ユーザー実機比較)。+180 して本家と同じ向きでスポーンさせる。
+        float yaw = jp.ngt.rtm.entity.train.EntityBogie.fixBogieYaw(-player.getYRot() + 180.0F, yw0);
         float pitch = jp.ngt.rtm.entity.train.EntityBogie.fixBogiePitch(rm0.getRailPitch(128, i0), yw0, yaw);
         double posX = rm0.getRailPos(128, i0)[1];
         double posY = rm0.getRailHeight(128, i0) + jp.ngt.rtm.entity.train.EntityTrainBase.TRAIN_HEIGHT;
