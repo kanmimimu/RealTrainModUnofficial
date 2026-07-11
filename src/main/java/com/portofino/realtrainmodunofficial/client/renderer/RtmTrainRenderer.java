@@ -59,6 +59,11 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                         && !BogieRenderer.isDummyBogieModel(b.modelFile())
                         && !b.modelFile().toLowerCase(Locale.ROOT).endsWith(".class"));
 
+        //乗員を車体より先に描画する。車体は半透明バッチ (AlphaBlend) が深度を書くため、
+        //列車→乗員の順に描かれると乗員がガラス/車体越しに遮蔽されて透明に見える
+        //(本家 1.7.10 は不透明ピクセル先行の 2 パスだったため発生しなかった問題)。
+        this.renderRidersFirst(entity, partialTicks, poseStack, buffer, packedLight);
+
         poseStack.pushPose();
         try {
             //本家 RenderVehicleBase: yaw → -pitch → roll → offset
@@ -85,6 +90,35 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, filter);
         } finally {
             poseStack.popPose();
+        }
+    }
+
+    /**
+     * 乗員 (運転士等) を車体より先に描画する。
+     * 通常の描画ループでも描かれるが、同一変換の二重描画は視覚上問題にならない。
+     */
+    private void renderRidersFirst(EntityTrain entity, float partialTicks, PoseStack poseStack,
+                                   MultiBufferSource buffer, int packedLight) {
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        var dispatcher = mc.getEntityRenderDispatcher();
+        for (net.minecraft.world.entity.Entity rider : entity.getPassengers()) {
+            //一人称の自分自身は描かない
+            if (rider == mc.getCameraEntity() && mc.options.getCameraType().isFirstPerson()) {
+                continue;
+            }
+            double rx = Mth.lerp(partialTicks, rider.xOld, rider.getX())
+                    - Mth.lerp(partialTicks, entity.xOld, entity.getX());
+            double ry = Mth.lerp(partialTicks, rider.yOld, rider.getY())
+                    - Mth.lerp(partialTicks, entity.yOld, entity.getY());
+            double rz = Mth.lerp(partialTicks, rider.zOld, rider.getZ())
+                    - Mth.lerp(partialTicks, entity.zOld, entity.getZ());
+            float riderYaw = Mth.rotLerp(partialTicks, rider.yRotO, rider.getYRot());
+            try {
+                dispatcher.render(rider, rx, ry, rz, riderYaw, partialTicks, poseStack, buffer,
+                        dispatcher.getPackedLightCoords(rider, partialTicks));
+            } catch (Throwable ignored) {
+                //乗員描画の失敗で車体描画を巻き込まない
+            }
         }
     }
 

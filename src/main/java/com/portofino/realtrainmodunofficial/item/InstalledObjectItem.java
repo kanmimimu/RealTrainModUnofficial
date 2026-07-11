@@ -61,10 +61,21 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         InstalledObjectDefinition definition = InstalledObjectRegistry.getById(selectedId);
         if (definition == null || definition.getCategory() != category) {
-            if (level.isClientSide) {
-                ClientHooks.openInstalledObjectSelectScreen(player, stack, category);
+            //コネクタは本家デフォルトモデル (Input01/Output01) で未選択でも即設置
+            if (category == InstalledObjectCategory.CONNECTOR_INPUT
+                    || category == InstalledObjectCategory.CONNECTOR_OUTPUT) {
+                String defaultName = category == InstalledObjectCategory.CONNECTOR_INPUT ? "Input01" : "Output01";
+                definition = InstalledObjectRegistry.getById(defaultName);
+                if (definition == null || definition.getCategory() != category) {
+                    definition = InstalledObjectRegistry.getByCategory(category).stream().findFirst().orElse(null);
+                }
             }
-            return InteractionResult.sidedSuccess(level.isClientSide);
+            if (definition == null) {
+                if (level.isClientSide) {
+                    ClientHooks.openInstalledObjectSelectScreen(player, stack, category);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            }
         }
 
         net.minecraft.core.Direction clickedFace = context.getClickedFace();
