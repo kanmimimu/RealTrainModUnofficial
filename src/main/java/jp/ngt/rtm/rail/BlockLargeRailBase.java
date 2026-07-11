@@ -54,9 +54,9 @@ public class BlockLargeRailBase extends BaseEntityBlock {
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
-        //本家は道床テクスチャ付きで描画 (RenderBlockLargeRail)。
-        //暫定: 静的スラブモデル (道床見た目)。4隅高さ対応の動的描画は後続で移植。
-        return RenderShape.MODEL;
+        //道床の見た目はレールモデル (MQO の base/ballast/sleeper グループ) が描画する。
+        //ブロック自体は当たり判定/構造用 (静的スラブ描画は浮き・二重描画になるため廃止)。
+        return RenderShape.INVISIBLE;
     }
 
     @Nullable
