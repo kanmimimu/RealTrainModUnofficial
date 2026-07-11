@@ -91,11 +91,12 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             for (int k = -1; k <= 1; k++) {
                 float moveX = moveZ * k;
                 poseStack.pushPose();
-                poseStack.translate(moveX, 0.0F, moveZ);
+                poseStack.translate(moveX, 0.2F, moveZ);
                 //向き回転を打ち消してビルボード化 (本家: -playerViewY - dir)
                 poseStack.mulPose(new Quaternionf().rotationY(-dir * Mth.DEG_TO_RAD));
                 poseStack.mulPose(cameraRot);
-                poseStack.scale(-0.025F, -0.025F, 0.025F);
+                //本家スケール: glScalef(-0.25, -0.25, 0.25)
+                poseStack.scale(-0.25F, -0.25F, 0.25F);
                 Matrix4f tm = poseStack.last().pose();
                 float x = -this.font.width(s) / 2.0F;
                 this.font.drawInBatch(s, x, -10.0F, color | 0xFF000000, false, tm, buffer,
@@ -154,9 +155,10 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             float z0 = (float) (pos[0] - rp.posZ);
             poseStack.translate(x0, y0 + 0.5F, z0);
             poseStack.mulPose(cameraRot);
-            poseStack.scale(-0.05F, -0.05F, 0.05F);
+            //本家は 0.05 だが視認性向上のため少し大きめ + "m" 付き
+            poseStack.scale(-0.1F, -0.1F, 0.1F);
             Matrix4f tm = poseStack.last().pose();
-            String s = String.valueOf((float) Math.round(rm.getLength() * 10000) / 10000);
+            String s = String.format("%.2fm", rm.getLength());
             float x = -this.font.width(s) / 2.0F;
             this.font.drawInBatch(s, x, -10.0F, 0xFF00EE00, false, tm, buffer,
                     Font.DisplayMode.SEE_THROUGH, 0, 0xF000F0);
