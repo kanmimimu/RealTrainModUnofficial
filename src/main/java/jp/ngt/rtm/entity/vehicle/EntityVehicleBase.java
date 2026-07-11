@@ -54,6 +54,7 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     protected int vehiclePosRotationInc;
     protected double vehicleX, vehicleY, vehicleZ;
     protected float vehicleYaw, vehiclePitch, vehicleRoll;
+    private boolean clientRotInit;
 
     public EntityVehicleBase(EntityType<?> type, Level level) {
         super(type, level);
@@ -201,6 +202,8 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
     /**
      * 本家 EntityVehicleBase.setPositionAndRotation2 相当 (エンティティトラッカーからの位置同期)。
+     * 回転はバニラパケットだとバイト量子化 (約1.4°刻み) で段階的になるため受け取らず、
+     * float 同期 (EntityTrainBase の DATA_YAW/DATA_PITCH → vehicleYaw/vehiclePitch) を使う。
      */
     @Override
     public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps) {
@@ -208,26 +211,38 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         this.vehicleX = x;
         this.vehicleY = y;
         this.vehicleZ = z;
-        this.vehicleYaw = yaw;
-        this.vehiclePitch = pitch;
+        if (!this.clientRotInit) {
+            //スポーン直後の初期姿勢のみパケット値を採用 (以降は float 同期)
+            this.vehicleYaw = yaw;
+            this.vehiclePitch = pitch;
+        }
     }
 
     /**
      * 本家 updatePosAndRotationClient の忠実移植 (クライアント補間)。
+     * 回転は毎tick float 同期値へ滑らかに追従する (量子化パケット非依存)。
      */
     protected void updatePosAndRotationClient() {
+        if (!this.clientRotInit) {
+            this.clientRotInit = true;
+            this.setRot(this.vehicleYaw, this.vehiclePitch);
+            this.yRotO = this.vehicleYaw;
+            this.xRotO = this.vehiclePitch;
+        }
         if (this.vehiclePosRotationInc > 0) {
             float d0 = 1.0F / (float) this.vehiclePosRotationInc;
             double x = this.getX() + (this.vehicleX - this.getX()) * d0;
             double y = this.getY() + (this.vehicleY - this.getY()) * d0;
             double z = this.getZ() + (this.vehicleZ - this.getZ()) * d0;
-            float yaw = this.getYRot() + Mth.wrapDegrees(this.vehicleYaw - this.getYRot()) * d0;
-            float pitch = this.getXRot() + (this.vehiclePitch - this.getXRot()) * d0;
-            this.rotationRoll = this.rotationRoll + (this.vehicleRoll - this.rotationRoll) * d0;
             --this.vehiclePosRotationInc;
             this.setPos(x, y, z);
-            this.setRot(yaw, pitch);
         }
+        //回転補間 (本家 d0=1/inc 相当。パケットが来ない tick も追従を続ける)
+        float t = 1.0F / 3.0F;
+        float yaw = this.getYRot() + Mth.wrapDegrees(this.vehicleYaw - this.getYRot()) * t;
+        float pitch = this.getXRot() + (this.vehiclePitch - this.getXRot()) * t;
+        this.rotationRoll = this.rotationRoll + (this.vehicleRoll - this.rotationRoll) * t;
+        this.setRot(yaw, pitch);
     }
 
     protected void onVehicleUpdate() {

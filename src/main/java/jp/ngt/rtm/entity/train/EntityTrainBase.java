@@ -47,6 +47,15 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      */
     private static final EntityDataAccessor<Float> DATA_ROLL =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.FLOAT);
+    /**
+     * 本家 PacketVehicleMovement 代替: ヨー/ピッチの float 同期。
+     * バニラのエンティティ回転パケットはバイト量子化 (約1.4°刻み) のため、
+     * カーブで曲がり方が段階的に見える — float で送って滑らかにする。
+     */
+    private static final EntityDataAccessor<Float> DATA_YAW =
+            SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> DATA_PITCH =
+            SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.FLOAT);
 
     public static final short MAX_AIR_COUNT = 2880;
     public static final short MIN_AIR_COUNT = 2480;
@@ -187,6 +196,8 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         builder.define(DATA_CAB_DIR, (byte) 0);
         builder.define(DATA_MODEL_NAME, "");
         builder.define(DATA_ROLL, 0.0F);
+        builder.define(DATA_YAW, 0.0F);
+        builder.define(DATA_PITCH, 0.0F);
     }
 
     @Override
@@ -287,6 +298,11 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
     @Override
     protected void applyPhysicalEffect() {
+        //ヨー/ピッチの float 同期 (updateMovement で確定した姿勢を毎tick送る)
+        if (!this.level().isClientSide) {
+            this.entityData.set(DATA_YAW, this.getYRot());
+            this.entityData.set(DATA_PITCH, this.getXRot());
+        }
         this.setDeltaMovement(this.getDeltaMovement().scale(0.99D));
 
         float f0 = 0.125F;
@@ -725,6 +741,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
         if (DATA_ROLL.equals(key) && this.level().isClientSide) {
             this.vehicleRoll = this.entityData.get(DATA_ROLL);
+        }
+        if (DATA_YAW.equals(key) && this.level().isClientSide) {
+            this.vehicleYaw = this.entityData.get(DATA_YAW);
+        }
+        if (DATA_PITCH.equals(key) && this.level().isClientSide) {
+            this.vehiclePitch = this.entityData.get(DATA_PITCH);
         }
         if (DATA_MODEL_NAME.equals(key)) {
             this.configCache = null;

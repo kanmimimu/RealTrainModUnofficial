@@ -48,7 +48,7 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.LIGHT_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.INSULATOR_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.OVERHEAD_LINE_POLE_ITEM.get());
+                //架線柱 はユーザー要望で削除 (NGTO Builder 等で代替。登録は既存ワールド互換のため残置)
                 output.accept(RealTrainModUnofficialItems.TICKET_GATE_ITEM.get());
                 //入力コネクタ/出力コネクタ/信号変換器 はユーザー要望で削除
                 //(信号機とワイヤーのみ残す。登録は既存ワールド互換のため残置)
