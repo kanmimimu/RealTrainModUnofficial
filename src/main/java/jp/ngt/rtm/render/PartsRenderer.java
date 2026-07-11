@@ -93,7 +93,13 @@ public class PartsRenderer {
         return (f1 + 1.0F) * 0.5F;
     }
 
+    /**
+     * 本家: modelSet.getConfig().getName() — スクリプトが車種判定に使う
+     */
     public String getModelName() {
+        if (this.modelSet instanceof jp.ngt.rtm.modelpack.modelset.ModelSetCompat msc) {
+            return msc.getConfig().getName();
+        }
         return "";
     }
 

@@ -42,15 +42,14 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.WRENCH_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CROSSING_GATE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.MARKER_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.MARKER_DIAGONAL_ITEM.get());
+                //マーカー(斜め)/分岐マーカー(斜め)/スピーカー はユーザー要望で削除
+                //(本家は通常マーカーが8方位対応のため斜めバリアント不要)
                 output.accept(RealTrainModUnofficialItems.MARKER_SWITCH_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.MARKER_SWITCH_DIAGONAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.LIGHT_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.INSULATOR_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.OVERHEAD_LINE_POLE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_GATE_ITEM.get());
-                output.accept(RealTrainModUnofficialItems.SPEAKER_ITEM.get());
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {

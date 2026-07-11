@@ -161,12 +161,13 @@ public class BlockMarker extends BaseEntityBlock {
         }
 
         if (!item.isEmpty()) {
-            //レンチ or マーカー: プレビュー更新 (本家: makeRailMap + GUI)
-            if (item.getItem() instanceof com.portofino.realtrainmodunofficial.item.WrenchItem
+            //本家: レンチ = makeRailMap + ItemWrench.onRightClickMarker (C/S 両方)
+            if (item.getItem() instanceof com.portofino.realtrainmodunofficial.item.RtmWrenchItem wrench
                     && (this.markerType == 0 || this.markerType == 1)) {
                 if (!world.isClientSide) {
                     this.makeRailMap(marker, pos.getX(), pos.getY(), pos.getZ(), player);
                 }
+                wrench.onRightClickMarker(item, world, player, marker);
                 return ItemInteractionResult.SUCCESS;
             } else if (Block.byItem(item.getItem()) instanceof BlockMarker && (this.markerType == 0 || this.markerType == 1)) {
                 if (!world.isClientSide) {

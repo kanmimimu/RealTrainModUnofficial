@@ -316,7 +316,7 @@ public final class VehicleScriptRenderers {
         ResourceLocation tex = texture != null ? texture
                 : ResourceLocation.withDefaultNamespace("textures/misc/white.png");
         //本家はブレンド有効の即時描画 — 半透明テクスチャ (方向幕/LCD) を正しく合成する
-        VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucentCull(tex));
+        VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucent(tex));
         int stride = 9;
         int count = draw.verts.length / stride;
         switch (draw.mode) {
@@ -391,7 +391,7 @@ public final class VehicleScriptRenderers {
         ResourceLocation tex = texture != null ? texture
                 : ResourceLocation.withDefaultNamespace("textures/misc/white.png");
         //本家はブレンド有効の即時描画 (モニタ/発光パーツ)
-        VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucentCull(tex));
+        VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucent(tex));
         PoseStack.Pose pose = poseStack.last();
         Matrix4f mat = pose.pose();
         for (Face face : group.faces) {

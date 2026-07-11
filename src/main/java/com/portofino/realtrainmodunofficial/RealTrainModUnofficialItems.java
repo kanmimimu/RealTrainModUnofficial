@@ -10,6 +10,7 @@ import com.portofino.realtrainmodunofficial.item.InstalledObjectItem;
 import com.portofino.realtrainmodunofficial.item.TrainVehicleItem;
 import com.portofino.realtrainmodunofficial.item.WireItem;
 import com.portofino.realtrainmodunofficial.item.WrenchItem;
+import com.portofino.realtrainmodunofficial.item.RtmWrenchItem;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -56,8 +57,9 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<CrowbarItem> CROWBAR_ITEM = ITEMS.register(
         "crowbar", CrowbarItem::new
     );
-    public static final DeferredItem<WrenchItem> WRENCH_ITEM = ITEMS.register(
-        "wrench", WrenchItem::new
+    //本家 ItemWrench 忠実移植版 (旧 WrenchItem はレガシー系の参照維持のため残置)
+    public static final DeferredItem<RtmWrenchItem> WRENCH_ITEM = ITEMS.register(
+        "wrench", RtmWrenchItem::new
     );
     public static final DeferredItem<WireItem> WIRE_ITEM = ITEMS.register(
         "wire", WireItem::new
