@@ -33,6 +33,11 @@ public class TrainConfig {
     public Object[][] smoke;
     public float[][] playerPos;
 
+    /**
+     * 本家 slotPos: {x, y, z, seatType} — EntityFloor (座席/フロア) のスポーン位置
+     */
+    private float[][] slotPos = new float[0][];
+
     public String[] rollsignNames = new String[0];
     public boolean isSingleTrain;
     public float wheelRotationSpeed = 1.0F;
@@ -87,6 +92,14 @@ public class TrainConfig {
 
     public float[][] getPlayerPos() {
         return this.playerPos;
+    }
+
+    public float[][] getSlotPos() {
+        return this.slotPos;
+    }
+
+    public void setSlotPos(float[][] pos) {
+        this.slotPos = pos != null ? pos : new float[0][];
     }
 
     public String getName() {

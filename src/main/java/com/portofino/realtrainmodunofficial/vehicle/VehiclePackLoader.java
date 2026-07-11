@@ -486,6 +486,7 @@ public class VehiclePackLoader {
                 singleTrain
             );
             definition.setServerScriptPath(serverScriptPath);
+            definition.setSlotPositions(parseSlotPositions(trainModel, obj));
             definition.setJsonRunningSounds(
                 soundStop,
                 soundStartAcceleration,
@@ -497,6 +498,32 @@ public class VehiclePackLoader {
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse train json {} in {}: {}", sourcePath, packName, e.getMessage());
         }
+    }
+
+    /**
+     * 本家 slotPos: [[x, y, z, seatType], ...] (ブロック単位、seatType 省略時は 2=座席)。
+     * trainModel2 側と JSON ルートの両方を読む。
+     */
+    private static java.util.List<float[]> parseSlotPositions(JsonObject trainModel, JsonObject obj) {
+        java.util.List<float[]> out = new ArrayList<>();
+        for (JsonObject src : new JsonObject[]{trainModel, obj}) {
+            if (src == null || !src.has("slotPos")) continue;
+            try {
+                for (var el : src.getAsJsonArray("slotPos")) {
+                    var arr = el.getAsJsonArray();
+                    if (arr.size() < 3) continue;
+                    float type = arr.size() >= 4 ? arr.get(3).getAsFloat() : 2.0F;
+                    out.add(new float[]{
+                            arr.get(0).getAsFloat(),
+                            arr.get(1).getAsFloat(),
+                            arr.get(2).getAsFloat(),
+                            type});
+                }
+            } catch (Exception ignored) {
+            }
+            if (!out.isEmpty()) break;
+        }
+        return out;
     }
 
     private static String fallbackTrainId(String sourcePath) {

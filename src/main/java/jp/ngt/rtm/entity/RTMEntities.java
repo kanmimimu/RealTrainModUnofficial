@@ -32,6 +32,15 @@ public final class RTMEntities {
                     .updateInterval(3)
                     .build("rtm_bogie"));
 
+    public static final DeferredHolder<EntityType<?>, EntityType<jp.ngt.rtm.entity.train.parts.EntityFloor>> FLOOR =
+            REGISTER.register("rtm_floor", () -> EntityType.Builder.<jp.ngt.rtm.entity.train.parts.EntityFloor>of(
+                            jp.ngt.rtm.entity.train.parts.EntityFloor::new, MobCategory.MISC)
+                    //本家 setSize(1.25F, 0.0625F) — 高さは掴みやすいよう少し確保
+                    .sized(1.25F, 0.35F)
+                    .clientTrackingRange(8)
+                    .updateInterval(3)
+                    .build("rtm_floor"));
+
     private RTMEntities() {
     }
 }

@@ -42,6 +42,10 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     private final jp.ngt.rtm.modelpack.state.ResourceState resourceState =
             new jp.ngt.rtm.modelpack.state.ResourceState(this::getResourceName);
 
+    //本家 vehicleFloors (slotPos 座席)
+    protected final java.util.List<jp.ngt.rtm.entity.train.parts.EntityFloor> vehicleFloors = new java.util.ArrayList<>();
+    protected boolean floorLoaded;
+
     public float prevRotationYawVehicle;
     public float prevRotationPitchVehicle;
 
@@ -76,6 +80,9 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         this.onVehicleUpdate();
 
         if (!this.level().isClientSide) {
+            if (!this.floorLoaded) {
+                this.setupFloors();
+            }
             this.updateMovement();
         }
 
@@ -101,6 +108,44 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
     protected float getMoveDir() {
         return 1.0F;
+    }
+
+    /**
+     * 本家 setupFloors (Server Only): config の slotPos ごとに EntityFloor をスポーン。
+     */
+    protected void setupFloors() {
+        this.vehicleFloors.stream().filter(java.util.Objects::nonNull).forEach(Entity::discard);
+        this.vehicleFloors.clear();
+
+        this.floorLoaded = true;
+        float[][] slots = this.getConfig().getSlotPos();
+        if (slots == null) {
+            return;
+        }
+        for (float[] fa : slots) {
+            if (fa == null || fa.length < 3) {
+                continue;
+            }
+            byte type = fa.length >= 4 ? (byte) fa[3] : (byte) 2;
+            jp.ngt.rtm.entity.train.parts.EntityFloor floor = new jp.ngt.rtm.entity.train.parts.EntityFloor(
+                    jp.ngt.rtm.entity.RTMEntities.FLOOR.get(), this.level(), this,
+                    new float[]{fa[0], fa[1], fa[2]}, type);
+            if (this.level().addFreshEntity(floor)) {
+                this.vehicleFloors.add(floor);
+            } else {
+                this.floorLoaded = false;//1つでもスポーン失敗したら、やり直し
+                break;
+            }
+        }
+    }
+
+    @Override
+    public void remove(RemovalReason reason) {
+        super.remove(reason);
+        if (!this.level().isClientSide && reason.shouldDestroy()) {
+            this.vehicleFloors.stream().filter(java.util.Objects::nonNull).forEach(Entity::discard);
+            this.vehicleFloors.clear();
+        }
     }
 
     /**

@@ -354,6 +354,17 @@ public class VehicleDefinition {
         this.serverScriptPath = path == null ? "" : path;
     }
 
+    /** 本家 slotPos: {x, y, z, seatType} (ブロック単位)。Loader が JSON 読込後に設定。 */
+    private java.util.List<float[]> slotPositions = java.util.List.of();
+
+    public java.util.List<float[]> getSlotPositions() {
+        return slotPositions;
+    }
+
+    public void setSlotPositions(java.util.List<float[]> slots) {
+        this.slotPositions = slots == null ? java.util.List.of() : java.util.List.copyOf(slots);
+    }
+
     public String getVehicleType() {
         return vehicleType;
     }

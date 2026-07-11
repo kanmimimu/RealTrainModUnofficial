@@ -59,6 +59,11 @@ public final class TrainConfigAdapter {
             if (rollsigns != null && !rollsigns.isEmpty()) {
                 cfg.rollsignNames = rollsigns.toArray(new String[0]);
             }
+
+            List<float[]> slots = def.getSlotPositions();
+            if (slots != null && !slots.isEmpty()) {
+                cfg.setSlotPos(slots.toArray(new float[0][]));
+            }
         }
         cfg.init();
         return cfg;

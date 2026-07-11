@@ -61,6 +61,10 @@ public final class RealTrainModUnofficialClientModEvents {
             jp.ngt.rtm.entity.RTMEntities.BOGIE.get(),
             RtmBogieRenderer::new
         );
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.FLOOR.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.RtmFloorRenderer::new
+        );
         if (RealTrainModUnofficialEntities.TRAIN.isBound()) {
             event.registerEntityRenderer(
                 RealTrainModUnofficialEntities.TRAIN.get(),

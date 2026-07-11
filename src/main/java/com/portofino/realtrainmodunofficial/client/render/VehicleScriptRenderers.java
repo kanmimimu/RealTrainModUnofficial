@@ -263,13 +263,9 @@ public final class VehicleScriptRenderers {
                     //TODO カラーオーバーレイ
                 }
                 case BIND_TEXTURE -> overrideTex = cmd.payload instanceof ResourceLocation rl ? rl : null;
-                case RENDER_PARTS -> {
+                case RENDER_PARTS, RENDER_GROUPS -> {
                     //TODO テクスチャ差し替え付きの MQO バッチ描画 (現状はデフォルトテクスチャで描画)
-                    if (model != null && cmd.payload instanceof Set<?> names) {
-                        model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
-                    }
-                }
-                case RENDER_GROUPS -> {
+                    //translucent=false は全バッチ描画 (renderSelectedBatches のフィルタ仕様)
                     if (model != null && cmd.payload instanceof Set<?> names) {
                         model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
                     }
