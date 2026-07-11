@@ -37,9 +37,9 @@ import java.util.List;
  * 空中右クリック: モード切替 / スニーク+右クリック: モードロック
  */
 public class RtmWrenchItem extends Item {
-    //アンカー移動 (レール形状編集) はレンチのモードではなく、本家 1122 方式:
-    //プレビュー中のアンカー線を右クリックで掴んで動かす (MarkerBlockEntityRenderer)
-    private static final int[] MODE_CYCLE = {0, 1, 6, 7, 8, 10, 11};
+    //モード 9 (アンカー移動) 中はアンカー線を右クリックで掴んで動かす (MarkerBlockEntityRenderer)
+    private static final int[] MODE_CYCLE = {0, 1, 6, 7, 8, 9, 10, 11};
+    public static final int MODE_ANCHOR = 9;
     /**
      * RailPosition.direction (8方位) → マーカー blockstate facing
      */
@@ -76,6 +76,7 @@ public class RtmWrenchItem extends Item {
             case 6 -> "距離表示 切替";
             case 7 -> "表示モード切替";
             case 8 -> "マーカー高さ変更";
+            case 9 -> "アンカー移動 (レール形状編集)";
             case 10 -> "隣接レール接続 切替";
             case 11 -> "レール→マーカー復元";
             default -> "mode_" + mode;

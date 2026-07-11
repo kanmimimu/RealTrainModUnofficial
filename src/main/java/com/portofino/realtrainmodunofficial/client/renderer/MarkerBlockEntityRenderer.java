@@ -41,11 +41,17 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             return;
         }
 
-        //本家 1122: プレビュー中はアンカー線を常時表示し、線を右クリックで掴んで編集
+        //レンチの「アンカー移動」モード中のみアンカー線を表示し、線を右クリックで掴んで編集
         if (marker.getCoreMarker() != null && marker.getState(MarkerState.LINE1)) {
-            this.changeAnchor(marker);
-            this.updateHover(marker);
-            this.renderAnchor(marker, poseStack, buffer);
+            if (isAnchorWrenchHeld()) {
+                this.changeAnchor(marker);
+                this.updateHover(marker);
+                this.renderAnchor(marker, poseStack, buffer);
+            } else if (editingMarker == marker) {
+                //モードを離れたら編集中断
+                marker.editMode = 0;
+                editingMarker = null;
+            }
         }
 
         if (!marker.displayDistance || !marker.getState(MarkerState.DISTANCE)) {
@@ -101,9 +107,26 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
      *
      * @return true = クリックを消費した
      */
+    /**
+     * レンチの「アンカー移動」モードを持っているか
+     */
+    public static boolean isAnchorWrenchHeld() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            return false;
+        }
+        net.minecraft.world.item.ItemStack stack = mc.player.getMainHandItem();
+        return stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.RtmWrenchItem
+                && com.portofino.realtrainmodunofficial.item.RtmWrenchItem.getMode(stack)
+                        == com.portofino.realtrainmodunofficial.item.RtmWrenchItem.MODE_ANCHOR;
+    }
+
     public static boolean onRightClick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
+            return false;
+        }
+        if (!isAnchorWrenchHeld()) {
             return false;
         }
         if (editingMarker != null) {
@@ -205,13 +228,17 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         float yawRad = rp.anchorYaw * Mth.DEG_TO_RAD;
         switch (elm) {
             case HEIGHT -> out.add(new net.minecraft.world.phys.Vec3[]{base, base.add(0.0D, 1.0D, 0.0D)});
-            case HORIZONTIAL -> out.add(new net.minecraft.world.phys.Vec3[]{base,
-                    base.add(Mth.sin(yawRad) * rp.anchorLengthHorizontal, 0.0D, Mth.cos(yawRad) * rp.anchorLengthHorizontal)});
+            case HORIZONTIAL -> {
+                float len = displayLen(rp.anchorLengthHorizontal);
+                out.add(new net.minecraft.world.phys.Vec3[]{base,
+                        base.add(Mth.sin(yawRad) * len, 0.0D, Mth.cos(yawRad) * len)});
+            }
             case VERTICAL -> {
                 float pitchRad = rp.anchorPitch * Mth.DEG_TO_RAD;
-                double h = Mth.cos(pitchRad) * rp.anchorLengthVertical;
+                float len = displayLen(rp.anchorLengthVertical);
+                double h = Mth.cos(pitchRad) * len;
                 out.add(new net.minecraft.world.phys.Vec3[]{base,
-                        base.add(Mth.sin(yawRad) * h, Mth.sin(pitchRad) * rp.anchorLengthVertical, Mth.cos(yawRad) * h)});
+                        base.add(Mth.sin(yawRad) * h, Mth.sin(pitchRad) * len, Mth.cos(yawRad) * h)});
             }
             case CANT_EDGE -> {
                 float cantRad = rp.cantEdge * Mth.DEG_TO_RAD;
@@ -467,6 +494,39 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
     }
 
     /**
+     * アンカー線の表示長: 実際の制御長に関わらずマーカーから 5 ブロック
+     * (制御長そのままだとプレビュー線と重なって見分けがつかないため)
+     */
+    private static float displayLen(float len) {
+        return len < 0.0F ? -5.0F : 5.0F;
+    }
+
+    /**
+     * 太いライン描画用 RenderType (バニラ lines() の線幅 5px 版)
+     */
+    private static final class AnchorRenderTypes extends RenderType {
+        private AnchorRenderTypes(String name, com.mojang.blaze3d.vertex.VertexFormat format,
+                                  com.mojang.blaze3d.vertex.VertexFormat.Mode mode, int bufferSize,
+                                  boolean affectsCrumbling, boolean sortOnUpload,
+                                  Runnable setupState, Runnable clearState) {
+            super(name, format, mode, bufferSize, affectsCrumbling, sortOnUpload, setupState, clearState);
+        }
+
+        static final RenderType THICK_LINES = create("rtmu_anchor_lines",
+                com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR_NORMAL,
+                com.mojang.blaze3d.vertex.VertexFormat.Mode.LINES, 1536, false, false,
+                CompositeState.builder()
+                        .setShaderState(RENDERTYPE_LINES_SHADER)
+                        .setLineState(new LineStateShard(java.util.OptionalDouble.of(5.0D)))
+                        .setLayeringState(VIEW_OFFSET_Z_LAYERING)
+                        .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                        .setOutputState(ITEM_ENTITY_TARGET)
+                        .setWriteMaskState(COLOR_DEPTH_WRITE)
+                        .setCullState(NO_CULL)
+                        .createCompositeState(false));
+    }
+
+    /**
      * 本家 1122 renderAnchorLine: 高さ(赤)/水平(緑)/勾配(橙)/カント(桃) の線 + 数値表示。
      * ホバー/編集中の線は減光ハイライト。
      */
@@ -479,7 +539,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 ? MarkerElement.values()[Math.min(marker.editMode, MarkerElement.values().length - 1)]
                 : (hoveredMarker == marker ? hoveredElement : MarkerElement.NONE);
 
-        VertexConsumer lines = buffer.getBuffer(RenderType.debugLineStrip(2.0D));
+        VertexConsumer lines = buffer.getBuffer(AnchorRenderTypes.THICK_LINES);
 
         //マーカーブロック原点 → RP 位置へ (レンダラは BlockPos 原点)
         double ox = rp.posX - marker.getBlockPos().getX();
@@ -492,15 +552,15 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         //高さ (赤)
         drawLine(lines, poseStack, 0, 0, 0, 0, 1, 0, colorOf(MarkerElement.HEIGHT, activeElm));
 
-        //水平 (緑) — yaw 回転下
+        //水平 (緑) — yaw 回転下、表示長は 5 ブロック固定 (プレビュー線との重なり防止)
         poseStack.pushPose();
         poseStack.mulPose(new Quaternionf().rotationY(rp.anchorYaw * Mth.DEG_TO_RAD));
-        drawLine(lines, poseStack, 0, 0, 0, 0, 0, rp.anchorLengthHorizontal, colorOf(MarkerElement.HORIZONTIAL, activeElm));
+        drawLine(lines, poseStack, 0, 0, 0, 0, 0, displayLen(rp.anchorLengthHorizontal), colorOf(MarkerElement.HORIZONTIAL, activeElm));
 
         //勾配 (橙)
         poseStack.pushPose();
         poseStack.mulPose(new Quaternionf().rotationX(-rp.anchorPitch * Mth.DEG_TO_RAD));
-        drawLine(lines, poseStack, 0, 0, 0, 0, 0, rp.anchorLengthVertical, colorOf(MarkerElement.VERTICAL, activeElm));
+        drawLine(lines, poseStack, 0, 0, 0, 0, 0, displayLen(rp.anchorLengthVertical), colorOf(MarkerElement.VERTICAL, activeElm));
         poseStack.popPose();
 
         //カント端 (桃)
@@ -561,14 +621,24 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
 
     private static void drawLine(VertexConsumer lines, PoseStack poseStack,
                                  float x0, float y0, float z0, float x1, float y1, float z1, int color) {
-        Matrix4f m = poseStack.last().pose();
+        PoseStack.Pose pose = poseStack.last();
+        Matrix4f m = pose.pose();
         float r = ((color >> 16) & 0xFF) / 255.0F;
         float g = ((color >> 8) & 0xFF) / 255.0F;
         float b = (color & 0xFF) / 255.0F;
-        lines.addVertex(m, x0, y0, z0).setColor(r, g, b, 0.0F);
-        lines.addVertex(m, x0, y0, z0).setColor(r, g, b, 1.0F);
-        lines.addVertex(m, x1, y1, z1).setColor(r, g, b, 1.0F);
-        lines.addVertex(m, x1, y1, z1).setColor(r, g, b, 0.0F);
+        float dx = x1 - x0;
+        float dy = y1 - y0;
+        float dz = z1 - z0;
+        float len = Mth.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1.0e-5F) {
+            return;
+        }
+        dx /= len;
+        dy /= len;
+        dz /= len;
+        //LINES (POSITION_COLOR_NORMAL): 法線 = 線の方向 (lines シェーダが太さ展開に使用)
+        lines.addVertex(m, x0, y0, z0).setColor(r, g, b, 1.0F).setNormal(pose, dx, dy, dz);
+        lines.addVertex(m, x1, y1, z1).setColor(r, g, b, 1.0F).setNormal(pose, dx, dy, dz);
     }
 
     private void renderDistanceMark(TileEntityMarker marker, BlockMarker block, BlockState state,
