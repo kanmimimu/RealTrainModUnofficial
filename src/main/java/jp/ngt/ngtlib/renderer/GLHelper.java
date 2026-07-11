@@ -54,6 +54,24 @@ public final class GLHelper {
         return 0;
     }
 
+    //ディスプレイリスト系 (NGTO Builder が使用) — 1.21 では毎フレーム再記録のため
+    //コンパイルはスキップし、描画呼び出しをそのまま実行させる
+    public static int generateGLList() {
+        return 0;
+    }
+
+    public static void startCompile(int list) {
+    }
+
+    public static void endCompile() {
+    }
+
+    public static void callList(int list) {
+    }
+
+    public static void deleteGLList(int list) {
+    }
+
     public static void transform(double x, double y, double z, float yaw, float pitch, float roll) {
         GLRecorder r = GLRecorder.active();
         if (r != null) {

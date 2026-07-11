@@ -42,6 +42,32 @@ public final class RailMaker {
         this(world, new ArrayList<>(Arrays.asList(par2)), fixRTMRailMapVersion);
     }
 
+    /**
+     * スクリプト互換: WorldCompat + List/配列 (SRB3 等が entity.field_70170_p を渡す)。
+     */
+    @SuppressWarnings("unchecked")
+    public RailMaker(Object world, Object positions, int fixRTMRailMapVersion) {
+        this.worldObj = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
+        List<RailPosition> list = new ArrayList<>();
+        if (positions instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof RailPosition rp) {
+                    list.add(rp);
+                }
+            }
+        } else if (positions instanceof RailPosition[] arr) {
+            list.addAll(Arrays.asList(arr));
+        } else if (positions instanceof Object[] arr) {
+            for (Object o : arr) {
+                if (o instanceof RailPosition rp) {
+                    list.add(rp);
+                }
+            }
+        }
+        this.rpList = list;
+        this.fixRTMRailMapVersion = fixRTMRailMapVersion;
+    }
+
     // ===== Remaster 暫定互換コンストラクタ (旧コードは world を渡さない。Phase 1 の BE 差し替え後に削除予定) =====
 
     /**

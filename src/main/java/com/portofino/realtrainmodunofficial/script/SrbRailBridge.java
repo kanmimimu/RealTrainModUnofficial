@@ -238,7 +238,7 @@ public final class SrbRailBridge {
         if (world instanceof Level level) {
             return level;
         }
-        if (world instanceof CarEntity.CarWorldCompat compat) {
+        if (world instanceof jp.ngt.mccompat.WorldCompat compat) {
             return compat.getLevel();
         }
         return null;

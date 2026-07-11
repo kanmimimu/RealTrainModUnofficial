@@ -49,23 +49,7 @@ import java.util.regex.Pattern;
  */
 public final class VehicleScriptRenderers {
 
-    private static final String PRELUDE =
-            "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n" +
-            "var GL12 = GL11;\n" +
-            "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n";
-
-    private static final Pattern INCLUDE_PATTERN = Pattern.compile("^\\s*//include\\s*<([^>]+)>", Pattern.MULTILINE);
-
-    private static final String[][] FQN_REMAP = {
-            {"Packages.net.minecraft.util.ResourceLocation", "Packages.jp.ngt.mccompat.ResourceLocation"},
-            {"Packages.net.minecraft.client.renderer.texture.TextureUtil", "Packages.jp.ngt.mccompat.TextureUtil"},
-            {"Packages.net.minecraft.client.renderer.texture.DynamicTexture", "Packages.jp.ngt.mccompat.DynamicTexture"},
-            {"Packages.net.minecraft.client.Minecraft", "Packages.jp.ngt.mccompat.Minecraft"},
-            {"Packages.net.minecraft.util.math.BlockPos", "Packages.net.minecraft.core.BlockPos"},
-            {"Packages.net.minecraft.world.EnumSkyBlock", "Packages.jp.ngt.mccompat.EnumSkyBlock"},
-            {"Packages.net.minecraft.util.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
-            {"Packages.net.minecraft.util.math.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
-    };
+    private static final String PRELUDE = com.portofino.realtrainmodunofficial.script.PackScriptSource.PRELUDE;
 
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
     private static final Scripted INVALID = new Scripted(null, null, null);
@@ -88,8 +72,7 @@ public final class VehicleScriptRenderers {
                 RealTrainModUnofficial.LOGGER.warn("Vehicle script not readable for {} ({})", def.getId(), def.getScriptPath());
                 return INVALID;
             }
-            source = resolveIncludes(source, new HashSet<>());
-            source = remapLegacyClasses(source);
+            source = com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source);
 
             ScriptEngine se = ScriptUtil.doScript(PRELUDE + source);
             Object rcName = se.get("renderClass");
@@ -166,41 +149,6 @@ public final class VehicleScriptRenderers {
         return mo;
     }
 
-    private static String resolveIncludes(String source, Set<String> visited) {
-        Matcher m = INCLUDE_PATTERN.matcher(source);
-        StringBuilder includes = new StringBuilder();
-        while (m.find()) {
-            String path = m.group(1).trim();
-            if (!visited.add(path.toLowerCase(Locale.ROOT))) {
-                continue;
-            }
-            byte[] bytes = NGTFileLoader.findAsset(path);
-            if (bytes == null) {
-                RealTrainModUnofficial.LOGGER.warn("Vehicle script include not found: {}", path);
-                continue;
-            }
-            String text = decode(bytes);
-            includes.append(resolveIncludes(text, visited)).append('\n');
-        }
-        return includes + source;
-    }
-
-    private static String decode(byte[] bytes) {
-        String utf8 = new String(bytes, StandardCharsets.UTF_8);
-        if (utf8.indexOf('�') >= 0) {
-            return new String(bytes, java.nio.charset.Charset.forName("Shift_JIS"));
-        }
-        return utf8;
-    }
-
-    private static String remapLegacyClasses(String source) {
-        String out = source;
-        for (String[] pair : FQN_REMAP) {
-            out = out.replace(pair[0], pair[1]);
-        }
-        return out;
-    }
-
     public static final class Scripted {
         private final VehiclePartsRenderer renderer;
         private final ScriptEngine engine;
@@ -218,7 +166,7 @@ public final class VehicleScriptRenderers {
          *
          * @return true = 描画を担当した
          */
-        public boolean render(EntityTrainBase entity, float partialTick, PoseStack poseStack,
+        public boolean render(Object entity, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel bodyModel) {
             GLRecorder rec = new GLRecorder();

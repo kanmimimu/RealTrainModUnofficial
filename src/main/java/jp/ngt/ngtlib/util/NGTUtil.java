@@ -46,6 +46,51 @@ public final class NGTUtil {
     }
 
     /**
+     * 本家 NGTUtil.setValueToField : リフレクションでフィールドへ書込
+     * (NGTO Builder が使用。SRG/現行名どちらでも探す)
+     */
+    public static void setValueToField(Object target, String fieldName, Object value) {
+        if (target == null || fieldName == null) {
+            return;
+        }
+        Class<?> cls = target.getClass();
+        while (cls != null) {
+            try {
+                java.lang.reflect.Field f = cls.getDeclaredField(fieldName);
+                f.setAccessible(true);
+                f.set(target, value);
+                return;
+            } catch (NoSuchFieldException e) {
+                cls = cls.getSuperclass();
+            } catch (Exception e) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * 本家 NGTUtil.getValueFromField 相当
+     */
+    public static Object getValueFromField(Object target, String fieldName) {
+        if (target == null || fieldName == null) {
+            return null;
+        }
+        Class<?> cls = target.getClass();
+        while (cls != null) {
+            try {
+                java.lang.reflect.Field f = cls.getDeclaredField(fieldName);
+                f.setAccessible(true);
+                return f.get(target);
+            } catch (NoSuchFieldException e) {
+                cls = cls.getSuperclass();
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
      * 本家 NGTUtil.reverse : 配列を逆順に
      */
     public static <T> void reverse(T[] array) {

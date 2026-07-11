@@ -33,7 +33,7 @@ public final class CarEntity extends Entity {
     private static final EntityDataAccessor<String> DATA_VEHICLE_ID =
         SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.STRING);
 
-    private ScriptEngine serverScriptEngine;
+    private com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry serverScript;
     private boolean attemptedServerScriptLoad;
     private final java.util.Map<String, String> scriptData = new java.util.HashMap<>();
     private boolean scriptDataDirty;
@@ -46,11 +46,19 @@ public final class CarEntity extends Entity {
     /** RTM の tick counter 名 (entity.field_70173_aa) */
     public int field_70173_aa;
     /** RTM の world 参照 (entity.field_70170_p)。WorldCompat 経由でアクセス。 */
-    public final CarWorldCompat field_70170_p = new CarWorldCompat(this);
+    public jp.ngt.mccompat.WorldCompat field_70170_p;
     /** RTM の motionX/Y/Z 名 (SRB3 の doFollowing が 0 を書いて漂流を止める)。 */
     public double field_70159_w;
     public double field_70181_x;
     public double field_70179_y;
+    /** 1.7.10 riddenByEntity (この車に乗っているプレイヤーのラッパー) */
+    public jp.ngt.mccompat.PlayerCompat field_70153_n;
+    /** 1.7.10 ridingEntity (この車が乗っている対象=ホストプレイヤーのラッパー) */
+    public jp.ngt.mccompat.PlayerCompat field_70154_o;
+    /** 1.7.10 posX/posY/posZ */
+    public double field_70165_t;
+    public double field_70163_u;
+    public double field_70161_v;
 
     /// 車輪のX座標オフセット
     public static final float WHEEL_X_COORD = cm2m(72.47766876220703f);
@@ -193,71 +201,16 @@ public final class CarEntity extends Entity {
         if (attemptedServerScriptLoad) return;
         String id = getVehicleId();
         if (id == null || id.isBlank()) return;
+        attemptedServerScriptLoad = true;
         VehicleDefinition def = VehicleRegistry.getById(id);
         if (def == null || !def.hasServerScript()) {
-            attemptedServerScriptLoad = true;
             return;
         }
-        attemptedServerScriptLoad = true;
         try {
-            serverScriptEngine = com.portofino.realtrainmodunofficial.client.model.MqoModelLoader
-                .loadServerScriptForVehicle(def);
+            //本家と同じ Nashorn (jp.ngt 実クラス) でサーバースクリプトを実行
+            serverScript = com.portofino.realtrainmodunofficial.script.CarServerScripts.get(def);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to load server script for {}: {}", id, t.toString());
-        }
-    }
-
-    /**
-     * RTM の {@code entity.field_70170_p} 互換オブジェクト。SRB3 等のスクリプトが
-     * world に setBlock 等を呼ぶための薄いシム。
-     */
-    public static final class CarWorldCompat {
-        private final CarEntity car;
-        public boolean field_72995_K;
-
-        public CarWorldCompat(CarEntity car) {
-            this.car = car;
-        }
-
-        public boolean isClientSide() {
-            field_72995_K = car != null && car.level().isClientSide();
-            return field_72995_K;
-        }
-
-        public net.minecraft.world.level.Level getLevel() {
-            return car != null ? car.level() : null;
-        }
-
-        /** func_175625_s = getBlockEntity(BlockPos) (SRB3 の getTileEntity が呼ぶ) */
-        public net.minecraft.world.level.block.entity.BlockEntity func_175625_s(net.minecraft.core.BlockPos pos) {
-            return (car != null && pos != null) ? car.level().getBlockEntity(pos) : null;
-        }
-
-        /** 座標直接版。スクリプトが 1.12.2 の net.minecraft.util.math.BlockPos を new せずに済むよう用意。 */
-        public net.minecraft.world.level.block.entity.BlockEntity func_175625_s(double x, double y, double z) {
-            if (car == null) {
-                return null;
-            }
-            return car.level().getBlockEntity(new net.minecraft.core.BlockPos(
-                (int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z)));
-        }
-
-        /** func_73045_a = getEntity(id) (SRB3 が hostPlayerEntityId からプレイヤーを引く) */
-        public net.minecraft.world.entity.Entity func_73045_a(Object id) {
-            if (car == null || id == null) {
-                return null;
-            }
-            try {
-                int i = (id instanceof Number) ? ((Number) id).intValue() : Integer.parseInt(id.toString());
-                return car.level().getEntity(i);
-            } catch (Throwable t) {
-                return null;
-            }
-        }
-
-        /** func_180495_p = getBlockState(BlockPos) */
-        public net.minecraft.world.level.block.state.BlockState func_180495_p(net.minecraft.core.BlockPos pos) {
-            return (car != null && pos != null) ? car.level().getBlockState(pos) : null;
         }
     }
 
@@ -344,6 +297,17 @@ public final class CarEntity extends Entity {
     /** func_70107_b = setPos(x,y,z) */
     public void func_70107_b(double x, double y, double z) {
         this.setPos(x, y, z);
+    }
+    /** func_70078_a = mountEntity (1.7.10)。SRB3 は車をホストプレイヤーに乗せて追従させる。 */
+    public void func_70078_a(Object target) {
+        if (target == null) {
+            this.stopRiding();
+        } else {
+            net.minecraft.world.entity.Entity e = jp.ngt.mccompat.EntityCompatUtil.unwrapEntity(target);
+            if (e != null) {
+                this.startRiding(e, true);
+            }
+        }
     }
 
     /// 右クリックされた時の処理
@@ -470,15 +434,37 @@ public final class CarEntity extends Entity {
         this.field_70177_z = getYRot();
         this.field_70125_A = getXRot();
         this.field_70173_aa = this.tickCount;
-        this.field_70170_p.isClientSide();
+        this.field_70165_t = getX();
+        this.field_70163_u = getY();
+        this.field_70161_v = getZ();
+        if (this.field_70170_p == null || this.field_70170_p.getLevel() != this.level()) {
+            this.field_70170_p = new jp.ngt.mccompat.WorldCompat(this.level());
+        }
+        // rider (1.7.10: field_70153_n) / ridingEntity (field_70154_o) — PlayerCompat で公開
+        {
+            var passengers = this.getPassengers();
+            net.minecraft.world.entity.player.Player rider = null;
+            if (!passengers.isEmpty() && passengers.get(0) instanceof net.minecraft.world.entity.player.Player p) {
+                rider = p;
+            }
+            this.field_70153_n = rider != null ? jp.ngt.mccompat.PlayerCompat.of(rider) : null;
+            if (this.field_70153_n != null) {
+                this.field_70153_n.refresh();
+            }
+            net.minecraft.world.entity.player.Player riding =
+                this.getVehicle() instanceof net.minecraft.world.entity.player.Player rp ? rp : null;
+            this.field_70154_o = riding != null ? jp.ngt.mccompat.PlayerCompat.of(riding) : null;
+            if (this.field_70154_o != null) {
+                this.field_70154_o.refresh();
+            }
+        }
 
         // サーバ側で vehicle 紐付けスクリプト（SRB3 等）を毎tick実行する。
         // クライアントでは何もしない（DataMap 同期は別経路）。
         if (!this.level().isClientSide()) {
             ensureServerScriptLoaded();
-            if (serverScriptEngine != null) {
-                com.portofino.realtrainmodunofficial.script.TrainScriptSystem
-                    .invokeServerScriptOnUpdate(serverScriptEngine, this);
+            if (serverScript != null) {
+                serverScript.onUpdate(this);
                 // サーバスクリプトが entity.field_70177_z=0 等で向きを制御する(SRB3はyawを0固定
                 // してマーカーをワールド座標で描く)。シムのフィールドを実際の向きへ反映する。
                 // 反映しないと車の実yawが残り、render が回転してマーカーが散らばる。

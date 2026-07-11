@@ -124,6 +124,32 @@ public class ItemRail extends Item {
         return nbt.contains("Property") ? RailProperty.readFromNBT(nbt.getCompound("Property")) : null;
     }
 
+    /**
+     * スクリプト互換: ItemStackCompat ラッパー (SRB3 が渡す) も受け、
+     * Remaster RailItem (選択モデル方式) のスタックからも RailProperty を作る。
+     */
+    public static RailProperty getProperty(Object stackLike) {
+        ItemStack stack = jp.ngt.mccompat.ItemStackCompat.unwrap(stackLike);
+        if (stack == null || stack.isEmpty()) {
+            return null;
+        }
+        if (stack.getItem() instanceof ItemRail) {
+            RailProperty prop = getProperty(stack);
+            return prop != null ? prop : RailProperty.getDefaultProperty();
+        }
+        if (stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.RailItem) {
+            String model = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
+            if (model == null || model.isEmpty()) {
+                com.portofino.realtrainmodunofficial.rail.RailDefinition def =
+                        com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
+                model = def != null ? def.getId() : "";
+            }
+            return new RailProperty(model == null ? "" : model,
+                    net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+        }
+        return null;
+    }
+
     private static String getShapeName(ItemStack stack) {
         return getTag(stack).getString("ShapeName");
     }

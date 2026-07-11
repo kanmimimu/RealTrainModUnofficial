@@ -3,6 +3,7 @@ package com.portofino.realtrainmodunofficial;
 import com.portofino.realtrainmodunofficial.item.CarItem;
 import com.portofino.realtrainmodunofficial.item.CrowbarItem;
 import com.portofino.realtrainmodunofficial.item.IcCardItem;
+import com.portofino.realtrainmodunofficial.item.MiniatureItem;
 import com.portofino.realtrainmodunofficial.item.MarkerItem;
 import com.portofino.realtrainmodunofficial.item.RailItem;
 import com.portofino.realtrainmodunofficial.item.TrainItem;
@@ -53,6 +54,10 @@ public class RealTrainModUnofficialItems {
     );
     public static final DeferredItem<IcCardItem> IC_CARD_ITEM = ITEMS.register(
         "ic_card", IcCardItem::new
+    );
+    //MCTE 互換ミニチュア (最低限: ブロック範囲キャプチャ。NGTO Builder が使用)
+    public static final DeferredItem<MiniatureItem> MINIATURE_ITEM = ITEMS.register(
+        "miniature", MiniatureItem::new
     );
     public static final DeferredItem<CrowbarItem> CROWBAR_ITEM = ITEMS.register(
         "crowbar", CrowbarItem::new

@@ -42,22 +42,46 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
         // SRB のマーカー描画基準(MCWrapper.getPosX → renderPosX)が PoseStack 原点と同じ
         // partialTick で entity 補間位置を出せるよう、現在の partialTick を共有する。
         com.portofino.realtrainmodunofficial.client.ScriptClientCompat.currentRenderPartialTick = partialTick;
+        // スクリプトが読む Minecraft/Player ラッパー (field_71462_r 等) を毎フレーム更新
+        jp.ngt.mccompat.Minecraft.refresh();
         VehicleDefinition def = VehicleRegistry.getById(entity.getVehicleId());
-        MqoModelLoader.MqoModel model = def != null ? MqoModelLoader.loadModelForVehicle(def) : null;
-        if (model != null) {
+        if (def == null) {
+            super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);
+            return;
+        }
+
+        // 本家式: rendererPath スクリプトを Nashorn (VehicleScriptRenderers) で実行。
+        // SRB3/NGTO Builder の GUI・マーカー・入力処理はこの render() 内で動く。
+        boolean scriptRendered = false;
+        var scripted = com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
+        if (scripted != null) {
             poseStack.pushPose();
             try {
-                // 車体の向き(EntityのYawは時計回り、GLは反時計回りなので符号反転)。
                 poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
-                // モデルのオフセット/スケール(列車と同じ定義)。
-                poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
-                poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
-                // 列車同様 MQO レンダラへ委譲(レンダースクリプト・テクスチャ・半透明2パス処理を再利用)。
-                MqoModelLoader.renderModel(model, poseStack, bufferSource, packedLight, null, null, entity);
+                MqoModelLoader.MqoModel bodyModel = MqoModelLoader.loadModelForVehicle(def);
+                scriptRendered = scripted.render(entity, partialTick, poseStack, bufferSource,
+                        packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, bodyModel);
             } catch (Throwable ignored) {
-                // 個別車両の描画失敗で他を巻き込まない。
             } finally {
                 poseStack.popPose();
+            }
+        }
+
+        if (!scriptRendered) {
+            //フォールバック: 旧 MQO パイプライン (ベイクドモデル)
+            MqoModelLoader.MqoModel model = MqoModelLoader.loadModelForVehicle(def);
+            if (model != null) {
+                poseStack.pushPose();
+                try {
+                    poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
+                    poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
+                    poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
+                    MqoModelLoader.renderModel(model, poseStack, bufferSource, packedLight, null, null, entity);
+                } catch (Throwable ignored) {
+                    // 個別車両の描画失敗で他を巻き込まない。
+                } finally {
+                    poseStack.popPose();
+                }
             }
         }
         super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);

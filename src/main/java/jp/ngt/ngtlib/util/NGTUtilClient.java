@@ -13,7 +13,16 @@ public final class NGTUtilClient {
     private NGTUtilClient() {
     }
 
-    public static Minecraft getMinecraft() {
+    /**
+     * スクリプト互換の Minecraft ラッパーを返す (field_71462_r/field_71439_g 等の
+     * SRG フィールドを SRB3/NGTO Builder が直接読むため)。最新値へ refresh してから返す。
+     */
+    public static jp.ngt.mccompat.Minecraft getMinecraft() {
+        jp.ngt.mccompat.Minecraft.refresh();
+        return jp.ngt.mccompat.Minecraft.func_71410_x();
+    }
+
+    public static Minecraft getRealMinecraft() {
         return Minecraft.getInstance();
     }
 

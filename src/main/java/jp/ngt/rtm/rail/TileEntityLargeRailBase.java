@@ -92,6 +92,14 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         return false;
     }
 
+    /**
+     * スクリプト互換 SRG: func_70296_d = markDirty (setChanged)。
+     * SRB3 のサーバースクリプトがレール生成後に呼ぶ。
+     */
+    public void func_70296_d() {
+        this.setChanged();
+    }
+
     @Override
     public RailMap getRailMap(Entity entity) {
         TileEntityLargeRailCore tile = this.getRailCore();

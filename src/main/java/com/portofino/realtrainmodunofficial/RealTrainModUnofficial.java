@@ -52,6 +52,8 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.TICKET_GATE_ITEM.get());
                 //入力コネクタ/出力コネクタ/信号変換器 はユーザー要望で削除
                 //(信号機とワイヤーのみ残す。登録は既存ワールド互換のため残置)
+                //MCTE 互換ミニチュア (NGTO Builder 用)
+                output.accept(RealTrainModUnofficialItems.MINIATURE_ITEM.get());
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {

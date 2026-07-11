@@ -44,6 +44,14 @@ public final class NGTLog {
     }
 
     /**
+     * PlayerCompat ラッパー (SRB3/NGTO のスクリプトが渡す) も受ける版
+     */
+    public static void sendChatMessage(Object player, String message, Object... objects) {
+        Player real = jp.ngt.mccompat.PlayerCompat.unwrap(player);
+        sendChatMessage(real, message, objects);
+    }
+
+    /**
      * フォーマットはこちらで行う
      */
     public static void sendChatMessageToAll(String message, Object... objects) {

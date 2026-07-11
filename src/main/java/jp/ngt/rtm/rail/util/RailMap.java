@@ -164,6 +164,34 @@ public abstract class RailMap {
     }
 
     /**
+     * スクリプト互換: WorldCompat (entity.field_70170_p) を渡す SRB3 等の呼び出しを受ける。
+     */
+    public void setRail(Object world, Object block, int x0, int y0, int z0, RailProperty prop) {
+        Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
+        if (level != null && block instanceof Block b) {
+            this.setRail(level, b, x0, y0, z0, prop);
+        }
+    }
+
+    /**
+     * スクリプト互換 canPlaceRail (WorldCompat 版)
+     */
+    public boolean canPlaceRail(Object world, boolean isCreative, RailProperty prop) {
+        Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
+        return level != null && this.canPlaceRail(level, isCreative, prop);
+    }
+
+    /**
+     * スクリプト互換 breakRail (WorldCompat 版)
+     */
+    public void breakRail(Object world, RailProperty prop, TileEntityLargeRailCore core) {
+        Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
+        if (level != null) {
+            this.breakRail(level, prop, core);
+        }
+    }
+
+    /**
      * ブロックの設置
      */
     public void setRail(Level world, Block block, int x0, int y0, int z0, RailProperty prop) {
