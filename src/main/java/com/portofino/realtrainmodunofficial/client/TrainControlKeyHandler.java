@@ -105,6 +105,10 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "dismount", 0));
             return;
         }
+        if (TrainControlKeyMappings.TOGGLE_CAB.matches(event.getKey(), event.getScanCode())) {
+            TrainHudOverlay.toggleCabHidden();
+            return;
+        }
         if (TrainControlKeyMappings.POWER_OFF.matches(event.getKey(), event.getScanCode())) {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "mascon_power", 0));
             return;
