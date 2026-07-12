@@ -1,6 +1,6 @@
 {
   "trainName": "E257_04",
-  "displayName": "E257系0番台 4号車 (モハ257 パンタ)",
+  "displayName": "E257系0番台 4号車 モハ257-0",
   "trainModel2": {
     "modelFile": "E257.mqo",
     "rendererPath": "../scripts/train_E257.js",

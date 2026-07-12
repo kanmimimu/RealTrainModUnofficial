@@ -87,6 +87,19 @@ public class EntityFloor extends EntityVehiclePart {
         }
     }
 
+    /**
+     * 当たり判定ボックスの持ち上げ量。slotPos (着座オフセット) は座面高さで台車と
+     * 同じ高さになるため、そのままだと台車をクリックしても座席が先に当たってしまう。
+     * 判定だけ着座した体 (胴体) の高さへ持ち上げる — 着座位置 (getPartVec) は不変。
+     */
+    private static final double HITBOX_LIFT = 0.55D;
+
+    @Override
+    public void updatePartPos(EntityVehicleBase<?> vehicle) {
+        super.updatePartPos(vehicle);
+        this.setPos(this.getX(), this.getY() + HITBOX_LIFT, this.getZ());
+    }
+
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
         if (this.level().isClientSide) {
