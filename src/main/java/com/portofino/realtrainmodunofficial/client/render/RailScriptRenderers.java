@@ -194,17 +194,47 @@ public final class RailScriptRenderers {
                     this.renderer.currentRailIndex = 0;
                     this.renderer.renderMapOverride = null;
                 }
-                if (isSwitch && rec.isEmpty()) {
-                    //スクリプトが分岐で何も描かなかった → 旧パイプラインで描かせる
-                    this.scriptSkippedSwitches.add(pos);
-                    be.shouldRerenderRail = false;
-                    return false;
-                }
-                this.scriptSkippedSwitches.remove(pos);
                 this.staticCache.put(pos, rec);
                 be.shouldRerenderRail = false;
             }
-            replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
+
+            //分岐: レール本体は本家どおり renderRailDynamic (トング可動) が描く。
+            //movement (転てつ状態) が変わらない限り記録を再利用する。
+            GLRecorder dyn = null;
+            if (isSwitch) {
+                long dynKey = computeSwitchDynKey((TileEntityLargeRailSwitchCore) be);
+                DynEntry cached = this.dynamicCache.get(pos);
+                if (cached != null && cached.key == dynKey) {
+                    dyn = cached.rec;
+                } else {
+                    dyn = new GLRecorder();
+                    GLRecorder.activate(dyn);
+                    try {
+                        this.renderer.modelGroupNames = model.getOriginalGroupNames();
+                        this.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+                    } catch (Throwable t) {
+                        RealTrainModUnofficial.LOGGER.warn("Rail dynamic script failed at {}", pos, t);
+                    } finally {
+                        GLRecorder.deactivate();
+                    }
+                    this.dynamicCache.put(pos, new DynEntry(dynKey, dyn));
+                }
+            }
+
+            boolean staticDrew = !rec.isEmpty();
+            boolean dynDrew = dyn != null && !dyn.isEmpty();
+            if (isSwitch && !staticDrew && !dynDrew) {
+                //スクリプトが分岐で何も描かなかった → 旧パイプラインで描かせる
+                this.scriptSkippedSwitches.add(pos);
+                return false;
+            }
+            this.scriptSkippedSwitches.remove(pos);
+            if (staticDrew) {
+                replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
+            }
+            if (dynDrew) {
+                replay(dyn, poseStack, buffer, packedLight, packedOverlay, model);
+            }
             return true;
         }
 
@@ -213,6 +243,28 @@ public final class RailScriptRenderers {
          */
         private final java.util.Set<BlockPos> scriptSkippedSwitches =
                 java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+        /**
+         * 分岐の動的描画 (トング) 記録キャッシュ。転てつ movement が変わったら再記録。
+         */
+        private final java.util.Map<BlockPos, DynEntry> dynamicCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+        private record DynEntry(long key, GLRecorder rec) {
+        }
+
+        private static long computeSwitchDynKey(TileEntityLargeRailSwitchCore be) {
+            long key = 1L;
+            jp.ngt.rtm.rail.util.SwitchType st = be.getSwitch();
+            if (st != null) {
+                jp.ngt.rtm.rail.util.Point[] points = st.getPoints();
+                if (points != null) {
+                    for (jp.ngt.rtm.rail.util.Point p : points) {
+                        key = key * 31L + (p == null ? 0 : Float.floatToIntBits(p.getMovement()));
+                    }
+                }
+            }
+            return key;
+        }
 
         /**
          * トング可動パーツ (L0/L1/R0/R1 + railL/railR) を持つモデルか。

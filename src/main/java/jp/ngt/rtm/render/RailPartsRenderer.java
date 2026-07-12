@@ -64,6 +64,49 @@ public class RailPartsRenderer extends PartsRenderer {
      * split = length*2 (0.5m 毎)、各点でモデルを yaw/-pitch/roll 回転して設置し、
      * 各オブジェクトは shouldRenderObject(tile, objName, max, i) を通す (位置依存可)。
      */
+    /**
+     * 本家 renderRailMapStatic の忠実移植 (GLRecorder 記録)。
+     * BRE 系スクリプトが分岐の非可動側レールを描くのに使う:
+     *   renderer.renderRailMapStatic(tile, rm, max, start, end, leftParts, rightParts, ...)
+     */
+    public void renderRailMapStatic(Object tileObj, Object railMapObj, int max, int startIndex, int endIndex, Parts... pArray) {
+        if (!(tileObj instanceof jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore tileEntity)
+                || !(railMapObj instanceof jp.ngt.rtm.rail.util.RailMap rm)) {
+            return;
+        }
+        jp.ngt.ngtlib.renderer.GLRecorder rec = jp.ngt.ngtlib.renderer.GLRecorder.active();
+        if (rec == null || max < 1) {
+            return;
+        }
+        double[] origPos = rm.getRailPos(max, 0);
+        double origHeight = rm.getRailHeight(max, 0);
+        int[] startPos = tileEntity.getStartPoint();
+        float[] revXZ = jp.ngt.rtm.rail.util.RailPosition.REVISION[tileEntity.getRailPositions()[0].direction];
+        //レール全体の始点からの移動差分 (本家式)
+        float moveX = (float) (origPos[1] - ((double) startPos[0] + 0.5D + (double) revXZ[0]));
+        float moveZ = (float) (origPos[0] - ((double) startPos[2] + 0.5D + (double) revXZ[1]));
+
+        for (int i = startIndex; i <= endIndex; i++) {
+            double[] p1 = rm.getRailPos(max, i);
+            double h = rm.getRailHeight(max, i);
+            float x0 = moveX + (float) (p1[1] - origPos[1]);
+            float y0 = (float) (h - origHeight);
+            float z0 = moveZ + (float) (p1[0] - origPos[0]);
+            float yaw = rm.getRailRotation(max, i);
+            float pitch = rm.getRailPitch(max, i);
+            rec.push();
+            rec.translate(x0, y0, z0);
+            rec.rotate(yaw, 0.0F, 1.0F, 0.0F);
+            rec.rotate(-pitch, 1.0F, 0.0F, 0.0F);
+            for (Parts parts : pArray) {
+                if (parts != null) {
+                    parts.render(this);
+                }
+            }
+            rec.pop();
+        }
+    }
+
     public void renderStaticParts(Object tileObj, double x, double y, double z) {
         if (!(tileObj instanceof TileEntityLargeRailCore tile)) {
             return;
