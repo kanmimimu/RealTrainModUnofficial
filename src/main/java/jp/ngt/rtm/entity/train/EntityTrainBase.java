@@ -347,17 +347,25 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
         this.setDeltaMovement(this.getDeltaMovement().scale(0.99D));
 
-        float f0 = 0.125F;
+        //本家はピッチを無条件で毎tick水平へ減衰させるが、坂に停車した列車まで
+        //水平になって片方が浮いてしまう。レールに乗っている間 (台車が RailMap を
+        //保持) は勾配ピッチを維持し、脱線/落下時のみ減衰させる。
+        boolean onRail = this.existBogies()
+                && ((this.getBogie(0) != null && this.getBogie(0).hasRailMap())
+                    || (this.getBogie(1) != null && this.getBogie(1).hasRailMap()));
         float pitch = this.getXRot();
-        if (pitch > 0.0F) {
-            pitch -= f0;
-        } else if (pitch < 0.0F) {
-            pitch += f0;
+        if (!onRail) {
+            float f0 = 0.125F;
+            if (pitch > 0.0F) {
+                pitch -= f0;
+            } else if (pitch < 0.0F) {
+                pitch += f0;
+            }
+            if (Math.abs(pitch) < f0) {
+                pitch = 0.0F;
+            }
+            this.setXRot(pitch);
         }
-        if (Math.abs(pitch) < f0) {
-            pitch = 0.0F;
-        }
-        this.setXRot(pitch);
 
         if (this.existBogies()) {
             this.getBogie(0).setXRot(pitch);

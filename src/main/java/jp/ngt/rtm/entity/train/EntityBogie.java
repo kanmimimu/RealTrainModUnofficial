@@ -145,6 +145,13 @@ public class EntityBogie extends Entity {
     private static long lastRailLostLog;
 
     /**
+     * レールに乗っているか (currentRailMap 保持)。停車中のピッチ維持判定に使用。
+     */
+    public boolean hasRailMap() {
+        return this.currentRailMap != null;
+    }
+
+    /**
      * @return 位置更新が成功したらtrue
      */
     public boolean updateBogiePos(float speed, float trainLength, EntityBogie frontBogie) {

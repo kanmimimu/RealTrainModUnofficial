@@ -949,21 +949,23 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
     private static int[] signalColorForGroup(String group) {
         String lower = group == null ? "" : group.toLowerCase();
+        //α255 = 完全発光。半透明だと暗い下地 (夜間の世界光) と混ざって
+        //「信号/踏切の光が暗い」見た目になるため不透明でフルブライト描画する
         if (CROSSING_LIGHT_LEFT.contains(lower) || CROSSING_LIGHT_RIGHT.contains(lower)
             || CROSSING_LIGHT_LEFT_LEGACY.contains(lower) || CROSSING_LIGHT_RIGHT_LEGACY.contains(lower)
             || CROSSING_LIGHT_COMMON_LEGACY.contains(lower)) {
-            return new int[] {255, 72, 48, 220};
+            return new int[] {255, 72, 48, 255};
         }
         if (RED_GROUPS.contains(lower)) {
-            return new int[] {255, 56, 32, 218};
+            return new int[] {255, 56, 32, 255};
         }
         if (YELLOW_GROUPS.contains(lower)) {
-            return new int[] {255, 210, 64, 206};
+            return new int[] {255, 210, 64, 255};
         }
         if (GREEN_GROUPS.contains(lower)) {
-            return new int[] {64, 255, 120, 198};
+            return new int[] {64, 255, 120, 255};
         }
-        return new int[] {255, 255, 255, 180};
+        return new int[] {255, 255, 255, 230};
     }
 
     @Override
