@@ -15,6 +15,13 @@ public class RailPartsRenderer extends PartsRenderer {
      */
     public int currentRailIndex;
 
+    /**
+     * 分岐コア用: renderStaticParts が描画する RailMap の差し替え。
+     * getRailMap(null) は分岐で先頭マップしか返さないため、呼び出し側
+     * (RailScriptRenderers) が getAllRailMaps の各マップを設定してマップごとに回す。
+     */
+    public jp.ngt.rtm.rail.util.RailMap renderMapOverride;
+
     public boolean isSwitchRail(Object tile) {
         return tile instanceof TileEntityLargeRailSwitchCore;
     }
@@ -65,7 +72,8 @@ public class RailPartsRenderer extends PartsRenderer {
         if (rec == null) {
             return;
         }
-        jp.ngt.rtm.rail.util.RailMap map = tile.getRailMap(null);
+        jp.ngt.rtm.rail.util.RailMap map = this.renderMapOverride != null
+                ? this.renderMapOverride : tile.getRailMap(null);
         if (map == null) {
             return;
         }

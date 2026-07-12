@@ -146,8 +146,10 @@ public final class RailScriptRenderers {
         public boolean render(TileEntityLargeRailCore be, RailMap[] maps, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
-            if (be instanceof TileEntityLargeRailSwitchCore) {
-                //分岐トング/ポイント描画は既存パイプラインへ (renderRailDynamic 未移植)
+            boolean isSwitch = be instanceof TileEntityLargeRailSwitchCore;
+            if (isSwitch && modelHasTongParts(model)) {
+                //トング可動パーツ持ちのモデル (RTM 公式レール等) は既存パイプラインへ
+                //(Point 単位の転てつアニメ; renderRailDynamic 未移植)
                 return false;
             }
             BlockPos pos = be.getBlockPos();
@@ -157,22 +159,64 @@ public final class RailScriptRenderers {
                 GLRecorder.activate(rec);
                 try {
                     this.renderer.modelGroupNames = model.getOriginalGroupNames();
-                    int railCount = 1 + be.subRails.size();
-                    for (int i = 0; i < railCount; i++) {
-                        this.renderer.currentRailIndex = i;
-                        this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+                    if (isSwitch) {
+                        //分岐: 全 RailMap をスクリプト静的描画 (本家 createRailPos は
+                        //getAllRailMaps を全部回す)。これでスクリプトの shouldRenderObject
+                        //(端トリミング/ピース循環) が分岐でも効き、AR 系レールで
+                        //端のピースが飛び出さない。
+                        RailMap[] allMaps = be.getAllRailMaps();
+                        if (allMaps != null) {
+                            for (int i = 0; i < allMaps.length; i++) {
+                                if (allMaps[i] == null) {
+                                    continue;
+                                }
+                                this.renderer.currentRailIndex = i;
+                                this.renderer.renderMapOverride = allMaps[i];
+                                this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+                            }
+                        }
+                    } else {
+                        int railCount = 1 + be.subRails.size();
+                        for (int i = 0; i < railCount; i++) {
+                            this.renderer.currentRailIndex = i;
+                            this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+                        }
                     }
                 } catch (Throwable t) {
                     RealTrainModUnofficial.LOGGER.warn("Rail script render failed at {}", pos, t);
                 } finally {
                     GLRecorder.deactivate();
                     this.renderer.currentRailIndex = 0;
+                    this.renderer.renderMapOverride = null;
                 }
                 this.staticCache.put(pos, rec);
                 be.shouldRerenderRail = false;
             }
             replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
             return true;
+        }
+
+        /**
+         * トング可動パーツ (L0/L1/R0/R1 + railL/railR) を持つモデルか。
+         * 持つ場合は転てつアニメのため既存パイプラインで描く必要がある。
+         */
+        private static boolean modelHasTongParts(MqoModelLoader.MqoModel model) {
+            java.util.Set<String> groups = model.getAllNormalizedGroupNames();
+            if (groups == null) {
+                return false;
+            }
+            boolean hasTong = false;
+            boolean hasRail = false;
+            for (String g : groups) {
+                String n = g.toLowerCase(java.util.Locale.ROOT);
+                if (n.equals("l0") || n.equals("l1") || n.equals("r0") || n.equals("r1")) {
+                    hasTong = true;
+                }
+                if (n.equals("raill") || n.equals("railr")) {
+                    hasRail = true;
+                }
+            }
+            return hasTong && hasRail;
         }
     }
 
