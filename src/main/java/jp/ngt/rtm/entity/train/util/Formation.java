@@ -320,15 +320,20 @@ public class Formation {
         } else if (id == TrainStateType.State_Door.id)//ドア
         {
             int stateR = data & 1;
-            int stateL = data >> 1;
-            //本家は getTrainDirection で反転するが、連結時に車両ごとの
-            //trainDirection が揃わずドアの開く物理側がバラバラになるため、
-            //編成内の物理向き (FormationEntry.dir) を基準に反転して統一する。
+            int stateL = (data >> 1) & 1;
+            //data は「操作した車両 (par2) 自身の物理左右」で来る。編成内の物理向き
+            //(FormationEntry.dir) が par2 と違う車両だけ左右を反転させれば、編成全体で
+            //同じ物理側のドアが開く (本家は getTrainDirection を基準に同じ事をしている)。
+            //旧実装は dir==0 を基準にしていたため、逆向き車 (dir==1) に乗ると
+            //par2 自身の値まで反転されて保存され、次のトグルで別のビットが立って
+            //「閉めたのに反対側が開く (両開き)」になっていた。
+            FormationEntry control = this.getEntry(par2);
+            int refDir = (control == null) ? 0 : control.dir;
             for (FormationEntry e : this.entries) {
                 if (e == null || e.train == null) {
                     continue;
                 }
-                int data2 = (e.dir == 0) ? (stateL << 1 | stateR) : (stateR << 1 | stateL);
+                int data2 = (e.dir == refDir) ? (stateL << 1 | stateR) : (stateR << 1 | stateL);
                 e.train.setTrainStateData_NoSync(id, (byte) data2);
             }
         } else {

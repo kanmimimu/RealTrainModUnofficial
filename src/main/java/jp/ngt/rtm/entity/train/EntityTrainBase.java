@@ -391,11 +391,29 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
+    /**
+     * 残ブレーキ量の割合 (0.0 = 完全に緩解, 1.0 = 最大ブレーキ)。
+     * brakeCount は「ブレーキノッチ × 18」で溜まり、緩解時は 1tick に 2 ずつ抜ける。
+     */
+    public float getBrakeRatio() {
+        int maxBrakeCount = (this.getConfig().deccelerations.length - 1) * 18;
+        if (maxBrakeCount <= 0) {
+            return this.brakeCount > 0 ? 1.0F : 0.0F;
+        }
+        float ratio = (float) this.brakeCount / (float) maxBrakeCount;
+        return Math.max(0.0F, Math.min(1.0F, ratio));
+    }
+
     protected void updateSpeed() {
         int notch = this.getNotch();
 
-        boolean isBrakeDisabled = true;
         float speed = this.trainSpeed;
+        //停車中に残っているブレーキ (brakeCount) が加速をどれだけ殺すか。1.0=緩解済み。
+        //本家は「緩解し切るまで加速を一切計算しない (isBrakeDisabled=false)」ため、
+        //B8 から発進すると 144/2 = 72tick (約3.6秒) 完全に無反応 → 抜けた瞬間フル加速、
+        //という不自然な挙動になっていた。残ブレーキ量に比例して加速を絞ることで、
+        //緩解が進むにつれて加速が立ち上がる (無反応時間も突然の加速も無くなる)。
+        float brakeReleaseFactor = 1.0F;
 
         //ブレーキ処理, 全ての車両で
         if (notch < 0) {
@@ -411,7 +429,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         } else {
             if (this.brakeCount > 0) {
                 if (speed <= 0.0F) {
-                    isBrakeDisabled = false;
+                    brakeReleaseFactor = 1.0F - this.getBrakeRatio();
                 }
                 this.brakeCount -= 2;
             } else if (this.brakeCount < 0) {
@@ -421,9 +439,10 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
         //速度処理, 先頭車のみ
         if (this.isControlCar()) {
-            if (isBrakeDisabled && !this.level().isClientSide) {
+            if (!this.level().isClientSide) {
                 TrainConfig cfg = this.getConfig();
-                float acceleration = TrainSpeedManager.getAcceleration(this, notch, Math.abs(speed), cfg);
+                float acceleration = TrainSpeedManager.getAcceleration(this, notch, Math.abs(speed), cfg)
+                        * brakeReleaseFactor;
                 TrainState dir = this.getTrainState(10);
                 if ((dir == TrainState.Direction_Back && speed > 0) || (dir == TrainState.Direction_Front && speed < 0)) {
                     acceleration = Math.abs(acceleration);

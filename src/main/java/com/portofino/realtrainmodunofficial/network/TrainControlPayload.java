@@ -208,19 +208,19 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 byte data = train.getTrainStateData(doorType.id);
                 train.setTrainStateData(doorType.id, (byte) (data == 0 ? 3 : 0));
             }
-            //ドアボタンの左右→ドアビット変換。ドアビットは編成物理向き基準
-            //(Formation の Door 分岐が FormationEntry.dir で各車反転) なので、運転士から
-            //見た左右は「乗車車両の編成内向き ^ 運転台向き」で変換する。旧実装の
-            //getTrainDirection^cabDir は乗車時に両者が同値セットされ XOR が常に 0 になり、
-            //逆向き先頭車の運転台だけ左右ラベルが逆になっていた。
+            //ドアボタンの左右→ドアビット変換。車両自身のドア byte は「その車両の物理左右」
+            //なので、運転士から見た左右は運転台の向き (cabDirection) だけで決まる
+            //(編成内でその車両が逆向きに繋がれていても、運転士から見える左右は変わらない)。
+            //編成の他車への配布は Formation が操作車両基準で反転する。
+            //GUI の DoorButton も同じ cabDirection 基準で開閉表示している。
             case "toggle_door_left" -> {
                 byte data = train.getTrainStateData(doorType.id);
-                boolean dir = ((formationEntryDir(train) ^ train.getCabDirection()) & 1) == 0;
+                boolean dir = (train.getCabDirection() & 1) == 0;
                 train.setTrainStateData(doorType.id, (byte) (data ^ (dir ? 1 : 2)));
             }
             case "toggle_door_right" -> {
                 byte data = train.getTrainStateData(doorType.id);
-                boolean dir = ((formationEntryDir(train) ^ train.getCabDirection()) & 1) == 0;
+                boolean dir = (train.getCabDirection() & 1) == 0;
                 train.setTrainStateData(doorType.id, (byte) (data ^ (dir ? 2 : 1)));
             }
             case "toggle_headlight" -> {
@@ -266,20 +266,6 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             default -> {
             }
         }
-    }
-
-    /**
-     * 乗車車両の編成内物理向き (FormationEntry.dir)。編成未参加 (単行直後等) は 0。
-     */
-    private static int formationEntryDir(jp.ngt.rtm.entity.train.EntityTrainBase train) {
-        jp.ngt.rtm.entity.train.util.Formation formation = train.getFormation();
-        if (formation != null) {
-            jp.ngt.rtm.entity.train.util.FormationEntry entry = formation.getEntry(train);
-            if (entry != null) {
-                return entry.dir;
-            }
-        }
-        return 0;
     }
 
     private static int resolveNextSoundIndex(TrainEntity controlTrain, int delta) {
