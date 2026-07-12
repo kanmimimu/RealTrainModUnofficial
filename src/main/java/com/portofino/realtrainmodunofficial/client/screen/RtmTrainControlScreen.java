@@ -174,7 +174,11 @@ public class RtmTrainControlScreen extends Screen {
             train.getResourceState().getDataMap().setInt("Button" + ((value >>> 8) & 0xFF), value & 0xFF, 0);
         }
         PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), action, value));
-        rebuildTabWidgets();
+        //スライダーはドラッグ中に毎回 applyValue が呼ばれる — 再構築すると
+        //ウィジェットが差し替わってドラッグが切れ、値が動かなくなる
+        if (!"set_custom_button".equals(action)) {
+            rebuildTabWidgets();
+        }
     }
 
     /**
