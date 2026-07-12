@@ -339,8 +339,9 @@ public class RtmTrainControlScreen extends Screen {
         @Override
         protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             int doorState = train.getTrainStateData(TrainStateType.State_Door.id);
-            //本家: trainDir ^ cabDir で表示側も入れ替える (サーバー側トグルと同じマッピング)
-            boolean dir = ((train.getTrainDirection() ^ train.getCabDirection()) & 1) == 0;
+            //車両自身のドア byte は常に「その車両の物理左右」(Formation が entry.dir で
+            //再配布済み)。運転士から見た左右は運転台向き (cabDir) だけで決まる。
+            boolean dir = (train.getCabDirection() & 1) == 0;
             int bit = leftDoor ? (dir ? 1 : 2) : (dir ? 2 : 1);
             boolean opened = (doorState & bit) == bit;
             int sliderOffset = opened ? -10 : -4;

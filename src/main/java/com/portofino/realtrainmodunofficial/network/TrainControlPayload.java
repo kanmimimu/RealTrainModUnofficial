@@ -208,17 +208,19 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 byte data = train.getTrainStateData(doorType.id);
                 train.setTrainStateData(doorType.id, (byte) (data == 0 ? 3 : 0));
             }
-            //本家 GuiTrainControlPanel: ドアボタンの左右は trainDir ^ cabDir で入れ替わる
-            //(逆向き運転台から操作しても運転士から見た左右が正しくなる)。
-            //ユーザー報告「右を開けたら左が出る」対応で基本マッピングも反転。
+            //ドアボタンの左右→ドアビット変換。ドアビットは編成物理向き基準
+            //(Formation の Door 分岐が FormationEntry.dir で各車反転) なので、運転士から
+            //見た左右は「乗車車両の編成内向き ^ 運転台向き」で変換する。旧実装の
+            //getTrainDirection^cabDir は乗車時に両者が同値セットされ XOR が常に 0 になり、
+            //逆向き先頭車の運転台だけ左右ラベルが逆になっていた。
             case "toggle_door_left" -> {
                 byte data = train.getTrainStateData(doorType.id);
-                boolean dir = ((train.getTrainDirection() ^ train.getCabDirection()) & 1) == 0;
+                boolean dir = ((formationEntryDir(train) ^ train.getCabDirection()) & 1) == 0;
                 train.setTrainStateData(doorType.id, (byte) (data ^ (dir ? 1 : 2)));
             }
             case "toggle_door_right" -> {
                 byte data = train.getTrainStateData(doorType.id);
-                boolean dir = ((train.getTrainDirection() ^ train.getCabDirection()) & 1) == 0;
+                boolean dir = ((formationEntryDir(train) ^ train.getCabDirection()) & 1) == 0;
                 train.setTrainStateData(doorType.id, (byte) (data ^ (dir ? 2 : 1)));
             }
             case "toggle_headlight" -> {
@@ -258,6 +260,20 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             default -> {
             }
         }
+    }
+
+    /**
+     * 乗車車両の編成内物理向き (FormationEntry.dir)。編成未参加 (単行直後等) は 0。
+     */
+    private static int formationEntryDir(jp.ngt.rtm.entity.train.EntityTrainBase train) {
+        jp.ngt.rtm.entity.train.util.Formation formation = train.getFormation();
+        if (formation != null) {
+            jp.ngt.rtm.entity.train.util.FormationEntry entry = formation.getEntry(train);
+            if (entry != null) {
+                return entry.dir;
+            }
+        }
+        return 0;
     }
 
     private static int resolveNextSoundIndex(TrainEntity controlTrain, int delta) {

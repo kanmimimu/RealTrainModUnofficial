@@ -87,8 +87,11 @@ var DOOR_MOVE = 0.89;
 var seatPivotL = -0.8;
 var seatPivotR = 0.8;
 
+var FULLBRIGHT = 15728880; //0xF000F0
+
 var car = null;
 var bodyParts = null;
+var interiorParts = null; //内装 (室内灯ONでフルブライト)
 var doorLParts = null;
 var doorRParts = null;
 var lampLParts = null;   //ドアランプ (開扉中のみ点灯表示)
@@ -151,6 +154,7 @@ function init(modelSet, modelObj) {
 
     //MQO の全オブジェクト名から号車の表示対象を選ぶ
     var body = [];
+    var interior = [];
     var lampL = [];
     var lampR = [];
     var rollsSide = [];
@@ -193,9 +197,16 @@ function init(modelSet, modelObj) {
         }
         //側面方向幕は単一オブジェクト: 本体にも描き、発光テクスチャを交互に重ねる
         if (lower.indexOf("_side_roll") >= 0) rollsSide.push(objName);
-        body.push(objName);
+        //内装 (in***_ プレフィックス + 運転席の座席/ボックス類) は室内灯で発光させる
+        if (lower.indexOf("in") == 0 || lower.indexOf("seat") == 0
+                || lower.indexOf("sub_seat") == 0 || lower.indexOf("box_") == 0) {
+            interior.push(objName);
+        } else {
+            body.push(objName);
+        }
     }
     bodyParts = toParts(body);
+    interiorParts = toParts(interior);
     lampLParts = lampL.length > 0 ? toParts(lampL) : null;
     lampRParts = lampR.length > 0 ? toParts(lampR) : null;
     rollSideParts = rollsSide.length > 0 ? toParts(rollsSide) : null;
@@ -299,13 +310,19 @@ function render(entity, pass, partialTicks) {
     //レバーサー (回転方向): 座席の向きにも使う
     var dir = 1;
     var notch = 0;
+    var interiorLit = false;
     if (entity != null) {
         try {
             dir = entity.getTrainStateData(10);
             notch = entity.getNotch();
+            interiorLit = entity.getTrainStateData(11) != 0;
         } catch (err) {
         }
     }
+
+    //内装: 室内灯ON中はフルブライト (車内だけ光る特殊発光)
+    if (interiorLit) renderer.setBrightness(FULLBRIGHT);
+    interiorParts.render(renderer);
 
     //客席 (memo: 基本座席を z=0 に格納、シートピッチ 0.96 で号車ごとに並べる。
     //台座 p_seat_base のみ固定、他は回転中心 x±0.8 で転換 — 後進時に180°)
@@ -344,6 +361,9 @@ function render(entity, pass, partialTicks) {
         var notchP = notchParts[notchKey];
         if (notchP != null) notchP.render(renderer);
     }
+
+    //内装フルブライト終了 (以降は環境光に戻す)
+    if (interiorLit) renderer.setBrightness(-1);
 
     //前照灯/尾灯 (ライトON時): 進行方向が先頭なら前照灯 (白)、逆向きなら尾灯 (赤)
     if (headLightParts != null && entity != null) {

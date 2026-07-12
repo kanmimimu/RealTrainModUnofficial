@@ -217,7 +217,8 @@ public final class VehicleScriptRenderers {
                     }
                 }
                 case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
-                case BRIGHTNESS -> light = (int) cmd.a;
+                //負値 = 元の環境光へ戻す (スクリプトの車内発光ブロック終端)
+                case BRIGHTNESS -> light = cmd.a < 0 ? packedLight : (int) cmd.a;
                 case COLOR -> {
                     //TODO カラーオーバーレイ
                 }
