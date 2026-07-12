@@ -3965,16 +3965,15 @@ public final class MqoModelLoader {
                         vy += ny * scale;
                         vz += nz * scale;
                     }
-                    float tnx = norm.m00() * nx + norm.m10() * ny + norm.m20() * nz;
-                    float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
-                    float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
-                    normalizeNormal(tnx, tny, tnz, normalized);
+                    //発光オーバーレイ: 実法線だと diffuse シェーディングで側面/下面が
+                    //最大 40% 減光して「昼でも夜でも暗い」ため、上向き法線 (×1.0) で描く
+                    //(本家は GL_LIGHTING 無効の全光量描画 — softenNormalForVanilla と同じ理由)
                     consumer.addVertex(mat, vx, vy, vz)
                         .setColor(red, green, blue, alpha)
                         .setUv(batch.data[o + 6], batch.data[o + 7])
                         .setOverlay(overlay)
                         .setLight(0x00F000F0)
-                        .setNormal(normalized[0], normalized[1], normalized[2]);
+                        .setNormal(0.0F, 1.0F, 0.0F);
                 }
             }
         }

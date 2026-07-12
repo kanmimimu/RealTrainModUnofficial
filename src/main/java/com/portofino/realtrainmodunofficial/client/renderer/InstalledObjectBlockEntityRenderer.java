@@ -134,6 +134,11 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(definition);
                         if (machineScripted != null
                                 && machineScripted.render(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
+                            //警報灯の発光オーバーレイ (スクリプトの pass2 は diffuse で減光する
+                            //ことがあるため、ここで確実に全光量の発光を重ねる)
+                            if (blockEntity.getCategory() == InstalledObjectCategory.CROSSING) {
+                                renderActiveLights(blockEntity, definition, poseStack, buffer, packedOverlay);
+                            }
                             poseStack.popPose();
                             pushed = false;
                             ClientRenderProfiler.endInstalledObject(profilerStart);
