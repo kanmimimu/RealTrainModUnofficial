@@ -184,9 +184,13 @@ public class SpeakerScreen extends Screen {
         py += 11;
         StringBuilder line = new StringBuilder();
         int perLine = 0;
+        //本家準拠: このスピーカー固有の割当を優先表示 (未登録はグローバルへフォールバック)
+        InstalledObjectBlockEntity speakerBe =
+            minecraft != null && minecraft.level != null
+                && minecraft.level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity b ? b : null;
         for (int i = 1; i <= 15; i++) {
-            String s = SpeakerSoundConfig.getSound(i);
-            if (s == null) {
+            String s = speakerBe != null ? speakerBe.getSpeakerSound(i) : SpeakerSoundConfig.getSound(i);
+            if (s == null || s.isBlank()) {
                 continue;
             }
             String shortS = s.length() > 26 ? s.substring(0, 25) + "…" : s;

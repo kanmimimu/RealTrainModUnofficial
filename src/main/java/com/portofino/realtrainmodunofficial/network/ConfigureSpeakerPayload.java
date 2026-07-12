@@ -54,12 +54,19 @@ public record ConfigureSpeakerPayload(BlockPos pos, int soundSlot, String soundN
                 return;
             }
             if (payload.soundSlot() >= 1 && payload.soundSlot() <= SpeakerSoundConfig.MAX_SOUND_ID) {
-                SpeakerSoundConfig.setSound(payload.soundSlot(), payload.soundName(), true);
-                String[] snapshot = SpeakerSoundConfig.snapshot();
-                SyncSpeakerSoundsPayload sync = new SyncSpeakerSoundsPayload(Arrays.asList(snapshot));
-                if (player.getServer() != null) {
-                    for (ServerPlayer p : player.getServer().getPlayerList().getPlayers()) {
-                        PacketDistributor.sendToPlayer(p, sync);
+                //本家 TileEntitySpeaker.setSound 準拠: 音の登録はスピーカーごと
+                //(グローバル設定は旧ワールドの読み取りフォールバックとして残す)
+                if (player.level().getBlockEntity(payload.pos()) instanceof InstalledObjectBlockEntity speakerBe
+                        && speakerBe.isSpeaker()) {
+                    speakerBe.setSpeakerSound(payload.soundSlot(), payload.soundName());
+                } else {
+                    SpeakerSoundConfig.setSound(payload.soundSlot(), payload.soundName(), true);
+                    String[] snapshot = SpeakerSoundConfig.snapshot();
+                    SyncSpeakerSoundsPayload sync = new SyncSpeakerSoundsPayload(Arrays.asList(snapshot));
+                    if (player.getServer() != null) {
+                        for (ServerPlayer p : player.getServer().getPlayerList().getPlayers()) {
+                            PacketDistributor.sendToPlayer(p, sync);
+                        }
                     }
                 }
             }

@@ -58,6 +58,8 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.SIGNAL_CONTROLLER_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_0.get());
                 output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_1.get());
+                //スピーカー: 本家仕様化 (スピーカーごとの音登録+可聴範囲) に伴い再追加
+                output.accept(RealTrainModUnofficialItems.SPEAKER_ITEM.get());
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {

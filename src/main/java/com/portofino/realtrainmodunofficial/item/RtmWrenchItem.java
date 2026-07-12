@@ -149,8 +149,17 @@ public class RtmWrenchItem extends Item {
         int mode = getMode(stack);
         BlockPos pos = context.getClickedPos();
 
-        //マーカーをクリックした場合は BlockMarker 側 (useItemOn) が処理する
+        //マーカーをクリックした場合は BlockMarker 側 (useItemOn) が処理する。
+        //ただしスニーク中はバニラがブロック操作をスキップして item.use() (モードロック切替)
+        //へ行ってしまうため、カント設定 GUI はここで開く。
         if (level.getBlockState(pos).getBlock() instanceof BlockMarker) {
+            if (player.isShiftKeyDown()) {
+                if (level.isClientSide
+                        && level.getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityMarker marker) {
+                    com.portofino.realtrainmodunofficial.ClientHooks.openMarkerCantScreen(marker);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            }
             return InteractionResult.PASS;
         }
 

@@ -259,6 +259,10 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     public void setElectricity(int levelValue) {
         if (this.electricity != levelValue) {
             this.electricity = levelValue;
+            //本家 TileEntitySpeaker.setElectricity: レベル 1-64 = そのスロットの音を再生
+            if (isSpeaker() && levelValue >= 1 && levelValue <= 64) {
+                playSpeakerSound(levelValue);
+            }
             //本家 TileEntitySignal.setElectricity 同様、信号機は電気レベル=現示。
             //現示 (SignalAspect) と electricity の二重管理が「UI で変えた現示と
             //配線/変換器/SignalController で変えた現示がバラバラ」の原因だったため、
@@ -337,6 +341,55 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     }
 
     /** スピーカーが音を鳴らす範囲(ブロック)。 */
+    /**
+     * 本家 TileEntitySpeaker.setSound/getSound 相当 (スピーカーごとの音登録)。
+     * 未登録スロットはグローバル設定 (SpeakerSoundConfig) にフォールバック (旧ワールド互換)。
+     */
+    public void setSpeakerSound(int index, String sound) {
+        scriptData.put("SpeakerSound" + index, sound == null ? "" : sound);
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    public String getSpeakerSound(int index) {
+        String own = scriptData.get("SpeakerSound" + index);
+        if (own != null && !own.isBlank()) {
+            return own;
+        }
+        return com.portofino.realtrainmodunofficial.installedobject.SpeakerSoundConfig.getSound(index);
+    }
+
+    /**
+     * 本家 TileEntitySpeaker.setElectricity 相当の発音 (index = 電気レベル 1-64)。
+     * 音量は可聴範囲 (speakerRange ブロック) から算出し、離れるほど減衰する
+     * (MC LINEAR 減衰: 可聴距離 ≒ volume × 16 ブロック)。
+     */
+    public void playSpeakerSound(int index) {
+        if (level == null || level.isClientSide || !isSpeaker()) {
+            return;
+        }
+        String sound = getSpeakerSound(index);
+        if (sound == null || sound.isBlank()) {
+            return;
+        }
+        double cx = worldPosition.getX() + 0.5D;
+        double cy = worldPosition.getY() + 0.5D;
+        double cz = worldPosition.getZ() + 0.5D;
+        int range = getSpeakerRange();
+        float volume = Math.max(0.05F, range / 16.0F);
+        var payload = new com.portofino.realtrainmodunofficial.network.SpeakerPlayPayload(cx, cy, cz, sound, volume, 1.0F);
+        double rangeSq = (double) range * (double) range;
+        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            for (net.minecraft.server.level.ServerPlayer p : serverLevel.players()) {
+                if (p.distanceToSqr(cx, cy, cz) <= rangeSq * 1.44D) {
+                    net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, payload);
+                }
+            }
+        }
+    }
+
     public int getSpeakerRange() {
         return speakerRange;
     }

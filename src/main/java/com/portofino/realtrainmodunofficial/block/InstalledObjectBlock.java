@@ -262,20 +262,10 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             double cy = pos.getY() + 0.5D;
             double cz = pos.getZ() + 0.5D;
             if (nowPowered && !wasPowered) {
-                // 立ち上がり: 再生
-                String sound = com.portofino.realtrainmodunofficial.installedobject.SpeakerSoundConfig.getSound(signal);
-                if (sound != null) {
-                    int range = blockEntity.getSpeakerRange();
-                    float volume = Math.max(1.0F, range / 16.0F);
-                    var payload = new com.portofino.realtrainmodunofficial.network.SpeakerPlayPayload(
-                        cx, cy, cz, sound, volume, 1.0F);
-                    double rangeSq = (double) range * (double) range;
-                    for (net.minecraft.server.level.ServerPlayer p : serverLevel.players()) {
-                        if (p.distanceToSqr(cx, cy, cz) <= rangeSq) {
-                            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, payload);
-                        }
-                    }
-                }
+                // 立ち上がり: 再生 (本家同様 RS 強度 = 音スロット。音はスピーカーごとの登録
+                // → 未登録はグローバル設定へフォールバック。音量は可聴範囲から算出し
+                // 距離減衰は MC LINEAR に任せる)
+                blockEntity.playSpeakerSound(signal);
             } else if (!nowPowered && wasPowered) {
                 // 立ち下がり(レバーOFF): 再生中の音を止める。範囲外プレイヤーにも送って取りこぼしを防ぐ。
                 var stop = new com.portofino.realtrainmodunofficial.network.SpeakerStopPayload(cx, cy, cz);
