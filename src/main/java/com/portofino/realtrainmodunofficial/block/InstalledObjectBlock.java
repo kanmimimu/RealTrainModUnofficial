@@ -106,6 +106,17 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
+        //本家 BlockMachineBase.clickMachine: バールで右クリック → 微調整 GUI (GuiChangeOffset)。
+        //レンチのシフト右クリックでも開けるようにする (ユーザー要望)。
+        boolean crowbar = stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.CrowbarItem;
+        boolean wrenchSneak = player.isShiftKeyDown()
+            && stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.RtmWrenchItem;
+        if ((crowbar || wrenchSneak) && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
+            if (level.isClientSide) {
+                com.portofino.realtrainmodunofficial.ClientHooks.openChangeOffsetScreen(be);
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 

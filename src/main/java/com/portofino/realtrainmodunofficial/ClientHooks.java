@@ -44,6 +44,16 @@ public final class ClientHooks {
         invokeClient("openSignalControllerScreen", new Class<?>[]{Object.class}, controller);
     }
 
+    /** 本家 GuiChangeOffset: バールで設置物を右クリック → 微調整 GUI */
+    public static void openChangeOffsetScreen(Object blockEntity) {
+        invokeClient("openChangeOffsetScreen", new Class<?>[]{Object.class}, blockEntity);
+    }
+
+    /** レールのカント設定: レンチでマーカーをシフト右クリック */
+    public static void openMarkerCantScreen(Object marker) {
+        invokeClient("openMarkerCantScreen", new Class<?>[]{Object.class}, marker);
+    }
+
     public static void openSignalChangerScreen(BlockPos pos) {
         invokeClient("openSignalChangerScreen", new Class<?>[]{BlockPos.class}, pos);
     }

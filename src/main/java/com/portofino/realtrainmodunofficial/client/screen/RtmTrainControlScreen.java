@@ -63,9 +63,10 @@ public class RtmTrainControlScreen extends Screen {
             addButton(left + 90, top + 28, 27, "前", "set_direction", 0).active = dir != 0;
             addButton(left + 117, top + 28, 28, "中", "set_direction", 1).active = dir != 1;
             addButton(left + 145, top + 28, 27, "後", "set_direction", 2).active = dir != 2;
-            addArrowButton(left + 4, top + 52, "<", "noop", 0);
-            addButton(left + 28, top + 52, 120, "チャンクロード", "noop", 0);
-            addArrowButton(left + 152, top + 52, ">", "noop", 0);
+            boolean loaderOn = train.getTrainStateData(TrainStateType.State_ChunkLoader.id) != 0;
+            addArrowButton(left + 4, top + 52, "<", "toggle_chunk_loader", 0);
+            addButton(left + 28, top + 52, 120, "チャンクロード" + (loaderOn ? " ON" : " OFF"), "toggle_chunk_loader", 0);
+            addArrowButton(left + 152, top + 52, ">", "toggle_chunk_loader", 0);
             int dest = train.getTrainStateData(TrainStateType.State_Destination.id);
             int destCount = Math.max(1, rollsignNames().length);
             addArrowButton(left + 4, top + 76, "<", "set_destination", Math.floorMod(dest - 1, destCount));

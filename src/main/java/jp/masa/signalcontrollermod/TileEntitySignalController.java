@@ -93,11 +93,13 @@ public class TileEntitySignalController extends BlockEntity {
 
     /**
      * 当 MOD の信号機 (SIGNAL カテゴリ) から現示レベルを取得。信号機以外は null。
+     * 信号機の見た目 (現示) は electricity でなく SignalAspect が持つため、
+     * RTM レベル互換の legacy 値 (1=停止..6=高速進行) で読み書きする。
      */
     private Integer getSignal(Level world, BlockPos pos) {
         BlockEntity tile = world.getBlockEntity(pos);
         if (tile instanceof InstalledObjectBlockEntity be && be.getCategory() == InstalledObjectCategory.SIGNAL) {
-            return be.getElectricity();
+            return be.getLegacySignalState();
         }
         return null;
     }
@@ -105,10 +107,8 @@ public class TileEntitySignalController extends BlockEntity {
     private void setSignal(Level world, BlockPos pos, int level) {
         BlockEntity tile = world.getBlockEntity(pos);
         if (tile instanceof InstalledObjectBlockEntity be && be.getCategory() == InstalledObjectCategory.SIGNAL) {
+            //本家 TileEntitySignal.setElectricity 同様 — 信号機は電気レベル=現示 (BE 側でミラー)
             be.setElectricity(level);
-            be.setChanged();
-            BlockState st = world.getBlockState(pos);
-            world.sendBlockUpdated(pos, st, st, 3);
         }
     }
 

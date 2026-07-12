@@ -101,18 +101,34 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     boolean veryFar = cameraDistanceSq > veryFarThreshold * veryFarThreshold;
                     poseStack.pushPose();
                     pushed = true;
-                    poseStack.translate(0.5D, 0.0D, 0.5D);
-                    Vec3 renderOffset = blockEntity.getRenderOffset();
-                    poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
-                    poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
-                    // 壁挿し碍子は横倒し(mountPitch)にする。0なら通常の縦置き。
-                    if (blockEntity.getMountPitch() != 0.0F) {
-                        poseStack.mulPose(Axis.XP.rotationDegrees(blockEntity.getMountPitch()));
+                    if (blockEntity.getMountFace() >= 0) {
+                        //本家 RenderElectricalWiring (碍子/コネクタ) 準拠:
+                        //ブロック中心 (+0.5,+0.5,+0.5) を基準に、クリック面 (meta 0-5) で回転。
+                        //持ち上げ/横倒しハックは使わない。
+                        poseStack.translate(0.5D, 0.5D, 0.5D);
+                        Vec3 renderOffset = blockEntity.getRenderOffset();
+                        poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
+                        applyAdjustments(poseStack, blockEntity);
+                        applyHonkeMountFaceRotation(poseStack, blockEntity.getMountFace());
+                        poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
+                        poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
+                    } else {
+                        poseStack.translate(0.5D, 0.0D, 0.5D);
+                        Vec3 renderOffset = blockEntity.getRenderOffset();
+                        poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
+                        applyAdjustments(poseStack, blockEntity);
+                        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
+                        // 壁挿し碍子は横倒し(mountPitch)にする。0なら通常の縦置き。
+                        if (blockEntity.getMountPitch() != 0.0F) {
+                            poseStack.mulPose(Axis.XP.rotationDegrees(blockEntity.getMountPitch()));
+                        }
+                        poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
+                        poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
                     }
-                    poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
-                    poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
-                    //踏切: 本家式スクリプト描画 (MachinePartsRenderer + Nashorn)。成功時は旧近似パスをスキップ。
-                    if (blockEntity.getCategory() == InstalledObjectCategory.CROSSING
+                    //踏切/改札: 本家式スクリプト描画 (MachinePartsRenderer + Nashorn)。成功時は旧近似パスをスキップ。
+                    //改札は本家 RenderTurnstile01.js が getMovingCount(entity)>0 で扉を回す (開閉アニメ)。
+                    if ((blockEntity.getCategory() == InstalledObjectCategory.CROSSING
+                            || blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE)
                             && definition.getScriptPath() != null && !definition.getScriptPath().isBlank()) {
                         com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.Scripted machineScripted =
                             com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(definition);
@@ -676,6 +692,52 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         return definition == null || definition.getScriptPath() == null
             ? ""
             : definition.getScriptPath().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /**
+     * 本家 GuiChangeOffset の微調整 (scale → roll → pitch → yaw、本家 RenderSignal と同順)
+     */
+    private static void applyAdjustments(PoseStack poseStack, InstalledObjectBlockEntity be) {
+        float scale = be.getAdjustScale();
+        if (scale != 1.0F) {
+            poseStack.scale(scale, scale, scale);
+        }
+        if (be.getAdjustRoll() != 0.0F) {
+            poseStack.mulPose(Axis.ZP.rotationDegrees(be.getAdjustRoll()));
+        }
+        if (be.getAdjustPitch() != 0.0F) {
+            poseStack.mulPose(Axis.XP.rotationDegrees(be.getAdjustPitch()));
+        }
+        if (be.getAdjustYaw() != 0.0F) {
+            poseStack.mulPose(Axis.YP.rotationDegrees(be.getAdjustYaw()));
+        }
+    }
+
+    /**
+     * 本家 RenderElectricalWiring の meta (クリック面 0-5) 回転。
+     * 0=下面(天井吊り)=Z180, 1=上面=そのまま, 2-5=側面=横倒し(取り付け面向き)。
+     */
+    private static void applyHonkeMountFaceRotation(PoseStack poseStack, int face) {
+        switch (face) {
+            case 0 -> poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
+            case 1 -> {
+            }
+            case 2 -> {
+                poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
+                poseStack.mulPose(Axis.XP.rotationDegrees(90.0F));
+            }
+            case 3 -> poseStack.mulPose(Axis.XP.rotationDegrees(90.0F));
+            case 4 -> {
+                poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F));
+                poseStack.mulPose(Axis.XP.rotationDegrees(90.0F));
+            }
+            case 5 -> {
+                poseStack.mulPose(Axis.YP.rotationDegrees(90.0F));
+                poseStack.mulPose(Axis.XP.rotationDegrees(90.0F));
+            }
+            default -> {
+            }
+        }
     }
 
     private static boolean shouldUseCompatibilityRendering(InstalledObjectDefinition definition, MqoModelLoader.MqoModel model) {

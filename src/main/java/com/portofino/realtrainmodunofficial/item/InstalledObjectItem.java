@@ -119,7 +119,12 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         float placeMountPitch = 0.0F;
         boolean wallMounted = false;
         boolean upsideDown = false;
-        if (category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL) {
+        //碍子: 本家 ItemInstalledObject 準拠 — クリック面 (meta 0-5) だけを保存し、
+        //描画は本家 RenderElectricalWiring と同じ (ブロック中心ピボット+面回転)。
+        //持ち上げ/横倒しハックは廃止 (当たり判定に対してモデルがずれる原因だった)。
+        boolean honkeFaceMount = category == InstalledObjectCategory.INSULATOR;
+        if (!honkeFaceMount
+                && category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL) {
             if (clickedFace == net.minecraft.core.Direction.DOWN) {
                 upsideDown = true;
                 placeMountPitch = 180.0F;
@@ -134,19 +139,24 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
             if (level.getBlockEntity(placePos) instanceof InstalledObjectBlockEntity blockEntity) {
                 blockEntity.setDefinition(definition.getId(), category, placeYaw);
                 blockEntity.setMountPitch(placeMountPitch);
-                if (category == InstalledObjectCategory.SIGNAL) {
+                if (honkeFaceMount) {
+                    //本家 meta = クリック面 (1.7.10 side と 1.21 Direction.ordinal は同一)
+                    blockEntity.setMountFace(clickedFace.ordinal());
+                    blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
+                } else if (category == InstalledObjectCategory.SIGNAL) {
                     // 当たり判定はそのままで、見た目だけ「クリックした柱」の中へ押し込む。
-                    // プレイヤー向きではなく設置面基準にすると、どの向きから置いても必ず埋まる。
-                    // ただし斜め向きのモデルは投影幅が少し広く見えるので、押し込み量を少し弱める。
-                    double yawRad = Math.toRadians(player.getYRot());
-                    double faceX = context.getClickedFace().getStepX();
-                    double faceZ = context.getClickedFace().getStepZ();
-                    double facingDot = Math.abs((-Math.sin(yawRad) * faceX) + (Math.cos(yawRad) * faceZ));
-                    double embedDepth = facingDot < 0.85D ? 0.905D : 0.92D;
-                    double inwardX = -faceX * embedDepth;
-                    double inwardY = -context.getClickedFace().getStepY() * embedDepth;
-                    double inwardZ = -faceZ * embedDepth;
-                    blockEntity.setRenderOffset(inwardX, inwardY, inwardZ);
+                    // 本家は信号が柱ブロックを置き換えてそこに描くため、横面設置のみ押し込む。
+                    // 上面/下面設置で埋め込むとモデルが 1 ブロック下に出るため無効化。
+                    if (clickedFace.getAxis().isHorizontal()) {
+                        double yawRad = Math.toRadians(player.getYRot());
+                        double faceX = context.getClickedFace().getStepX();
+                        double faceZ = context.getClickedFace().getStepZ();
+                        double facingDot = Math.abs((-Math.sin(yawRad) * faceX) + (Math.cos(yawRad) * faceZ));
+                        double embedDepth = facingDot < 0.85D ? 0.905D : 0.92D;
+                        blockEntity.setRenderOffset(-faceX * embedDepth, 0.0D, -faceZ * embedDepth);
+                    } else {
+                        blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
+                    }
                 } else if (upsideDown) {
                     // 逆さ(180°)は反転でモデルが下へ出るので、1ブロック持ち上げて天井から吊るす。
                     blockEntity.setRenderOffset(0.0D, UPSIDE_DOWN_RAISE, 0.0D);

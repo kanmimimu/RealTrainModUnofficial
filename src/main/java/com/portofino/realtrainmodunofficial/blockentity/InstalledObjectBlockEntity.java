@@ -28,6 +28,14 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     private float yaw;
     // 壁(横面)挿し時に碍子を横倒しにするためのピッチ(度)。0=通常(縦置き)。
     private float mountPitch;
+    // 本家 meta 相当のクリック面 (0-5)。-1 = 旧方式
+    private int mountFace = -1;
+    // 本家 TileEntityPlaceable の微調整 (GuiChangeOffset): 追加回転とスケール。
+    // オフセットは renderOffset (offsetX/Y/Z) を共用する。
+    private float adjustRoll;
+    private float adjustPitch;
+    private float adjustYaw;
+    private float adjustScale = 1.0F;
     private BlockPos wireStart;
     private BlockPos wireEnd;
     private boolean powered;
@@ -57,6 +65,11 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         tag.putString("Category", category);
         tag.putFloat("Yaw", yaw);
         tag.putFloat("MountPitch", mountPitch);
+        tag.putInt("MountFace", mountFace);
+        tag.putFloat("AdjustRoll", adjustRoll);
+        tag.putFloat("AdjustPitch", adjustPitch);
+        tag.putFloat("AdjustYaw", adjustYaw);
+        tag.putFloat("AdjustScale", adjustScale);
         if (wireStart != null) {
             tag.putInt("WireStartX", wireStart.getX());
             tag.putInt("WireStartY", wireStart.getY());
@@ -92,6 +105,11 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         category = tag.contains("Category") ? tag.getString("Category") : InstalledObjectCategory.LIGHT.name();
         yaw = tag.getFloat("Yaw");
         mountPitch = tag.getFloat("MountPitch");
+        mountFace = tag.contains("MountFace") ? tag.getInt("MountFace") : -1;
+        adjustRoll = tag.getFloat("AdjustRoll");
+        adjustPitch = tag.getFloat("AdjustPitch");
+        adjustYaw = tag.getFloat("AdjustYaw");
+        adjustScale = tag.contains("AdjustScale") ? tag.getFloat("AdjustScale") : 1.0F;
         wireStart = tag.contains("WireStartX") ? new BlockPos(tag.getInt("WireStartX"), tag.getInt("WireStartY"), tag.getInt("WireStartZ")) : null;
         wireEnd = tag.contains("WireEndX") ? new BlockPos(tag.getInt("WireEndX"), tag.getInt("WireEndY"), tag.getInt("WireEndZ")) : null;
         powered = tag.getBoolean("Powered");
@@ -104,6 +122,11 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         offsetZ = tag.getDouble("OffsetZ");
         signalChannel = tag.contains("SignalChannel") ? tag.getInt("SignalChannel") : -1;
         signalAspect = tag.contains("SignalAspect") ? tag.getInt("SignalAspect") : SignalAspect.STOP.getId();
+        //旧セーブ互換: 信号機は現示 (SignalAspect) と electricity を単一状態にミラーする。
+        //electricity 未保存 (0) の場合は現示側を正とする。
+        if (getCategory() == InstalledObjectCategory.SIGNAL && electricity == 0) {
+            electricity = SignalAspect.byId(signalAspect).getLegacyValue();
+        }
         speakerRange = tag.contains("SpeakerRange") ? tag.getInt("SpeakerRange") : 32;
         scriptData.clear();
         if (tag.contains("ScriptData")) {
@@ -159,6 +182,52 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         setChanged();
     }
 
+    /**
+     * 本家 ItemInstalledObject の meta (クリック面 0-5)。-1 = 旧方式 (持ち上げハック)。
+     * 碍子等は本家 RenderElectricalWiring と同じブロック中心ピボット+面回転で描画する。
+     */
+    public int getMountFace() {
+        return mountFace;
+    }
+
+    public void setMountFace(int face) {
+        this.mountFace = face;
+        setChanged();
+    }
+
+    // ===== 本家 GuiChangeOffset の微調整 (追加回転/スケール) =====
+
+    public float getAdjustRoll() {
+        return adjustRoll;
+    }
+
+    public float getAdjustPitch() {
+        return adjustPitch;
+    }
+
+    public float getAdjustYaw() {
+        return adjustYaw;
+    }
+
+    public float getAdjustScale() {
+        return adjustScale;
+    }
+
+    public void setAdjustments(double offX, double offY, double offZ,
+                               float roll, float pitch, float yawAdj, float scale) {
+        this.offsetX = offX;
+        this.offsetY = offY;
+        this.offsetZ = offZ;
+        this.adjustRoll = roll;
+        this.adjustPitch = pitch;
+        this.adjustYaw = yawAdj;
+        this.adjustScale = Math.max(0.01F, Math.min(10.0F, scale));
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public void setRenderOffset(double offsetX, double offsetY, double offsetZ) {
         this.offsetX = offsetX;
         this.offsetY = offsetY;
@@ -190,6 +259,14 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     public void setElectricity(int levelValue) {
         if (this.electricity != levelValue) {
             this.electricity = levelValue;
+            //本家 TileEntitySignal.setElectricity 同様、信号機は電気レベル=現示。
+            //現示 (SignalAspect) と electricity の二重管理が「UI で変えた現示と
+            //配線/変換器/SignalController で変えた現示がバラバラ」の原因だったため、
+            //信号カテゴリでは常に両方向ミラーして単一状態にする。
+            if (getCategory() == InstalledObjectCategory.SIGNAL) {
+                this.signalAspect = com.portofino.realtrainmodunofficial.signal.SignalAspect
+                        .byLegacyValue(levelValue).getId();
+            }
             setChanged();
             if (level != null && !level.isClientSide) {
                 if (getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
@@ -333,7 +410,10 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     }
 
     public void setSignalAspect(SignalAspect aspect, boolean updateClient) {
-        this.signalAspect = aspect == null ? SignalAspect.STOP.getId() : aspect.getId();
+        SignalAspect a = aspect == null ? SignalAspect.STOP : aspect;
+        this.signalAspect = a.getId();
+        //electricity と双方向ミラー (setElectricity 側のコメント参照)
+        this.electricity = a.getLegacyValue();
         setChanged();
         if (updateClient && level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
@@ -417,6 +497,13 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         }
         if (be.getCategory() == InstalledObjectCategory.TICKET_GATE) {
             boolean changed = false;
+            //レッドストーン入力でも開く (本家 Turnstile は切符で openGate だが、
+            //自動化/検知ブロック連携用に RS 開扉を追加)
+            if (!be.powered && level.getBestNeighborSignal(pos) > 0) {
+                be.powered = true;
+                be.tickCountOnActive = 0;
+                changed = true;
+            }
             if (be.powered) {
                 if (be.barMoveCount < 90) {
                     be.barMoveCount = Math.min(90, be.barMoveCount + Math.max(1, 90 / TICKET_GATE_MOVE_TICKS));

@@ -225,6 +225,11 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 byte data = train.getTrainStateData(lightType.id);
                 train.setTrainStateData(lightType.id, (byte) (data == 0 ? 1 : 0));
             }
+            case "toggle_chunk_loader" -> {
+                var loaderType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_ChunkLoader;
+                byte data = train.getTrainStateData(loaderType.id);
+                train.setTrainStateData(loaderType.id, (byte) (data == 0 ? 1 : 0));
+            }
             case "set_light_mode" -> train.setTrainStateData(lightType.id, (byte) value);
             case "toggle_interior_light" -> {
                 byte data = train.getTrainStateData(interiorType.id);

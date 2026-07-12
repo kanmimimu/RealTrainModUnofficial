@@ -76,6 +76,9 @@ public class RealTrainModUnofficial {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerNetwork);
         modEventBus.addListener(this::buildCreativeTabContents);
+        //本家 RTM のチャンクローダー (列車の State_ChunkLoader) 用チケットコントローラ
+        modEventBus.addListener((net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent event) ->
+            event.register(com.portofino.realtrainmodunofficial.world.TrainChunkLoader.CONTROLLER));
 
         RealTrainModUnofficialBlocks.BLOCKS.register(modEventBus);
         // jp.ngt.rtm.rail: 本家忠実移植のレール/マーカー (Phase 1)

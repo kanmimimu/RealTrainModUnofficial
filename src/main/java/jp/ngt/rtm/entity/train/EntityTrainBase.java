@@ -279,6 +279,11 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     @Override
     public void remove(RemovalReason reason) {
         super.remove(reason);
+        //チャンクローダーのチケットを解放 (残すと空チャンクを永久ロードする)
+        if (!this.level().isClientSide && this.chunkLoaderLastChunk != Long.MIN_VALUE) {
+            com.portofino.realtrainmodunofficial.world.TrainChunkLoader.release(this, this.chunkLoaderLastChunk);
+            this.chunkLoaderLastChunk = Long.MIN_VALUE;
+        }
         if (!this.level().isClientSide && reason.shouldDestroy()) {
             this.bogieController.setDead();
             if (this.formation != null) {
@@ -319,12 +324,26 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
+    /**
+     * チャンクローダーの前回チャンク (ChunkPos.toLong)。Long.MIN_VALUE = 未登録
+     */
+    private long chunkLoaderLastChunk = Long.MIN_VALUE;
+
     @Override
     protected void applyPhysicalEffect() {
         //ヨー/ピッチの float 同期 (updateMovement で確定した姿勢を毎tick送る)
         if (!this.level().isClientSide) {
             this.entityData.set(DATA_YAW, this.getYRot());
             this.entityData.set(DATA_PITCH, this.getXRot());
+            //本家 ChunkLoader (TrainState State_ChunkLoader): ON なら周囲チャンクを強制ロード。
+            //軽量化: 10tick に 1 回だけチェック + 編成先頭車のみ (全車両分のチケットは張らない)。
+            //チケットの付替えはチャンクをまたいだ時のみ。
+            if (this.tickCount % 10 == 0) {
+                boolean loaderOn = this.getTrainStateData(TrainState.TrainStateType.State_ChunkLoader.id) != 0
+                        && this.formation != null && this.formation.isFrontCar(this);
+                this.chunkLoaderLastChunk = com.portofino.realtrainmodunofficial.world.TrainChunkLoader
+                        .update(this, loaderOn, this.chunkLoaderLastChunk);
+            }
         }
         this.setDeltaMovement(this.getDeltaMovement().scale(0.99D));
 

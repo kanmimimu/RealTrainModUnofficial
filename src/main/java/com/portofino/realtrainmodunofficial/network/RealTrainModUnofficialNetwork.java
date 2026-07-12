@@ -33,5 +33,7 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToClient(SyncSpeakerSoundsPayload.TYPE, SyncSpeakerSoundsPayload.STREAM_CODEC, SyncSpeakerSoundsPayload::handleOnClient);
         //SignalControllerMod (masa300) 移植
         registrar.playToServer(SignalControllerPayload.TYPE, SignalControllerPayload.STREAM_CODEC, SignalControllerPayload::handleOnServer);
+        //本家 GuiChangeOffset (設置物の微調整)
+        registrar.playToServer(ChangeOffsetPayload.TYPE, ChangeOffsetPayload.STREAM_CODEC, ChangeOffsetPayload::handleOnServer);
     }
 }

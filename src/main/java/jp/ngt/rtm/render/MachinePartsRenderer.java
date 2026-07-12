@@ -33,6 +33,8 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
                 return (float) be.getBarMoveCount() / 90.0F;
             }
             if (be.getCategory() == InstalledObjectCategory.TICKET_GATE) {
+                //本家 MachinePartsRenderer: canThrough() ? 0 : 1 — 通れる(開)=0, 閉=1。
+                //MQO のデフォルトポーズが「開」で、state>0 の回転で「閉」になる。
                 return be.isTicketGateOpen() ? 0.0F : 1.0F;
             }
         }

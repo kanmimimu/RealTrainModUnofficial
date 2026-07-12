@@ -55,6 +55,22 @@ public final class ClientHooksClient {
         }
     }
 
+    /** 本家 GuiChangeOffset: バールで設置物を右クリック → 微調整 GUI */
+    public static void openChangeOffsetScreen(Object blockEntity) {
+        if (blockEntity instanceof InstalledObjectBlockEntity be) {
+            Minecraft.getInstance().setScreen(
+                new com.portofino.realtrainmodunofficial.client.screen.ChangeOffsetScreen(be));
+        }
+    }
+
+    /** レールのカント設定: レンチでマーカーをシフト右クリック */
+    public static void openMarkerCantScreen(Object marker) {
+        if (marker instanceof jp.ngt.rtm.rail.TileEntityMarker te) {
+            Minecraft.getInstance().setScreen(
+                new com.portofino.realtrainmodunofficial.client.screen.MarkerCantScreen(te));
+        }
+    }
+
     public static void openSignalChangerScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(new SignalChangerScreen(pos));
     }
