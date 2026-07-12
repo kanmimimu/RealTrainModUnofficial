@@ -153,6 +153,11 @@ public final class RailScriptRenderers {
                 return false;
             }
             BlockPos pos = be.getBlockPos();
+            //スクリプトが分岐を描かないパック (AR 等は isSwitchRail で早期 return):
+            //記録が空だったコアは旧パイプラインに任せる (端トリミング付き)
+            if (isSwitch && this.scriptSkippedSwitches.contains(pos) && !be.shouldRerenderRail) {
+                return false;
+            }
             GLRecorder rec = this.staticCache.get(pos);
             if (rec == null || be.shouldRerenderRail) {
                 rec = new GLRecorder();
@@ -189,12 +194,25 @@ public final class RailScriptRenderers {
                     this.renderer.currentRailIndex = 0;
                     this.renderer.renderMapOverride = null;
                 }
+                if (isSwitch && rec.isEmpty()) {
+                    //スクリプトが分岐で何も描かなかった → 旧パイプラインで描かせる
+                    this.scriptSkippedSwitches.add(pos);
+                    be.shouldRerenderRail = false;
+                    return false;
+                }
+                this.scriptSkippedSwitches.remove(pos);
                 this.staticCache.put(pos, rec);
                 be.shouldRerenderRail = false;
             }
             replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
             return true;
         }
+
+        /**
+         * スクリプトが描画を拒否した分岐コア (毎フレームのスクリプト再実行を避けるキャッシュ)。
+         */
+        private final java.util.Set<BlockPos> scriptSkippedSwitches =
+                java.util.concurrent.ConcurrentHashMap.newKeySet();
 
         /**
          * トング可動パーツ (L0/L1/R0/R1 + railL/railR) を持つモデルか。

@@ -152,12 +152,14 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     return;
                 }
                 // フォールバック(Point 情報やパーツが無い): 本家 createRailPos 同様、全 RailMap を全描画。
+                // trimEnds=true: 端のサンプルを半ピース内側に寄せ、レール端からモデルが
+                // 飛び出さないようにする (AR 系パックのダブルクロッシング対策)。
                 for (int mapIndex = 0; mapIndex < maps.length; mapIndex++) {
                     RailMap map = maps[mapIndex];
                     if (map != null) {
                         renderRailMap(be, map, mapIndex, layout, activeIndex, previousIndex, switchProgress,
                             poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, cameraDistanceSq, compatibilityHeavy,
-                            null);
+                            null, true);
                     }
                 }
                 return;
@@ -198,6 +200,34 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         boolean compatibilityHeavy,
         RailSample[] primarySamples
     ) {
+        renderRailMap(blockEntity, map, mapIndex, layout, activeIndex, previousIndex, switchProgress,
+            poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, definition, cameraDistanceSq,
+            compatibilityHeavy, primarySamples, false);
+    }
+
+    private void renderRailMap(
+        TileEntityLargeRailCore blockEntity,
+        RailMap map,
+        int mapIndex,
+        RenderSwitchLayout layout,
+        int activeIndex,
+        int previousIndex,
+        float switchProgress,
+        PoseStack poseStack,
+        MultiBufferSource buffer,
+        int packedLight,
+        double ox,
+        double oy,
+        double oz,
+        net.minecraft.world.phys.Vec3 mo,
+        float scale,
+        MqoModelLoader.MqoModel model,
+        RailDefinition definition,
+        double cameraDistanceSq,
+        boolean compatibilityHeavy,
+        RailSample[] primarySamples,
+        boolean trimEnds
+    ) {
         double length = map.getLength();
         if (length < 1.0e-4) {
             return;
@@ -216,11 +246,12 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         int endIndex = Math.max(startIndex, samples.length - 1 - Math.max(0, clip[1]));
         for (int i = startIndex; i <= endIndex; i += stride) {
             RailSample sample = samples[i];
+            double[] p = trimmedSamplePos(samples, i, trimEnds);
             renderRailSample(
                 blockEntity,
-                sample.x,
-                sample.y,
-                sample.z,
+                p[0],
+                p[1],
+                p[2],
                 sample.yaw,
                 sample.pitch,
                 sample.roll,
@@ -241,11 +272,12 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         }
         if (endIndex > startIndex && (endIndex - startIndex) % stride != 0) {
             RailSample sample = samples[endIndex];
+            double[] p = trimmedSamplePos(samples, endIndex, trimEnds);
             renderRailSample(
                 blockEntity,
-                sample.x,
-                sample.y,
-                sample.z,
+                p[0],
+                p[1],
+                p[2],
                 sample.yaw,
                 sample.pitch,
                 sample.roll,
@@ -264,6 +296,31 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 compatibilityHeavy
             );
         }
+    }
+
+    /**
+     * trimEnds 時、端 (先頭/末尾) のサンプルを半ピース (0.25m) 内側へ寄せた座標を返す。
+     * ピース中心が端点に来るとモデルが半分レール外へ飛び出すため、端では面一にする。
+     */
+    private static double[] trimmedSamplePos(RailSample[] samples, int index, boolean trimEnds) {
+        RailSample sample = samples[index];
+        double sx = sample.x;
+        double sy = sample.y;
+        double sz = sample.z;
+        if (trimEnds && samples.length >= 2 && (index == 0 || index == samples.length - 1)) {
+            RailSample toward = samples[index == 0 ? 1 : samples.length - 2];
+            double dx = toward.x - sx;
+            double dy = toward.y - sy;
+            double dz = toward.z - sz;
+            double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (len > 1.0e-6) {
+                double k = 0.25D / len;
+                sx += dx * k;
+                sy += dy * k;
+                sz += dz * k;
+            }
+        }
+        return new double[]{sx, sy, sz};
     }
 
     // ===== 本家RTM準拠の分岐レンダリング (LibRenderRail.js / RenderRailStandardHP.js 移植) =====
