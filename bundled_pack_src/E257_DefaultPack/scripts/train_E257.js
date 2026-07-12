@@ -18,6 +18,7 @@ var CARS = {
         excludes: ["ex0end2_step11", "2000"],
         doorsL: ["doorL01a", "doorL01b"], doorsR: ["doorR01a", "doorR01b"], doorDir: -1.0,
         mascon: "plain", panta: false,
+        lightsHead: ["ex0_light", "ex0_light_top"], lightsTail: ["ex0_light_rear"],
         seatZ: 5.4, seatRows: 13,
         offsetZ: -0.25
     },
@@ -29,6 +30,7 @@ var CARS = {
         excludes: ["ex0end2_step11", "in1cp100_door_No_joint"],
         doorsL: ["doorL01a", "doorL01b"], doorsR: ["doorR01a", "doorR01b"], doorDir: -1.0,
         mascon: "b", panta: false,
+        lightsHead: ["ex100_front_light"], lightsTail: ["ex100_rear_light"],
         seatZ: 5.4, seatRows: 13,
         offsetZ: -0.25
     },
@@ -57,6 +59,7 @@ var CARS = {
         excludes: ["ex0end2_step0", "2000"],
         doorsL: ["doorL01a"], doorsR: ["doorR01a"], doorDir: -1.0,
         mascon: "plain", panta: false,
+        lightsHead: ["ex0_light", "ex0_light_top"], lightsTail: ["ex0_light_rear"],
         seatZ: 5.4, seatRows: 16,
         offsetZ: -0.25
     }
@@ -102,9 +105,11 @@ var leverParts = {};
 var notchParts = {};
 //パンタ可動 Parts (PANTA 構造に対応)
 var pantaParts = null;
-//方向幕の交互表示テクスチャ
-var rollTex1 = new RLClass("minecraft", "textures/mat3_light1.png");
-var rollTex2 = new RLClass("minecraft", "textures/mat3_light2.png");
+//前照灯/尾灯の発光オーバーレイテクスチャ (透明地に光っている部分のみ)
+var headLightTex = new RLClass("minecraft", "textures/mat2_0_light1.png");
+var tailLightTex = new RLClass("minecraft", "textures/mat2_0_light2.png");
+var headLightParts = null;
+var tailLightParts = null;
 
 function toParts(list) {
     return renderer.registerParts(new PartsClass(Java.to(list, "java.lang.String[]")));
@@ -227,6 +232,12 @@ function init(modelSet, modelObj) {
     if (car.panta) {
         pantaParts = buildPantaParts(PANTA);
     }
+
+    //前照灯/尾灯 (先頭車のみ)
+    if (car.lightsHead != null) {
+        headLightParts = toParts(car.lightsHead);
+        tailLightParts = toParts(car.lightsTail);
+    }
 }
 
 //本家 BasicVehiclePartsRenderer.renderParts と同じ入れ子変換
@@ -253,17 +264,14 @@ function render(entity, pass, partialTicks) {
     //車体 (固定部)
     bodyParts.render(renderer);
 
-    //方向幕の交互表示 (約3秒周期): 前面は front1/front2 を交互に片方だけ表示、
-    //側面は単一オブジェクトに発光テクスチャ (mat3_light1/2) を交互に重ねる
+    //前面方向幕の交互表示 (約3秒周期、front1/front2 を片方だけ表示)。
+    //mat3 のテクスチャは _light 版も同一画像 (交互はオブジェクト切替のみの設計) なので
+    //発光テクスチャの重ね描きはしない — 側面幕はそのまま本体描画 (rollSideParts は本体に含む)。
     var phase = Math.floor(new Date().getTime() / 3000) % 2;
     var frontRoll = (phase == 0) ? rollFront1Parts : rollFront2Parts;
     if (frontRoll != null) {
         frontRoll.render(renderer);
     }
-    renderer.bindTexture(phase == 0 ? rollTex1 : rollTex2);
-    if (frontRoll != null) frontRoll.render(renderer);
-    if (rollSideParts != null) rollSideParts.render(renderer);
-    renderer.bindTexture(null);
 
     //ドア (memo: 1/3/11号車は-Z方向、4/6号車は+Z方向、移動量0.89。本家同様 sigmoid 補間)
     var dL = renderer.sigmoid(renderer.getDoorMovementL(entity));
@@ -335,6 +343,22 @@ function render(entity, pass, partialTicks) {
         var notchKey = (notch >= 0) ? ("n" + Math.min(notch, 5)) : ("b" + Math.min(-notch - 1, 8));
         var notchP = notchParts[notchKey];
         if (notchP != null) notchP.render(renderer);
+    }
+
+    //前照灯/尾灯 (ライトON時): 進行方向が先頭なら前照灯 (白)、逆向きなら尾灯 (赤)
+    if (headLightParts != null && entity != null) {
+        var lightOn = 0;
+        var tdir = 0;
+        try {
+            lightOn = entity.getTrainStateData(5);
+            tdir = entity.getTrainDirection();
+        } catch (err2) {
+        }
+        if (lightOn != 0) {
+            renderer.bindTexture(tdir == 0 ? headLightTex : tailLightTex);
+            ((tdir == 0) ? headLightParts : tailLightParts).render(renderer);
+            renderer.bindTexture(null);
+        }
     }
 
     //パンタグラフ可動 (4/6号車、本家 childParts 方式の入れ子回転)
