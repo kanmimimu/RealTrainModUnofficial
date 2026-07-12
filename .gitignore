@@ -26,6 +26,8 @@ run-data
 repo
 
 *.mqo
+# 同梱デフォルトパックのモデルはビルドに必須なので例外
+!bundled_pack_src/**/*.mqo
 .DS_Store
 .vscode
 backups
