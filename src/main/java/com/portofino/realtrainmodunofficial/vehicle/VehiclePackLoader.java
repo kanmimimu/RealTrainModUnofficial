@@ -510,6 +510,8 @@ public class VehiclePackLoader {
                 singleTrain
             );
             definition.setServerScriptPath(serverScriptPath);
+            //本家 sound_Announcement の表示名 ([[名前, 音]] の名前側)
+            definition.setAnnouncementNames(parseAnnouncementNames(obj, trainModel));
             definition.setSlotPositions(parseSlotPositions(trainModel, obj));
             definition.setJsonRunningSounds(
                 soundStop,
@@ -1030,6 +1032,52 @@ public class VehiclePackLoader {
         appendAnnouncementSounds(trainModel, sounds);
         appendAnnouncementSounds(obj, sounds);
         return List.copyOf(sounds);
+    }
+
+    /**
+     * 本家 sound_Announcement は [[表示名, 音声パス], ...]。表示名 (要素0) を取り出す。
+     * 名前が無い書き方 (文字列だけ等) の場合はそのエントリを空文字にして、
+     * 表示側で「アナウンス N」にフォールバックさせる。
+     */
+    private static List<String> parseAnnouncementNames(JsonObject obj, JsonObject trainModel) {
+        List<String> names = new ArrayList<>();
+        appendAnnouncementNames(trainModel, names);
+        appendAnnouncementNames(obj, names);
+        return List.copyOf(names);
+    }
+
+    private static void appendAnnouncementNames(JsonObject json, List<String> target) {
+        if (json == null || !json.has("sound_Announcement")) {
+            return;
+        }
+        JsonElement element = json.get("sound_Announcement");
+        if (!element.isJsonArray()) {
+            return;
+        }
+        for (JsonElement entry : element.getAsJsonArray()) {
+            //音声が取れないエントリは parseAnnouncementSounds 側でも捨てられるので、
+            //名前リストとインデックスがずれないよう同じ条件で揃える。
+            String sound = extractAnnouncementSound(entry);
+            if (sound == null || sound.isBlank()) {
+                continue;
+            }
+            target.add(extractAnnouncementName(entry));
+        }
+    }
+
+    private static String extractAnnouncementName(JsonElement entry) {
+        if (entry != null && entry.isJsonArray()) {
+            JsonArray array = entry.getAsJsonArray();
+            //[表示名, 音声パス] — 2要素以上のときだけ要素0を名前とみなす
+            if (array.size() >= 2 && array.get(0).isJsonPrimitive() && array.get(0).getAsJsonPrimitive().isString()) {
+                return array.get(0).getAsString();
+            }
+        }
+        if (entry != null && entry.isJsonObject()) {
+            JsonObject object = entry.getAsJsonObject();
+            return firstNonBlank(getString(object, "name"), getString(object, "displayName"));
+        }
+        return "";
     }
 
     private static void appendAnnouncementSounds(JsonObject json, List<String> target) {

@@ -64,7 +64,7 @@ public class TrainControlScreen extends Screen {
             addButton(left + 28, top + 76, 120, destinationLabel(), "next_destination", 0);
             addArrowButton(left + 152, top + 76, ">", "next_destination");
             addArrowButton(left + 4, top + 100, "<", "prev_sound");
-            addButton(left + 28, top + 100, 120, "アナウンス " + (train.getSoundIndex() + 1), "next_sound", 0);
+            addButton(left + 28, top + 100, 120, announcementLabel(), "next_sound", 0);
             addArrowButton(left + 152, top + 100, ">", "next_sound");
         } else if (selectedTab == ControlTab.FUNCTION) {
             VehicleDefinition definition = VehicleRegistry.getById(train.getVehicleId());
@@ -193,6 +193,23 @@ public class TrainControlScreen extends Screen {
 
     private String pantographLabel() {
         return train.isPantographUp() ? "パンタ 上" : "パンタ 下";
+    }
+
+    /**
+     * 本家 sound_Announcement は [[表示名, 音声パス], ...] なので、指定された表示名を出す。
+     * 名前が未指定 / パック未登録のときだけ従来の「アナウンス N」にフォールバックする。
+     */
+    private String announcementLabel() {
+        int index = train.getSoundIndex();
+        VehicleDefinition definition = VehicleRegistry.getById(train.getVehicleId());
+        List<String> names = definition != null ? definition.getAnnouncementNames() : List.of();
+        if (index >= 0 && index < names.size()) {
+            String name = names.get(index);
+            if (name != null && !name.isBlank()) {
+                return name;
+            }
+        }
+        return "アナウンス " + (index + 1);
     }
 
     private String destinationLabel() {

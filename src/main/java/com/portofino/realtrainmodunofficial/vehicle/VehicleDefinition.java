@@ -68,6 +68,8 @@ public class VehicleDefinition {
     private final List<LightDefinition> interiorLights;
     private final String hornSound;
     private final List<String> announcementSounds;
+    /** sound_Announcement の表示名 (Loader が JSON 読込後に設定)。 */
+    private List<String> announcementNames = List.of();
     private String soundStop = "";
     private String soundStartAcceleration = "";
     private String soundAcceleration = "";
@@ -459,6 +461,18 @@ public class VehicleDefinition {
 
     public List<String> getAnnouncementSounds() {
         return announcementSounds;
+    }
+
+    /**
+     * 本家 sound_Announcement の表示名 ([[表示名, 音声パス], ...] の表示名側)。
+     * announcementSounds と同じ順・同じ長さ。名前未指定のエントリは空文字。
+     */
+    public List<String> getAnnouncementNames() {
+        return announcementNames;
+    }
+
+    public void setAnnouncementNames(List<String> names) {
+        this.announcementNames = names == null ? List.of() : List.copyOf(names);
     }
 
     public String getSoundStop() {

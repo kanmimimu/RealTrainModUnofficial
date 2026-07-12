@@ -74,7 +74,7 @@ public class RtmTrainControlScreen extends Screen {
             addArrowButton(left + 152, top + 76, ">", "set_destination", (dest + 1) % destCount);
             int announce = train.getTrainStateData(TrainStateType.State_Announcement.id);
             addArrowButton(left + 4, top + 100, "<", "set_announcement", Math.max(0, announce - 1));
-            addButton(left + 28, top + 100, 120, "アナウンス " + (announce + 1), "set_announcement", announce + 1);
+            addButton(left + 28, top + 100, 120, announcementLabel(announce), "set_announcement", announce + 1);
             addArrowButton(left + 152, top + 100, ">", "set_announcement", announce + 1);
         } else if (selectedTab == ControlTab.FUNCTION) {
             VehicleDefinition definition = VehicleRegistry.getById(train.getModelName());
@@ -146,6 +146,22 @@ public class RtmTrainControlScreen extends Screen {
 
     private String pantographLabel() {
         return train.getTrainStateData(TrainStateType.State_Pantograph.id) != 0 ? "パンタ 上" : "パンタ 下";
+    }
+
+    /**
+     * 本家 sound_Announcement は [[表示名, 音声パス], ...] なので、指定された表示名を出す。
+     * 名前が未指定 / パック未登録のときだけ従来の「アナウンス N」にフォールバックする。
+     */
+    private String announcementLabel(int announce) {
+        VehicleDefinition definition = VehicleRegistry.getById(train.getModelName());
+        List<String> names = definition != null ? definition.getAnnouncementNames() : List.of();
+        if (announce >= 0 && announce < names.size()) {
+            String name = names.get(announce);
+            if (name != null && !name.isBlank()) {
+                return name;
+            }
+        }
+        return "アナウンス " + (announce + 1);
     }
 
     private String destinationLabel() {
