@@ -85,6 +85,14 @@ public class RtmTrainControlScreen extends Screen {
                 int index = i;
                 int value = train.getResourceState().getDataMap().getInt("Button" + i);
                 List<String> optionList = options.get(i);
+                //スライダー型: customButtons のエントリを ["slider:名前"] と書くと
+                //0-100% のスライダーになる (値は DataMap Button{i}、0=未設定は 100% 扱い)
+                if (optionList.size() == 1 && optionList.get(0).startsWith("slider:")) {
+                    String label = optionList.get(0).substring("slider:".length());
+                    int shown = value <= 0 ? 100 : Math.min(100, value);
+                    addRenderableWidget(new CustomSliderButton(left + 4, y, 164, 22, label, index, shown));
+                    continue;
+                }
                 String text = optionList.isEmpty() ? ("カスタム" + (i + 1))
                         : optionList.get(Math.floorMod(value, optionList.size()));
                 int packed = (index << 8) | (value & 0xFF);
@@ -162,9 +170,43 @@ public class RtmTrainControlScreen extends Screen {
                     ? (current + 1) % options.get(index).size()
                     : (current == 0 ? 1 : 0);
             train.getResourceState().getDataMap().setInt("Button" + index, next, 0);
+        } else if ("set_custom_button".equals(action)) {
+            train.getResourceState().getDataMap().setInt("Button" + ((value >>> 8) & 0xFF), value & 0xFF, 0);
         }
         PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), action, value));
         rebuildTabWidgets();
+    }
+
+    /**
+     * スライダー型カスタムボタン (0-100%)。ドラッグ確定ごとに DataMap Button{i} を送信。
+     */
+    private class CustomSliderButton extends net.minecraft.client.gui.components.AbstractSliderButton {
+        private final String label;
+        private final int index;
+
+        CustomSliderButton(int x, int y, int w, int h, String label, int index, int initialPercent) {
+            super(x, y, w, h, Component.literal(label + " " + initialPercent + "%"), initialPercent / 100.0D);
+            this.label = label;
+            this.index = index;
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(Component.literal(this.label + " " + currentPercent() + "%"));
+        }
+
+        @Override
+        protected void applyValue() {
+            //0 は「未設定=100%」の予約値なので最低 1
+            int percent = Math.max(1, currentPercent());
+            train.getResourceState().getDataMap().setInt("Button" + this.index, percent, 0);
+            PacketDistributor.sendToServer(new TrainControlPayload(
+                    train.getId(), "set_custom_button", (this.index << 8) | percent));
+        }
+
+        private int currentPercent() {
+            return (int) Math.round(this.value * 100.0D);
+        }
     }
 
     /**
@@ -173,6 +215,10 @@ public class RtmTrainControlScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
+        //スライダードラッグ中に再構築するとドラッグ状態が失われる
+        if (this.isDragging()) {
+            return;
+        }
         if (++refreshTimer >= 5) {
             refreshTimer = 0;
             rebuildTabWidgets();

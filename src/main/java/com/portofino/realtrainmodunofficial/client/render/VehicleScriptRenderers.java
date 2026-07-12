@@ -197,6 +197,8 @@ public final class VehicleScriptRenderers {
                                PolygonModel bodyGraph) {
         int light = packedLight;
         ResourceLocation overrideTex = null;
+        //スクリプトの glColor4f (発光オーバーレイの強度等に使用)
+        float colR = 1.0F, colG = 1.0F, colB = 1.0F, colA = 1.0F;
         int depth = 0;
         for (GLRecorder.Cmd cmd : rec.getCommands()) {
             switch (cmd.op) {
@@ -220,7 +222,10 @@ public final class VehicleScriptRenderers {
                 //負値 = 元の環境光へ戻す (スクリプトの車内発光ブロック終端)
                 case BRIGHTNESS -> light = cmd.a < 0 ? packedLight : (int) cmd.a;
                 case COLOR -> {
-                    //TODO カラーオーバーレイ
+                    colR = cmd.a;
+                    colG = cmd.b;
+                    colB = cmd.c;
+                    colA = cmd.d;
                 }
                 case BIND_TEXTURE -> overrideTex = cmd.payload instanceof ResourceLocation rl ? rl : null;
                 case RENDER_PARTS, RENDER_GROUPS -> {
@@ -230,7 +235,7 @@ public final class VehicleScriptRenderers {
                             //同グループの面を差し替えテクスチャで描画 (UV は MQO のまま)
                             for (Object name : names) {
                                 drawModelGroup(bodyGraph, String.valueOf(name), poseStack, buffer,
-                                        light, packedOverlay, overrideTex);
+                                        light, packedOverlay, overrideTex, colR, colG, colB, colA);
                             }
                         } else if (model != null) {
                             //translucent=false は全バッチ描画 (renderSelectedBatches のフィルタ仕様)
@@ -245,7 +250,8 @@ public final class VehicleScriptRenderers {
                 }
                 case DRAW_MODEL_GROUP -> {
                     if (cmd.payload instanceof PolygonModel pm) {
-                        drawModelGroup(pm, cmd.name, poseStack, buffer, light, packedOverlay, overrideTex);
+                        drawModelGroup(pm, cmd.name, poseStack, buffer, light, packedOverlay, overrideTex,
+                                colR, colG, colB, colA);
                     }
                 }
             }
@@ -326,7 +332,8 @@ public final class VehicleScriptRenderers {
     }
 
     private static void drawModelGroup(PolygonModel pm, String groupName, PoseStack poseStack,
-                                       MultiBufferSource buffer, int light, int overlay, ResourceLocation texture) {
+                                       MultiBufferSource buffer, int light, int overlay, ResourceLocation texture,
+                                       float colR, float colG, float colB, float colA) {
         GroupObject group = null;
         for (GroupObject g : pm.groupObjects) {
             if (g.name.equalsIgnoreCase(groupName)) {
@@ -366,7 +373,7 @@ public final class VehicleScriptRenderers {
                         vv = face.uvs[idx[k] * 2 + 1];
                     }
                     vc.addVertex(mat, vert.x, vert.y, vert.z)
-                            .setColor(255, 255, 255, 255)
+                            .setColor(colR, colG, colB, colA)
                             .setUv(u, vv)
                             .setOverlay(overlay)
                             .setLight(light)

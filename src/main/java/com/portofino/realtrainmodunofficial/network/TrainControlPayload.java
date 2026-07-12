@@ -257,6 +257,12 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                         : (currentValue == 0 ? 1 : 0);
                 train.getResourceState().getDataMap().setInt("Button" + index, next, 1);
             }
+            //スライダー型カスタムボタン: 上位8bit=index, 下位8bit=値 (0-100)
+            case "set_custom_button" -> {
+                int index = (value >>> 8) & 0xFF;
+                int sliderValue = value & 0xFF;
+                train.getResourceState().getDataMap().setInt("Button" + index, sliderValue, 1);
+            }
             default -> {
             }
         }

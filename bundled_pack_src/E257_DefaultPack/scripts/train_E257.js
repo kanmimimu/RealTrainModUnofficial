@@ -375,18 +375,21 @@ function render(entity, pass, partialTicks) {
         } catch (err2) {
         }
         if (lightOn != 0) {
-            //カスタムボタン0 = ライト光量 (弱/中/強)。加算合成なので重ね描きで光が強くなる
-            var strength = 1;
+            //カスタムスライダー0 = ライト光量 (1-100%、0=未設定は100%)。
+            //加算合成なので色乗算がそのまま光の強さになる
+            var percent = 100;
             try {
-                strength = entity.getResourceState().getDataMap().getInt("Button0") + 1;
+                var stored = entity.getResourceState().getDataMap().getInt("Button0");
+                if (stored > 0) percent = Math.min(stored, 100);
             } catch (err3) {
             }
+            var f = percent / 100.0;
             var lit = (tdir == 0) ? headLightParts : tailLightParts;
+            GL11.glColor4f(f, f, f, 1.0);
             renderer.bindTexture(tdir == 0 ? headLightTex : tailLightTex);
-            for (var s = 0; s < strength; s++) {
-                lit.render(renderer);
-            }
+            lit.render(renderer);
             renderer.bindTexture(null);
+            GL11.glColor4f(1.0, 1.0, 1.0, 1.0);
         }
     }
 
