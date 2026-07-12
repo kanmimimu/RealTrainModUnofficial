@@ -61,6 +61,7 @@ public final class PackRequirementWarnings {
             FMLPaths.GAMEDIR.get().resolve("mods"),
             FMLPaths.GAMEDIR.get().resolve("content"),
             FMLPaths.GAMEDIR.get().resolve("vehicle_packs"),
+            com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get(),
             FMLPaths.GAMEDIR.get().resolve("config").resolve("realtrainmodunofficial"),
             FMLPaths.GAMEDIR.get().resolve("config").resolve("realtrainmodunofficial").resolve("packs"),
             FMLPaths.GAMEDIR.get().resolve("config").resolve("realtrainmodunofficial").resolve("vehicle_packs")

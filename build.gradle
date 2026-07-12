@@ -134,8 +134,22 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 }
 
+// 同梱デフォルトパック: bundled_pack_src/<PackName>/ を zip 化して jar の
+// assets/realtrainmodunofficial/bundled_packs/vehicle/ に入れる (起動時に
+// rtm_default_assets フォルダへ展開される)
+def buildE257DefaultPack = tasks.register('buildE257DefaultPack', Zip) {
+    from 'bundled_pack_src/E257_DefaultPack'
+    archiveFileName = 'E257_DefaultPack.zip'
+    destinationDirectory = layout.buildDirectory.dir('generated_bundled_packs')
+    // MQO/テクスチャは既圧縮 or テキストなので標準圧縮で十分
+}
+
 tasks.named('jar', Jar).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    dependsOn buildE257DefaultPack
+    from(buildE257DefaultPack.flatMap { it.archiveFile }) {
+        into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
+    }
     from {
         configurations.jsRuntime
                 .filter { it.isDirectory() || it.name.endsWith('.jar') }

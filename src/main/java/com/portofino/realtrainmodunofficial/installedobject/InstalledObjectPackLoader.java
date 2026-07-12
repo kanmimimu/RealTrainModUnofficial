@@ -56,6 +56,11 @@ public final class InstalledObjectPackLoader {
                 loadDirectoryPacks(contentDir);
                 loadArchiveDirectory(contentDir);
             }
+            Path defaultAssetsDir = com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get();
+            if (Files.isDirectory(defaultAssetsDir)) {
+                loadDirectoryPacks(defaultAssetsDir);
+                loadArchiveDirectory(defaultAssetsDir);
+            }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not scan installed object packs", e);
         }

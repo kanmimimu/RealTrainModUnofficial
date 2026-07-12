@@ -77,7 +77,10 @@ public final class PackScriptSource {
             bindOpt("NGTRenderHelper", "jp.ngt.ngtlib.renderer.NGTRenderHelper") +
             bindOpt("NGTObjectRenderer", "jp.ngt.ngtlib.renderer.NGTObjectRenderer") +
             bindOpt("MCTE", "jp.ngt.mcte.MCTE") +
-            bindOpt("ItemMiniature", "jp.ngt.mcte.item.ItemMiniature");
+            bindOpt("ItemMiniature", "jp.ngt.mcte.item.ItemMiniature") +
+            //車両/レール描画スクリプトが直接 new する描画クラス
+            bindOpt("Parts", "jp.ngt.rtm.render.Parts") +
+            bindOpt("ModelObject", "jp.ngt.rtm.render.ModelObject");
 
     private static String bindOpt(String name, String fqn) {
         //失敗したクラス名は __bindFails に集約 (ScriptUtil.doScript がログに出す)

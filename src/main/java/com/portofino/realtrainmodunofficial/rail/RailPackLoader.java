@@ -75,6 +75,8 @@ public class RailPackLoader {
             if (Files.isDirectory(contentDir)) loadArchiveDirectory(contentDir);
             Path vp = gameDir.resolve("vehicle_packs");
             if (Files.isDirectory(vp)) loadArchiveDirectory(vp);
+            Path defaultAssets = com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get();
+            if (Files.isDirectory(defaultAssets)) loadArchiveDirectory(defaultAssets);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not scan game directory for rail packs", e);
         }
@@ -367,6 +369,8 @@ public class RailPackLoader {
         if (Files.exists(candidate)) return candidate;
         Path modsDir = gameDir.resolve("mods").resolve(packName);
         if (Files.exists(modsDir)) return modsDir;
+        Path defaultAssetsPack = com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get().resolve(packName);
+        if (Files.exists(defaultAssetsPack)) return defaultAssetsPack;
         Path contentDir = gameDir.resolve("content").resolve(packName);
         if (Files.exists(contentDir)) return contentDir;
         Path nestedCacheDir = gameDir.resolve("config").resolve("realtrainmodunofficial").resolve("nested_pack_cache");

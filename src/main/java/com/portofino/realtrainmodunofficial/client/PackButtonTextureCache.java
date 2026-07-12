@@ -183,6 +183,8 @@ public final class PackButtonTextureCache {
         addArchiveChildren(gameDir.resolve("content"), seen, result);
         addDirectoryChildren(gameDir.resolve("vehicle_packs"), seen, result);
         addArchiveChildren(gameDir.resolve("vehicle_packs"), seen, result);
+        addDirectoryChildren(com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get(), seen, result);
+        addArchiveChildren(com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get(), seen, result);
         addDirectoryChildren(gameDir.resolve("config").resolve("realtrainmodunofficial"), seen, result);
         addArchiveChildren(gameDir.resolve("config").resolve("realtrainmodunofficial"), seen, result);
         for (String category : new String[]{"vehicle", "rail", "installed_object", "official"}) {

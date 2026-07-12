@@ -178,6 +178,7 @@ public final class NGTFileLoader {
         List<Path> out = new ArrayList<>();
         Path gameDir = FMLPaths.GAMEDIR.get();
         addZips(out, gameDir.resolve("mods"));
+        addZips(out, com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get());
         Path cfg = gameDir.resolve("config").resolve("realtrainmodunofficial");
         for (String sub : new String[]{"vehicle_packs", "rail_packs", "packs", "nested_pack_cache"}) {
             addZips(out, cfg.resolve(sub));

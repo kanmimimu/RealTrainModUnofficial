@@ -14,11 +14,21 @@ import java.util.Set;
 public class Parts {
     private final String[] names;
     private final Set<String> nameSet;
+    //正規化済み (小文字) 名前 Set。GLRecorder 再生側の IdentityHashMap キャッシュに
+    //毎フレーム同一インスタンスでヒットさせるため、生成時に確定して使い回す。
+    private final Set<String> normalizedNames;
     private jp.ngt.ngtlib.renderer.model.GroupObject[] objs;
 
     public Parts(String... names) {
         this.names = names != null ? names : new String[0];
         this.nameSet = new LinkedHashSet<>(Arrays.asList(this.names));
+        Set<String> normalized = new LinkedHashSet<>();
+        for (String name : this.names) {
+            if (name != null) {
+                normalized.add(name.trim().toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        this.normalizedNames = java.util.Collections.unmodifiableSet(normalized);
     }
 
     public String[] getNames() {
@@ -63,9 +73,9 @@ public class Parts {
     }
 
     public void render(PartsRenderer renderer) {
-        for (String name : this.names) {
-            renderer.recordRenderParts(name);
-        }
+        //名前ごとの記録ではなく正規化済み Set を 1 コマンドで記録する
+        //(再生側キャッシュに同一インスタンスでヒットさせる + コマンド数削減)
+        renderer.recordRenderPartsSet(this.normalizedNames);
     }
 
     public void render(Object renderer) {

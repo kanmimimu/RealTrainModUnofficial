@@ -25,20 +25,30 @@ public final class BundledPackInstaller {
 
     public static void installDefaultPacks() {
         try {
-            installBundledPacksToMods();
+            installBundledPacksToDefaultAssets();
             removeDeprecatedPacks();
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not clean bundled default packs", e);
         }
     }
 
-    private static void installBundledPacksToMods() throws IOException {
+    /**
+     * 同梱デフォルトパックは mods ではなく専用フォルダ (rtm_default_assets) に展開する。
+     * 以前のバージョンが mods にコピーした同名 zip は二重ロード防止のため削除する。
+     */
+    private static void installBundledPacksToDefaultAssets() throws IOException {
+        Path assetsDir = DefaultAssetsFolder.ensure();
         Path modsDir = FMLPaths.GAMEDIR.get().resolve("mods");
-        Files.createDirectories(modsDir);
         for (String category : new String[]{"rail", "installed_object", "vehicle"}) {
             for (Path bundledPack : BundledPackStore.listBundledPacks(category)) {
-                Path target = modsDir.resolve(bundledPack.getFileName().toString());
+                String fileName = bundledPack.getFileName().toString();
+                Path target = assetsDir.resolve(fileName);
                 Files.copy(bundledPack, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                Path oldCopy = modsDir.resolve(fileName);
+                if (Files.exists(oldCopy)) {
+                    Files.delete(oldCopy);
+                    RealTrainModUnofficial.LOGGER.info("Moved bundled pack from mods to {}: {}", DefaultAssetsFolder.NAME, fileName);
+                }
             }
         }
     }

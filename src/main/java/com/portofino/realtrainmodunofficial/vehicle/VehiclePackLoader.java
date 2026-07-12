@@ -118,6 +118,8 @@ public class VehiclePackLoader {
             if (Files.exists(contentDir)) scanPackRoot(contentDir);
             Path vehiclePacksDir = gameDir.resolve("vehicle_packs");
             if (Files.exists(vehiclePacksDir)) scanPackRoot(vehiclePacksDir);
+            Path defaultAssetsDir = com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get();
+            if (Files.exists(defaultAssetsDir)) scanPackRoot(defaultAssetsDir);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not scan game directory for vehicle packs", e);
         }

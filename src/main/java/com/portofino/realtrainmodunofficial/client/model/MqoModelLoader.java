@@ -739,6 +739,7 @@ public final class MqoModelLoader {
                 addPackCandidates(candidates, gameDir.resolve("mods"));
                 addPackCandidates(candidates, gameDir.resolve("content"));
                 addPackCandidates(candidates, gameDir.resolve("vehicle_packs"));
+                addPackCandidates(candidates, com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get());
                 Path configDir = gameDir.resolve("config").resolve("realtrainmodunofficial");
                 addPackCandidates(candidates, configDir);
                 addPackCandidates(candidates, configDir.resolve("packs"));
@@ -2367,30 +2368,33 @@ public final class MqoModelLoader {
             }
         }
         String entryName = "assets/" + resolvedDomain + "/" + normalizedPath;
-        Path modsDir = Minecraft.getInstance().gameDirectory.toPath().resolve("mods");
-        if (!Files.isDirectory(modsDir)) {
-            return null;
-        }
-        try (var files = Files.list(modsDir)) {
-            for (Path file : files.toList()) {
-                String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
-                if (!name.endsWith(".zip") && !name.endsWith(".jar")) {
-                    continue;
-                }
-                ZipFile zip = new ZipFile(file.toFile());
-                ZipEntry entry = findEntry(zip, entryName);
-                if (entry == null) {
-                    zip.close();
-                    continue;
-                }
-                InputStream raw = zip.getInputStream(entry);
-                return new java.io.FilterInputStream(raw) {
-                    @Override
-                    public void close() throws IOException {
-                        super.close();
-                        zip.close();
+        for (Path packDir : new Path[]{
+                Minecraft.getInstance().gameDirectory.toPath().resolve("mods"),
+                com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get()}) {
+            if (!Files.isDirectory(packDir)) {
+                continue;
+            }
+            try (var files = Files.list(packDir)) {
+                for (Path file : files.toList()) {
+                    String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+                    if (!name.endsWith(".zip") && !name.endsWith(".jar")) {
+                        continue;
                     }
-                };
+                    ZipFile zip = new ZipFile(file.toFile());
+                    ZipEntry entry = findEntry(zip, entryName);
+                    if (entry == null) {
+                        zip.close();
+                        continue;
+                    }
+                    InputStream raw = zip.getInputStream(entry);
+                    return new java.io.FilterInputStream(raw) {
+                        @Override
+                        public void close() throws IOException {
+                            super.close();
+                            zip.close();
+                        }
+                    };
+                }
             }
         }
         return null;

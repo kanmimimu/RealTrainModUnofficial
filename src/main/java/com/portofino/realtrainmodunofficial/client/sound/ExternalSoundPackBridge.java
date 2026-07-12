@@ -109,6 +109,7 @@ public final class ExternalSoundPackBridge {
             gameDir.resolve("mods"),
             gameDir.resolve("content"),
             gameDir.resolve("vehicle_packs"),
+            com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get(),
             gameDir.resolve("config").resolve("realtrainmodunofficial"),
             gameDir.resolve("config").resolve("realtrainmodunofficial").resolve("vehicle_packs"),
             gameDir.resolve("config").resolve("realtrainmodunofficial").resolve("packs"),

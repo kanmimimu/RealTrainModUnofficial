@@ -166,6 +166,16 @@ public class PartsRenderer {
         }
     }
 
+    /**
+     * Parts.render() から呼ばれる — 正規化済み名前 Set を 1 コマンドで記録。
+     */
+    public void recordRenderPartsSet(java.util.Set<String> normalizedNames) {
+        GLRecorder r = GLRecorder.active();
+        if (r != null) {
+            r.renderGroups(normalizedNames);
+        }
+    }
+
     public void bindTexture(Object texture) {
         //GLRecorder に BIND_TEXTURE として記録 (null でデフォルト復帰)
         jp.ngt.ngtlib.util.NGTUtilClient.bindTexture(texture);
