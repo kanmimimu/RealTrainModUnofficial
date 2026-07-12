@@ -45,6 +45,7 @@ public class TileEntitySignalController extends BlockEntity {
     }
 
     private long lastDebugLog;
+    private boolean prevRSPowered;
 
     /**
      * 原作 updateEntity (Server Only)
@@ -70,8 +71,16 @@ public class TileEntitySignalController extends BlockEntity {
         }
         int nextSignalLevel = (this.last) ? 1 : nextSignalList.stream().mapToInt(v -> v).max().orElse(0);
 
-        // RS入力(停止現示)
-        boolean isRSPowered = world.getBestNeighborSignal(this.worldPosition) > 0;
+        // RS入力(停止現示)。getBestNeighborSignal に加え、直接通電 (hasNeighborSignal /
+        // 強い動力で通電されたブロック経由) も見る — 原作 isBlockIndirectlyGettingPowered 相当
+        boolean isRSPowered = world.getBestNeighborSignal(this.worldPosition) > 0
+                || world.hasNeighborSignal(this.worldPosition)
+                || world.getDirectSignalTo(this.worldPosition) > 0;
+        if (isRSPowered != this.prevRSPowered) {
+            this.prevRSPowered = isRSPowered;
+            jp.ngt.ngtlib.io.NGTLog.debug("[SignalController] %s RS changed -> %s",
+                    this.worldPosition.toShortString(), String.valueOf(isRSPowered));
+        }
 
         //表示する信号機の制御 (変化したときだけ変更して負荷を減らす — 原作コメント)
         int signalLevel = (this.repeat && (3 <= nextSignalLevel && nextSignalLevel <= 4))
@@ -80,9 +89,14 @@ public class TileEntitySignalController extends BlockEntity {
         if (isRSPowered) signalLevel = 1;
 
         if (debug) {
-            jp.ngt.ngtlib.io.NGTLog.debug("[SignalController] %s rs=%s next=%d level=%d display=%d above=%s last=%s type=%s",
+            StringBuilder disp = new StringBuilder();
+            for (BlockPos p : this.displayPos) {
+                Integer cur = this.getSignal(world, p);
+                disp.append(p.toShortString()).append('=').append(cur == null ? "非信号!" : cur).append(' ');
+            }
+            jp.ngt.ngtlib.io.NGTLog.debug("[SignalController] %s rs=%s next=%d level=%d above=%s last=%s type=%s disp=[%s]",
                     this.worldPosition.toShortString(), String.valueOf(isRSPowered), nextSignalLevel, signalLevel,
-                    this.displayPos.size(), String.valueOf(this.above), String.valueOf(this.last), this.signalType);
+                    String.valueOf(this.above), String.valueOf(this.last), this.signalType, disp.toString().trim());
         }
 
         if (this.above) {
