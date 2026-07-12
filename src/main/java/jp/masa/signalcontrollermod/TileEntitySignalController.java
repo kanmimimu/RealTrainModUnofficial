@@ -44,6 +44,8 @@ public class TileEntitySignalController extends BlockEntity {
         this(com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities.SIGNAL_CONTROLLER.get(), pos, state);
     }
 
+    private long lastDebugLog;
+
     /**
      * 原作 updateEntity (Server Only)
      */
@@ -51,6 +53,12 @@ public class TileEntitySignalController extends BlockEntity {
         Level world = this.getLevel();
         if (world == null || world.isClientSide) {
             return;
+        }
+        boolean debug = false;
+        long now = System.currentTimeMillis();
+        if (now - lastDebugLog > 5000L) {
+            lastDebugLog = now;
+            debug = true;
         }
         int MAXSIGNALLEVEL = 6;
         List<Integer> nextSignalList = new ArrayList<>();
@@ -70,6 +78,12 @@ public class TileEntitySignalController extends BlockEntity {
                 ? nextSignalLevel : this.signalType.upSignalLevel(nextSignalLevel);
         if (signalLevel > MAXSIGNALLEVEL) signalLevel = MAXSIGNALLEVEL;
         if (isRSPowered) signalLevel = 1;
+
+        if (debug) {
+            jp.ngt.ngtlib.io.NGTLog.debug("[SignalController] %s rs=%s next=%d level=%d display=%d above=%s last=%s type=%s",
+                    this.worldPosition.toShortString(), String.valueOf(isRSPowered), nextSignalLevel, signalLevel,
+                    this.displayPos.size(), String.valueOf(this.above), String.valueOf(this.last), this.signalType);
+        }
 
         if (this.above) {
             BlockPos abovePos = this.searchSignalAbove(world);

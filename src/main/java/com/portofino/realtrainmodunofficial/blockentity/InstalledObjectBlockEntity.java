@@ -257,7 +257,11 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     }
 
     public void setElectricity(int levelValue) {
-        if (this.electricity != levelValue) {
+        //信号機は「電気値は同じだが現示 (aspect) がズレている」ことがある
+        //(ミラー導入前の設置物や手動変更との競合) — その場合も書き込む
+        boolean signalDesynced = getCategory() == InstalledObjectCategory.SIGNAL
+                && getLegacySignalState() != levelValue;
+        if (this.electricity != levelValue || signalDesynced) {
             this.electricity = levelValue;
             //本家 TileEntitySpeaker.setElectricity: レベル 1-64 = そのスロットの音を再生
             if (isSpeaker() && levelValue >= 1 && levelValue <= 64) {
