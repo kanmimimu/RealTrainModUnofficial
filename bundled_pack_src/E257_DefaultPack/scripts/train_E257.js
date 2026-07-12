@@ -111,6 +111,9 @@ var pantaParts = null;
 //前照灯/尾灯の発光オーバーレイテクスチャ (透明地に光っている部分のみ)
 var headLightTex = new RLClass("minecraft", "textures/mat2_0_light1.png");
 var tailLightTex = new RLClass("minecraft", "textures/mat2_0_light2.png");
+//室内灯が点いた状態の内装テクスチャ (加算発光用)
+var interiorGlowTex = new RLClass("minecraft", "textures/mat2_0_light0.png");
+var NGTUtilClientClass = Java.type("jp.ngt.ngtlib.util.NGTUtilClient");
 var headLightParts = null;
 var tailLightParts = null;
 
@@ -320,9 +323,16 @@ function render(entity, pass, partialTicks) {
         }
     }
 
-    //内装: 室内灯ON中はフルブライト (車内だけ光る特殊発光)
+    //内装: 室内灯ON中はフルブライト (車内だけ光る特殊発光)。
+    //シェーダーパック使用時はライトマップが効かないため、点灯状態テクスチャ
+    //(mat2_0_light0) を加算発光で重ねる (前照灯と同じ経路 = シェーダーでも光る)。
     if (interiorLit) renderer.setBrightness(FULLBRIGHT);
     interiorParts.render(renderer);
+    if (interiorLit && NGTUtilClientClass.usingShader()) {
+        renderer.bindTexture(interiorGlowTex);
+        interiorParts.render(renderer);
+        renderer.bindTexture(null);
+    }
 
     //客席 (memo: 基本座席を z=0 に格納、シートピッチ 0.96 で号車ごとに並べる。
     //台座 p_seat_base のみ固定、他は回転中心 x±0.8 で転換 — 後進時に180°)

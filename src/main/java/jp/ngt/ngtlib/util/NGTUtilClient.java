@@ -55,6 +55,7 @@ public final class NGTUtilClient {
     }
 
     public static boolean usingShader() {
-        return false;
+        //Iris/Oculus のシェーダーパック使用中か (スクリプトが発光の描き方を切り替える)
+        return com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse();
     }
 }
