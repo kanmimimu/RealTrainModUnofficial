@@ -249,7 +249,7 @@ public class ModelSelectScreen extends Screen {
             RenderSystem.enableDepthTest();
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
             MultiBufferSource.BufferSource buf = Minecraft.getInstance().renderBuffers().bufferSource();
-            Object previewEnt = (vehicleDef != null && model.hasRenderScript())
+            Object previewEnt = (vehicleDef != null && (model.hasRenderScript() || vehicleDef.hasScript()))
                 ? getOrCreatePreviewEntity(vehicleDef, model) : null;
             renderStablePreviewModel(model, vehicleDef, ps, buf, previewEnt);
             buf.endBatch();
@@ -310,7 +310,22 @@ public class ModelSelectScreen extends Screen {
 
             MqoModelLoader.GroupPredicate previewFilter = ModelSelectScreen::shouldRenderPreviewGroup;
             boolean rendered = false;
-            if (vehicleDef != null && model.hasRenderScript()) {
+            // 本家式スクリプト (Nashorn, VehicleScriptRenderers) がある車両はそれを最優先。
+            // これを通さないと全オブジェクト (E257 のような全号車同居 MQO では他号車の
+            // パーツ全部) が未フィルタで描かれてプレビューが暴走する。
+            if (vehicleDef != null && vehicleDef.hasScript()) {
+                try {
+                    com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.Scripted scripted =
+                            com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(vehicleDef);
+                    if (scripted != null && scripted.render(previewEnt, 0.0F, poseStack, buffer,
+                            LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, model)) {
+                        rendered = true;
+                    }
+                } catch (Throwable ignored) {
+                    rendered = false;
+                }
+            }
+            if (!rendered && vehicleDef != null && model.hasRenderScript()) {
                 try {
                     // スクリプトは entity を参照するため、プレビュー用の一時車両エンティティを渡す。
                     // null を渡すと多くのスクリプトが例外を投げてフォールバック(=非適用)になっていた。
