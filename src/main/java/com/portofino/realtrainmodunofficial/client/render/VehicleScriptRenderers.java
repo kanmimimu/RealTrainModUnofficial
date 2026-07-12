@@ -338,8 +338,14 @@ public final class VehicleScriptRenderers {
         }
         ResourceLocation tex = texture != null ? texture
                 : ResourceLocation.withDefaultNamespace("textures/misc/white.png");
+        //発光テクスチャ (***_light*.png) は黒地=非発光なので加算合成+フルブライトで重ねる
+        //(通常ブレンドだと黒地が不透明に描かれて方向幕等が黒く潰れる)
+        boolean lightOverlay = NGTFileLoader.isLightOverlayTexture(tex);
+        if (lightOverlay) {
+            light = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
+        }
         //本家はブレンド有効の即時描画 (モニタ/発光パーツ)
-        VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucent(tex));
+        VertexConsumer vc = buffer.getBuffer(lightOverlay ? RenderType.eyes(tex) : RenderType.entityTranslucent(tex));
         PoseStack.Pose pose = poseStack.last();
         Matrix4f mat = pose.pose();
         for (Face face : group.faces) {

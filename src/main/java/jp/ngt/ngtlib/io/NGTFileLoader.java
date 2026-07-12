@@ -113,10 +113,25 @@ public final class NGTFileLoader {
             var rl = net.minecraft.client.Minecraft.getInstance().getTextureManager()
                     .register("rtmu_pack_tex", new net.minecraft.client.renderer.texture.DynamicTexture(img));
             TEXTURE_CACHE.put(key, rl);
+            //発光テクスチャ (***_light*.png): 黒地=非発光として加算合成で描くための印
+            if (key.toLowerCase(java.util.Locale.ROOT).contains("_light")) {
+                LIGHT_OVERLAY_TEXTURES.add(rl);
+            }
             return rl;
         } catch (IOException e) {
             return null;
         }
+    }
+
+    private static final java.util.Set<net.minecraft.resources.ResourceLocation> LIGHT_OVERLAY_TEXTURES =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * resolvePackTexture で登録した発光系テクスチャ (パスに _light を含む) か。
+     * 描画側はこれを加算合成 (黒=寄与なし) + フルブライトで描く。
+     */
+    public static boolean isLightOverlayTexture(net.minecraft.resources.ResourceLocation rl) {
+        return rl != null && LIGHT_OVERLAY_TEXTURES.contains(rl);
     }
 
     private static String pathOf(Object resource) {

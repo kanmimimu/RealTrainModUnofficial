@@ -80,7 +80,9 @@ var PANTA = {
 
 var SEAT_PITCH = 0.96;
 var DOOR_MOVE = 0.89;
-var SEAT_PIVOT_X = 0.8;
+//転換座席の回転中心 (memo: x±0.8)。init でモデル実座標から確定する。
+var seatPivotL = -0.8;
+var seatPivotR = 0.8;
 
 var car = null;
 var bodyParts = null;
@@ -113,6 +115,23 @@ function buildPantaParts(node) {
         rot: node.rot,
         children: node.children.map(buildPantaParts)
     };
+}
+
+//グループの頂点 X 中心 (座席の回転ピボット確定用)
+function groupCenterX(model, name) {
+    var g = model.getGroupObject(name);
+    if (g == null || g.faces.size() == 0) return null;
+    var min = 1.0e9;
+    var max = -1.0e9;
+    for (var i = 0; i < g.faces.size(); i++) {
+        var verts = g.faces.get(i).vertices;
+        for (var v = 0; v < verts.length; v++) {
+            var x = verts[v].x;
+            if (x < min) min = x;
+            if (x > max) max = x;
+        }
+    }
+    return (min + max) * 0.5;
 }
 
 function init(modelSet, modelObj) {
@@ -173,6 +192,11 @@ function init(modelSet, modelObj) {
     seatBaseR = toParts(["p_seat_base_R"]);
     seatTopL = toParts(["p_seat_a_L", "p_seat_arm_L", "p_seat_frame10_L", "p_seat_b_L"]);
     seatTopR = toParts(["p_seat_a_R", "p_seat_arm_R", "p_seat_frame10_R", "p_seat_b_R"]);
+    //転換ピボットは実モデルの座席中心 X から確定 (memo: ±0.8 のはずだが左右の符号を推測しない)
+    var pl = groupCenterX(modelObj.model, "p_seat_base_L");
+    var pr = groupCenterX(modelObj.model, "p_seat_base_R");
+    if (pl != null) seatPivotL = pl;
+    if (pr != null) seatPivotR = pr;
 
     //マスコン (運転台のある号車のみ)
     if (car.mascon != "none") {
@@ -269,16 +293,17 @@ function render(entity, pass, partialTicks) {
         seatBaseL.render(renderer);
         seatBaseR.render(renderer);
         if (seatYaw != 0.0) {
+            //座席自身の中心 (x=±0.8) を軸に回転: T(pivot)・R・T(-pivot)
             GL11.glPushMatrix();
-            GL11.glTranslatef(-SEAT_PIVOT_X, 0.0, 0.0);
+            GL11.glTranslatef(seatPivotL, 0.0, 0.0);
             GL11.glRotatef(seatYaw, 0.0, 1.0, 0.0);
-            GL11.glTranslatef(SEAT_PIVOT_X, 0.0, 0.0);
+            GL11.glTranslatef(-seatPivotL, 0.0, 0.0);
             seatTopL.render(renderer);
             GL11.glPopMatrix();
             GL11.glPushMatrix();
-            GL11.glTranslatef(SEAT_PIVOT_X, 0.0, 0.0);
+            GL11.glTranslatef(seatPivotR, 0.0, 0.0);
             GL11.glRotatef(seatYaw, 0.0, 1.0, 0.0);
-            GL11.glTranslatef(-SEAT_PIVOT_X, 0.0, 0.0);
+            GL11.glTranslatef(-seatPivotR, 0.0, 0.0);
             seatTopR.render(renderer);
             GL11.glPopMatrix();
         } else {
