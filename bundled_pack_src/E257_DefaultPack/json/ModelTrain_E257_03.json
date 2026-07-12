@@ -18,7 +18,7 @@
     {"modelFile": "dt64_3175.mqo", "textures": [["mat1", "textures/DT64.png"]]}
   ],
   "playerPos": [[0.8, 0.6, 9.0]],
-  "rollsignNames": ["あずさ-かいじ"],
+  "rollsignNames": ["特急:あずさ"],
   "slotPos": [
     [-0.8, -0.5, 5.40, 2],
     [0.8, -0.5, 5.40, 2],
