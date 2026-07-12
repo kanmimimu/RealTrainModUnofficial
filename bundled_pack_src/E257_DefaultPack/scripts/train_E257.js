@@ -323,16 +323,9 @@ function render(entity, pass, partialTicks) {
         }
     }
 
-    //内装: 室内灯ON中はフルブライト (車内だけ光る特殊発光)。
-    //シェーダーパック使用時はライトマップが効かないため、点灯状態テクスチャ
-    //(mat2_0_light0) を加算発光で重ねる (前照灯と同じ経路 = シェーダーでも光る)。
+    //内装: 室内灯ON中はフルブライト (車内だけ光る特殊発光)
     if (interiorLit) renderer.setBrightness(FULLBRIGHT);
     interiorParts.render(renderer);
-    if (interiorLit && NGTUtilClientClass.usingShader()) {
-        renderer.bindTexture(interiorGlowTex);
-        interiorParts.render(renderer);
-        renderer.bindTexture(null);
-    }
 
     //客席 (memo: 基本座席を z=0 に格納、シートピッチ 0.96 で号車ごとに並べる。
     //台座 p_seat_base のみ固定、他は回転中心 x±0.8 で転換 — 後進時に180°)
@@ -385,21 +378,9 @@ function render(entity, pass, partialTicks) {
         } catch (err2) {
         }
         if (lightOn != 0) {
-            //カスタムスライダー0 = ライト光量 (1-100%、0=未設定は100%)。
-            //加算合成なので色乗算がそのまま光の強さになる
-            var percent = 100;
-            try {
-                var stored = entity.getResourceState().getDataMap().getInt("Button0");
-                if (stored > 0) percent = Math.min(stored, 100);
-            } catch (err3) {
-            }
-            var f = percent / 100.0;
-            var lit = (tdir == 0) ? headLightParts : tailLightParts;
-            GL11.glColor4f(f, f, f, 1.0);
             renderer.bindTexture(tdir == 0 ? headLightTex : tailLightTex);
-            lit.render(renderer);
+            ((tdir == 0) ? headLightParts : tailLightParts).render(renderer);
             renderer.bindTexture(null);
-            GL11.glColor4f(1.0, 1.0, 1.0, 1.0);
         }
     }
 
