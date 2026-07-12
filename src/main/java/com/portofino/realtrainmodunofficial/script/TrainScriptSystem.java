@@ -3307,7 +3307,9 @@ public class TrainScriptSystem {
                 }
                 for (int c = 0; c < 4; c++) {
                     TessVertex vtx = tessellatorVertices.get(i + c);
-                    vc.addVertex(mat,
+                    //addVertex(Matrix4f,..) はバニラ実装が頂点ごとに new Vector3f() を確保するため、
+                    //同じ変換を確保なしで行う (見た目は不変)。
+                    com.portofino.realtrainmodunofficial.client.render.VertexWriter.addVertex(vc, mat,
                             vtx.x + nx * overlayBias,
                             vtx.y + ny * overlayBias,
                             vtx.z + nz * overlayBias)
@@ -3429,7 +3431,7 @@ public class TrainScriptSystem {
                 float[][] uv = {{u0, v0}, {u0, v1}, {u1, v1}, {u1, v0}};
                 for (int c = 0; c < 4; c++) {
                     float vx = q[c * 3] + nx * off, vy = q[c * 3 + 1] + ny * off, vz = q[c * 3 + 2] + nz * off;
-                    vc.addVertex(mat, vx, vy, vz)
+                    com.portofino.realtrainmodunofficial.client.render.VertexWriter.addVertex(vc, mat, vx, vy, vz)
                         .setColor(255, 255, 255, 255)
                         .setUv(uv[c][0], uv[c][1])
                         .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)

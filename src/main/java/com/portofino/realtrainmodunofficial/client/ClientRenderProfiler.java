@@ -26,8 +26,29 @@ public final class ClientRenderProfiler {
     private static final long[] displayTotalsNs = new long[CATEGORY_NAMES.length];
     private static final int[] displayCounts = new int[CATEGORY_NAMES.length];
 
+    //CPU が 1 秒間に VertexConsumer へ書き込んだ頂点数 / バッチ数。
+    //「重さの正体は頂点スループット」なのかを数字で確定させるための計測。
+    private static long verticesThisSecond;
+    private static long batchesThisSecond;
+    private static long displayVertices;
+    private static long displayBatches;
+    private static int framesThisSecond;
+    private static int displayFrames;
+
     private static long lastSnapshotNs = System.nanoTime();
     private static boolean overlayEnabled;
+
+    /**
+     * 1 バッチ (= 1 回の描画呼び出し) 分の頂点数を計上する。
+     */
+    public static void addVertices(int vertexCount) {
+        verticesThisSecond += vertexCount;
+        batchesThisSecond++;
+    }
+
+    public static void countFrame() {
+        framesThisSecond++;
+    }
 
     private ClientRenderProfiler() {
     }
@@ -70,6 +91,12 @@ public final class ClientRenderProfiler {
             totalsNs[i] = 0L;
             counts[i] = 0;
         }
+        displayVertices = verticesThisSecond;
+        displayBatches = batchesThisSecond;
+        displayFrames = framesThisSecond;
+        verticesThisSecond = 0L;
+        batchesThisSecond = 0L;
+        framesThisSecond = 0;
         lastSnapshotNs = now;
     }
 
@@ -80,6 +107,7 @@ public final class ClientRenderProfiler {
             return;
         }
 
+        countFrame();
         snapshotIfNeeded();
 
         GuiGraphics graphics = event.getGuiGraphics();
@@ -88,7 +116,7 @@ public final class ClientRenderProfiler {
         int y = 8;
         int lineHeight = font.lineHeight + 2;
         int width = 0;
-        String[] lines = new String[CATEGORY_NAMES.length + 1];
+        String[] lines = new String[CATEGORY_NAMES.length + 2];
         lines[0] = "Profiler [F8]";
         for (int i = 0; i < CATEGORY_NAMES.length; i++) {
             double totalMs = displayTotalsNs[i] / 1_000_000.0D;
@@ -99,6 +127,11 @@ public final class ClientRenderProfiler {
                 + String.format(java.util.Locale.ROOT, "%.2f avg", avgMs)
                 + " (" + displayCounts[i] + ")";
         }
+        //CPU が毎フレーム VertexConsumer に流している頂点数 (= 重さの正体)
+        long vertsPerFrame = displayFrames > 0 ? displayVertices / displayFrames : 0L;
+        long batchesPerFrame = displayFrames > 0 ? displayBatches / displayFrames : 0L;
+        lines[CATEGORY_NAMES.length + 1] = "Verts/frame: " + vertsPerFrame
+            + "  (batches " + batchesPerFrame + ", fps " + displayFrames + ")";
 
         for (String line : lines) {
             width = Math.max(width, font.width(line));

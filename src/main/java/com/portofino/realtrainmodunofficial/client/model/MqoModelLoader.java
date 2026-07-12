@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.portofino.realtrainmodunofficial.client.render.VertexWriter;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.portofino.realtrainmodunofficial.Config;
 import net.minecraft.client.renderer.GameRenderer;
@@ -71,6 +72,13 @@ import org.w3c.dom.Node;
  * Metasequoia (.mqo) loader aligned with legacy model library {@code MqoModel}: 0.01 vertex scale, triangulation and quad handling.
  */
 public final class MqoModelLoader {
+    /**
+     * メッシュ捕獲モード (レール 1 本を 1 VBO に統合するための焼き込み中)。
+     * true の間はバッチ単位の VBO 高速経路を使わず、必ず VertexConsumer に頂点を流す
+     * (捕獲側がそれを受け取って 1 つのメッシュに統合する)。描画スレッド専用。
+     */
+    public static boolean captureMode;
+
     private static final float RTM_DEFAULT_SMOOTHING_ANGLE = 60.0F;
     private static final String TEXTURE_META_SEPARATOR = "|ptmeta=";
     private static final Pattern V_PATTERN = Pattern.compile("V\\((.+?)\\)");
@@ -3764,7 +3772,10 @@ public final class MqoModelLoader {
                         //静的 VBO 高速経路: 頂点データ/シェーダー/ライトが BufferSource と同一
                         //条件のときだけ使う (= 見た目完全不変で毎フレームの頂点プッシュを省く)。
                         //列車 (E257 等の大型 MQO + 座席複製) の FPS 低下対策。
-                        if (!needsBlend && groupTransform == null && depthBias == 0.0F
+                        //メッシュ捕獲中 (レール 1 本を 1 VBO に統合する焼き込み) は、
+                        //頂点を捕獲側の VertexConsumer に流す必要があるので VBO 経路を通さない。
+                        if (!captureMode
+                            && !needsBlend && groupTransform == null && depthBias == 0.0F
                             && overlay == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
                             && scriptRed == 255 && scriptGreen == 255 && scriptBlue == 255 && scriptAlpha == 255
                             && (scriptRenderer == null || !scriptRenderer.hasUvWindow())
@@ -3773,6 +3784,8 @@ public final class MqoModelLoader {
                             continue;
                         }
                         VertexConsumer consumer = buffer.getBuffer(renderType);
+                        //計測: CPU が毎フレーム流している頂点数 (F8 オーバーレイに出す)
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.addVertices(batch.vertexCount);
                         PoseStack.Pose pose = poseStack.last();
                         Matrix4f mat = pose.pose();
                         Matrix3f norm = pose.normal();
@@ -3794,7 +3807,11 @@ public final class MqoModelLoader {
                             float tny = norm.m01()*nx + norm.m11()*ny + norm.m21()*nz;
                             float tnz = norm.m02()*nx + norm.m12()*ny + norm.m22()*nz;
                             normalizeNormal(tnx, tny, tnz, normalOut);
-                            consumer.addVertex(mat, x, y, z)
+                            //addVertex(Matrix4f,...) はバニラのデフォルト実装が頂点ごとに
+                            //new Vector3f() を確保する。レールは 1 本で数万頂点を毎フレーム
+                            //流すため、これが GC を回して FPS を落とす主因だった。
+                            //変換式は同一のまま、確保だけを避ける (見た目は不変)。
+                            VertexWriter.addVertex(consumer, mat, x, y, z)
                                 .setColor(scriptRed, scriptGreen, scriptBlue, scriptAlpha)
                                 .setUv(u, v)
                                 .setOverlay(overlay)
@@ -4006,7 +4023,7 @@ public final class MqoModelLoader {
                     //発光オーバーレイ: 実法線だと diffuse シェーディングで側面/下面が
                     //最大 40% 減光して「昼でも夜でも暗い」ため、上向き法線 (×1.0) で描く
                     //(本家は GL_LIGHTING 無効の全光量描画 — softenNormalForVanilla と同じ理由)
-                    consumer.addVertex(mat, vx, vy, vz)
+                    VertexWriter.addVertex(consumer, mat, vx, vy, vz)
                         .setColor(red, green, blue, alpha)
                         .setUv(batch.data[o + 6], batch.data[o + 7])
                         .setOverlay(overlay)
@@ -4030,6 +4047,69 @@ public final class MqoModelLoader {
         private static boolean drawBatchWithEntityVbo(Batch batch, RenderType renderType,
                                                       PoseStack poseStack, int packedLight) {
             com.mojang.blaze3d.vertex.VertexBuffer vbo = batch.getOrBuildEntityVbo(packedLight);
+            if (vbo == null || vbo.isInvalid()) {
+                return false;
+            }
+            java.lang.reflect.Field field = shaderLightDirsField;
+            if (field == null) {
+                if (shaderLightDirsFailed) {
+                    return false;
+                }
+                try {
+                    field = RenderSystem.class.getDeclaredField("shaderLightDirections");
+                    field.setAccessible(true);
+                    shaderLightDirsField = field;
+                } catch (Throwable t) {
+                    shaderLightDirsFailed = true;
+                    return false;
+                }
+            }
+            org.joml.Vector3f origL0 = null;
+            org.joml.Vector3f origL1 = null;
+            try {
+                Object dirsObj = field.get(null);
+                if (!(dirsObj instanceof org.joml.Vector3f[] dirs)
+                    || dirs.length < 2 || dirs[0] == null || dirs[1] == null) {
+                    return false;
+                }
+                origL0 = new org.joml.Vector3f(dirs[0]);
+                origL1 = new org.joml.Vector3f(dirs[1]);
+                org.joml.Matrix3f invRot = new org.joml.Matrix3f(poseStack.last().normal()).transpose();
+                RenderSystem.setShaderLights(
+                    invRot.transform(new org.joml.Vector3f(origL0)),
+                    invRot.transform(new org.joml.Vector3f(origL1)));
+                renderType.setupRenderState();
+                try {
+                    net.minecraft.client.renderer.ShaderInstance shader = RenderSystem.getShader();
+                    if (shader == null) {
+                        return false;
+                    }
+                    Matrix4f mv = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(poseStack.last().pose());
+                    vbo.bind();
+                    vbo.drawWithShader(mv, RenderSystem.getProjectionMatrix(), shader);
+                    com.mojang.blaze3d.vertex.VertexBuffer.unbind();
+                    return true;
+                } finally {
+                    renderType.clearRenderState();
+                }
+            } catch (Throwable t) {
+                return false;
+            } finally {
+                if (origL0 != null) {
+                    RenderSystem.setShaderLights(origL0, origL1);
+                }
+            }
+        }
+
+        /**
+         * 統合済みメッシュ (レール 1 本ぶんを 1 つにまとめた VBO) を描画する。
+         * 陰影・状態設定は drawBatchWithEntityVbo と完全に同じ (法線は pose 変換されていないので、
+         * ライト方向ユニフォームを pose の逆回転で回して数学的に等価にする)。
+         *
+         * @return true = 描画した
+         */
+        public static boolean drawMergedVbo(com.mojang.blaze3d.vertex.VertexBuffer vbo, RenderType renderType,
+                                            PoseStack poseStack) {
             if (vbo == null || vbo.isInvalid()) {
                 return false;
             }

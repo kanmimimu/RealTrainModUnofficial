@@ -323,12 +323,15 @@ public final class VehicleScriptRenderers {
                                    Vector3f normal, int light, int overlay) {
         int o = index * 9;
         Matrix4f mat = pose.pose();
-        vc.addVertex(mat, v[o], v[o + 1], v[o + 2])
+        //バニラの addVertex(Matrix4f,..)/setNormal(Pose,..) は頂点ごとに new Vector3f() を
+        //確保する。スクリプト車両は 1 フレームに数万頂点を流すため GC 負荷が大きい。
+        //変換式は同一のまま確保だけを避ける (見た目は不変)。
+        VertexConsumer written = VertexWriter.addVertex(vc, mat, v[o], v[o + 1], v[o + 2])
                 .setColor(v[o + 5], v[o + 6], v[o + 7], v[o + 8])
                 .setUv(v[o + 3], v[o + 4])
                 .setOverlay(overlay)
-                .setLight(light)
-                .setNormal(pose, normal.x, normal.y, normal.z);
+                .setLight(light);
+        VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z);
     }
 
     private static void drawModelGroup(PolygonModel pm, String groupName, PoseStack poseStack,
@@ -372,12 +375,12 @@ public final class VehicleScriptRenderers {
                         u = face.uvs[idx[k] * 2];
                         vv = face.uvs[idx[k] * 2 + 1];
                     }
-                    vc.addVertex(mat, vert.x, vert.y, vert.z)
+                    VertexConsumer written = VertexWriter.addVertex(vc, mat, vert.x, vert.y, vert.z)
                             .setColor(colR, colG, colB, colA)
                             .setUv(u, vv)
                             .setOverlay(overlay)
-                            .setLight(light)
-                            .setNormal(pose, normal.x, normal.y, normal.z);
+                            .setLight(light);
+                    VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z);
                 }
             }
         }

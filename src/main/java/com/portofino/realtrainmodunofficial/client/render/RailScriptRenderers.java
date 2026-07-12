@@ -110,6 +110,7 @@ public final class RailScriptRenderers {
         }
         BlockPos pos = be.getBlockPos();
         GLRecorder rec = PLAIN_CACHE.get(pos);
+        boolean rebuilt = false;
         if (rec == null || be.shouldRerenderRail) {
             rec = new GLRecorder();
             GLRecorder.activate(rec);
@@ -123,6 +124,10 @@ public final class RailScriptRenderers {
             }
             PLAIN_CACHE.put(pos, rec);
             be.shouldRerenderRail = false;
+            rebuilt = true;
+        }
+        if (RailMeshCache.draw(pos, rec, model, poseStack, packedLight, packedOverlay, rebuilt)) {
+            return true;
         }
         replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
         return true;
@@ -159,7 +164,8 @@ public final class RailScriptRenderers {
                 return false;
             }
             GLRecorder rec = this.staticCache.get(pos);
-            if (rec == null || be.shouldRerenderRail) {
+            boolean rebuilt = rec == null || be.shouldRerenderRail;
+            if (rebuilt) {
                 rec = new GLRecorder();
                 GLRecorder.activate(rec);
                 try {
@@ -230,7 +236,12 @@ public final class RailScriptRenderers {
             }
             this.scriptSkippedSwitches.remove(pos);
             if (staticDrew) {
-                replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
+                //静的部分 (レール本体・枕木・バラスト) はレール 1 本 = 1 メッシュに焼いて
+                //GPU に置きっぱなしにする (本家のディスプレイリスト相当)。
+                //転てつのトング (dyn) は動くので焼かず、従来どおり毎フレーム描く。
+                if (!RailMeshCache.draw(pos, rec, model, poseStack, packedLight, packedOverlay, rebuilt)) {
+                    replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
+                }
             }
             if (dynDrew) {
                 replay(dyn, poseStack, buffer, packedLight, packedOverlay, model);
@@ -288,6 +299,14 @@ public final class RailScriptRenderers {
             }
             return hasTong && hasRail;
         }
+    }
+
+    /**
+     * RailMeshCache が「統合メッシュへの焼き込み」に使う再生 (捕獲用 MultiBufferSource に流す)。
+     */
+    static void replayForCapture(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
+                                 int packedLight, int packedOverlay, MqoModelLoader.MqoModel model) {
+        replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
     }
 
     @SuppressWarnings("unchecked")
