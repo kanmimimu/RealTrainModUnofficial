@@ -95,7 +95,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             if (def == null) return;
             MqoModelLoader.MqoModel model = MqoModelLoader.loadModelForRail(def);
             if (model == null) return;
-            boolean compatibilityHeavy = shouldUseCompatibilityRendering(def, model);
             RailMap[] maps = be.getAllRailMaps();
             if (maps == null || maps.length == 0) return;
 
@@ -114,6 +113,9 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     be, maps, poseStack, buffer, packedLight, packedOverlay, model)) {
                 return;
             }
+            //ここから下は旧パイプライン (スクリプト/プレーン経路が描いた場合は到達しない)。
+            //compatibilityHeavy はこのパスでしか使わないので、早期 return の後で求める。
+            boolean compatibilityHeavy = shouldUseCompatibilityRendering(def, model);
             net.minecraft.world.phys.Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
             double cameraDistanceSq = cameraPos.distanceToSqr(be.getBlockPos().getX() + 0.5, be.getBlockPos().getY() + 0.5, be.getBlockPos().getZ() + 0.5);
 

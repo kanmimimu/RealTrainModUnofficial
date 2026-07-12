@@ -29,6 +29,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.joml.Matrix4f;
 
 public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<InstalledObjectBlockEntity> {
+    /** 本家 SignalLevel.HIGH_SPEED_PROCEED.level — 現示の上限。 */
+    private static final int MAX_SIGNAL_LEVEL = 6;
+    /** 点灯用テクスチャをそのままの色で全光量表示する (色付けしない)。 */
+    private static final int[] SIGNAL_LIT_COLOR = {255, 255, 255, 255};
     private static final Set<String> GREEN_GROUPS = Set.of("light1", "light2");
     private static final Set<String> YELLOW_GROUPS = Set.of("light3", "light5");
     private static final Set<String> RED_GROUPS = Set.of("light4");
@@ -39,6 +43,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
     private static final List<String> CROSSING_LIGHT_RIGHT_LEGACY = List.of("light2");
     private static final List<String> CROSSING_LIGHT_COMMON_LEGACY = List.of("light3");
     private static final Map<String, Long> FAILED_RENDER_UNTIL_NANOS = new ConcurrentHashMap<>();
+    /** 信号の点灯用テクスチャ差し替えマップ (定義ID → overrides)。毎フレームの Map 生成を避ける。 */
+    private static final Map<String, Map<String, String>> LIGHT_TEXTURE_OVERRIDES = new ConcurrentHashMap<>();
     /** 診断: 改札のグループ名を定義IDごとに1回だけログするための記録。 */
     private static final Set<String> TICKET_GATE_LOGGED = ConcurrentHashMap.newKeySet();
 
@@ -135,9 +141,12 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(definition);
                         if (machineScripted != null
                                 && machineScripted.render(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
-                            //警報灯の発光オーバーレイ (スクリプトの pass2 は diffuse で減光する
-                            //ことがあるため、ここで確実に全光量の発光を重ねる)
-                            if (blockEntity.getCategory() == InstalledObjectCategory.CROSSING) {
+                            //警報灯/現示灯の発光オーバーレイ (スクリプトの pass2 は diffuse で減光する
+                            //ことがあるため、ここで確実に全光量の発光を重ねる)。
+                            //信号はスクリプトが点灯パーツを描いても素のテクスチャ (消灯レンズ) のままなので、
+                            //点灯用テクスチャを貼った現示灯をここで重ねる。
+                            if (blockEntity.getCategory() == InstalledObjectCategory.CROSSING
+                                    || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL) {
                                 renderActiveLights(blockEntity, definition, poseStack, buffer, packedOverlay);
                             }
                             poseStack.popPose();
@@ -844,10 +853,19 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         if (groups.isEmpty()) {
             return;
         }
+        // 本家 BasicSignalPartsRenderer の点灯パス: 現示灯は「点灯用テクスチャ (lightTexture)」を
+        // 貼った同じポリゴンを全光量で描く。消灯時の signalTexture は暗いレンズなので、
+        // 色はテクスチャ側が持っている (グループ名から色を推測してはいけない — light1/light2/light3 は
+        // 踏切の警報灯と名前が衝突していて、どの現示でも赤く塗られていた)。
+        String lightTexture = definition.getEmissiveTexture();
+        boolean useLightTexture = blockEntity.isSignal() && lightTexture != null && !lightTexture.isBlank();
+        //テクスチャ差し替えマップは毎フレーム作らず定義ごとに使い回す (モデルキャッシュのキーにも使われる)。
         MqoModelLoader.MqoModel emissiveModel = MqoModelLoader.loadModelFromPack(
             definition.getPackName(),
             definition.getModelFile(),
-            definition.getTextureOverrides(),
+            useLightTexture
+                ? LIGHT_TEXTURE_OVERRIDES.computeIfAbsent(definition.getId(), id -> Map.of("default", lightTexture))
+                : definition.getTextureOverrides(),
             "",
             definition.isSmoothing()
         );
@@ -857,7 +875,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         // RTM signal scripts treat the active lamp groups as a separate emissive pass.
         // We mirror that here so packs light up even when the legacy script only toggles groups.
         for (String group : groups) {
-            int[] color = signalColorForGroup(group);
+            int[] color = useLightTexture ? SIGNAL_LIT_COLOR : signalColorForGroup(group);
             MqoModelLoader.renderModelColorOverlay(
                 emissiveModel,
                 poseStack,
@@ -890,9 +908,10 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             return List.of();
         }
         if (blockEntity.isSignal()) {
-            List<String> groups = definition.getSignalLightGroups().get(blockEntity.getLegacySignalState());
-            if (groups == null || groups.isEmpty()) {
-                groups = fallbackSignalGroups(blockEntity.getLegacySignalState());
+            int signal = blockEntity.getLegacySignalState();
+            List<String> groups = selectSignalLightGroups(definition.getSignalLightGroups(), signal);
+            if (groups.isEmpty()) {
+                groups = fallbackSignalGroups(signal);
             }
             return groups == null ? List.of() : groups;
         }
@@ -926,18 +945,57 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
     private record CrossingTransform(double pivotX, double pivotY, double pivotZ, double degrees) {}
 
+    /**
+     * グループ名 → 比較用に正規化した名前 (小文字化 + "_"/"-" 除去) のキャッシュ。
+     * groupMatches は「毎フレーム × 設置物 × バッチ数 × 定義パーツ数」呼ばれるため、
+     * ここで文字列を作ると使い捨ての String が大量に出る (GC 負荷)。
+     * グループ名は有限個なので 1 度だけ正規化して使い回す。判定結果は従来と同一。
+     */
+    private static final Map<String, String> COMPACT_GROUP_NAMES = new ConcurrentHashMap<>();
+
+    private static String compactGroupName(String name) {
+        String cached = COMPACT_GROUP_NAMES.get(name);
+        if (cached != null) {
+            return cached;
+        }
+        String compact = name.toLowerCase(java.util.Locale.ROOT).replace("_", "").replace("-", "");
+        //グループ名は有限 (モデルのパーツ名 + 定義のパーツ名) なので上限を切らずに保持できる。
+        COMPACT_GROUP_NAMES.put(name, compact);
+        return compact;
+    }
+
     private static boolean groupMatches(String candidate, String expected) {
         if (candidate == null || expected == null) {
             return false;
         }
-        String normalizedCandidate = candidate.toLowerCase(java.util.Locale.ROOT);
-        String normalizedExpected = expected.toLowerCase(java.util.Locale.ROOT);
-        if (normalizedCandidate.equals(normalizedExpected)) {
-            return true;
+        //小文字化だけの一致も compact 同士の一致に含まれる ("_"/"-" を落としても
+        //同名なら等しい) ため、正規化 1 回で従来と同じ判定になる。
+        return compactGroupName(candidate).equals(compactGroupName(expected));
+    }
+
+    /**
+     * 本家 BasicSignalPartsRenderer の点灯パーツ選択。
+     * S(n) を昇順に見て、最初に「現示 <= n」となるエントリ *だけ* を点灯する。
+     * (3灯式は S(1)/S(3)/S(5) しか持たないので、現示 2 (警戒) や 4 (減速) を
+     * 完全一致で引くと何も点かない。本家は直上の現示灯を点ける。)
+     * 現示は本家同様 6 (高速進行) で頭打ち。
+     */
+    private static List<String> selectSignalLightGroups(Map<Integer, List<String>> lights, int signal) {
+        if (lights == null || lights.isEmpty() || signal <= 0) {
+            return List.of();
         }
-        String compactCandidate = normalizedCandidate.replace("_", "").replace("-", "");
-        String compactExpected = normalizedExpected.replace("_", "").replace("-", "");
-        return compactCandidate.equals(compactExpected);
+        int level = Math.min(signal, MAX_SIGNAL_LEVEL);
+        int matched = Integer.MAX_VALUE;
+        for (int declared : lights.keySet()) {
+            if (level <= declared && declared < matched) {
+                matched = declared;
+            }
+        }
+        if (matched == Integer.MAX_VALUE) {
+            return List.of();
+        }
+        List<String> groups = lights.get(matched);
+        return groups == null ? List.of() : groups;
     }
 
     private static List<String> fallbackSignalGroups(int legacyState) {

@@ -1,5 +1,6 @@
 package jp.ngt.rtm.render;
 
+import jp.ngt.ngtlib.io.ScriptUtil;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 /**
@@ -9,6 +10,17 @@ public abstract class TileEntityPartsRenderer extends PartsRenderer {
 
     public TileEntityPartsRenderer(String... par1) {
         super(par1);
+    }
+
+    /**
+     * 本家 render: スクリプトの render(tileEntity, pass, partialTick) を実行
+     * (踏切/改札の MachinePartsRenderer と信号の SignalPartsRenderer で共通)
+     */
+    public void render(Object t, int pass, float partialTick) {
+        this.currentPass = pass;
+        if (this.script != null) {
+            ScriptUtil.doScriptIgnoreError(this.script, "render", t, pass, partialTick);
+        }
     }
 
     /**

@@ -2,7 +2,6 @@ package jp.ngt.rtm.render;
 
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
-import jp.ngt.ngtlib.io.ScriptUtil;
 
 /**
  * 本家 jp.ngt.rtm.render.MachinePartsRenderer (KaizPatchX) の移植。
@@ -12,16 +11,6 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
 
     public MachinePartsRenderer(String... par1) {
         super(par1);
-    }
-
-    /**
-     * 本家 render: スクリプトの render(tileEntity, pass, partialTick) を実行
-     */
-    public void render(Object t, int pass, float partialTick) {
-        this.currentPass = pass;
-        if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "render", t, pass, partialTick);
-        }
     }
 
     /**

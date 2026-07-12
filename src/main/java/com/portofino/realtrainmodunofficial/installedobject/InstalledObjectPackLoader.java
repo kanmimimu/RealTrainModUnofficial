@@ -343,8 +343,10 @@ public final class InstalledObjectPackLoader {
                 1.0F,
                 0.125F,
                 "",
+                // 点灯用テクスチャ (本家 SignalConfig.lightTexture / TextureSet "Light")。
+                // buttonTexture は GUI のボタン画像なので現示灯には使えない (フォールバック禁止)。
                 (category == InstalledObjectCategory.SIGNAL || category == InstalledObjectCategory.LIGHT)
-                    ? firstNonBlank(getString(obj, "lightTexture"), getString(obj, "emissiveTexture"), getString(obj, "buttonTexture"))
+                    ? firstNonBlank(getString(obj, "lightTexture"), getString(obj, "emissiveTexture"))
                     : "",
                 runningSound,
                 // 照明(LIGHT)も信号と同じ "lights": ["S(1) P(部品名)"] 形式で発光パーツを定義できる。
