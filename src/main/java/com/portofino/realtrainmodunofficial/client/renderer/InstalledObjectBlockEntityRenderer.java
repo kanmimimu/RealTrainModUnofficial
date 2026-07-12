@@ -128,7 +128,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     //踏切/改札: 本家式スクリプト描画 (MachinePartsRenderer + Nashorn)。成功時は旧近似パスをスキップ。
                     //改札は本家 RenderTurnstile01.js が getMovingCount(entity)>0 で扉を回す (開閉アニメ)。
                     if ((blockEntity.getCategory() == InstalledObjectCategory.CROSSING
-                            || blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE)
+                            || blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE
+                            || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL)
                             && definition.getScriptPath() != null && !definition.getScriptPath().isBlank()) {
                         com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.Scripted machineScripted =
                             com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(definition);

@@ -12,7 +12,7 @@ import jp.ngt.ngtlib.renderer.model.Material;
 import jp.ngt.ngtlib.renderer.model.ModelLoader;
 import jp.ngt.ngtlib.renderer.model.PolygonModel;
 import jp.ngt.ngtlib.renderer.model.TextureSet;
-import jp.ngt.rtm.render.MachinePartsRenderer;
+import jp.ngt.rtm.render.TileEntityPartsRenderer;
 import jp.ngt.rtm.render.ModelObject;
 import net.minecraft.client.renderer.MultiBufferSource;
 
@@ -69,8 +69,10 @@ public final class MachineScriptRenderers {
             } catch (NoSuchMethodException e) {
                 instance = rc.getDeclaredConstructor().newInstance();
             }
-            if (!(instance instanceof MachinePartsRenderer renderer)) {
-                RealTrainModUnofficial.LOGGER.warn("renderClass {} is not a MachinePartsRenderer ({})", rcName, def.getId());
+            //踏切/改札 (MachinePartsRenderer) に加え、信号 (SignalPartsRenderer) も
+            //共通基底 TileEntityPartsRenderer なので受け入れる。
+            if (!(instance instanceof TileEntityPartsRenderer renderer)) {
+                RealTrainModUnofficial.LOGGER.warn("renderClass {} is not a TileEntityPartsRenderer ({})", rcName, def.getId());
                 return INVALID;
             }
             renderer.setScript(se);
@@ -110,10 +112,10 @@ public final class MachineScriptRenderers {
     }
 
     public static final class Scripted {
-        private final MachinePartsRenderer renderer;
+        private final TileEntityPartsRenderer renderer;
         private final ModelObject modelObject;
 
-        Scripted(MachinePartsRenderer renderer, ModelObject modelObject) {
+        Scripted(TileEntityPartsRenderer renderer, ModelObject modelObject) {
             this.renderer = renderer;
             this.modelObject = modelObject;
         }
