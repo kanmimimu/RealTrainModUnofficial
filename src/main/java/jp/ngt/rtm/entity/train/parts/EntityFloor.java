@@ -108,6 +108,29 @@ public class EntityFloor extends EntityVehiclePart {
         if (this.getSeatType() == 0 || player.isShiftKeyDown()) {
             return InteractionResult.PASS;
         }
+        //バール所持中は着席しない。台車を狙ったクリックが手前の座席に吸われて
+        //連結モードに入れなくなるため、最寄りの台車へ転送する (本家の連結操作)。
+        if (player.getMainHandItem().getItem() instanceof com.portofino.realtrainmodunofficial.item.CrowbarItem) {
+            EntityVehicleBase<?> parentVehicle = this.getVehicle();
+            if (parentVehicle instanceof jp.ngt.rtm.entity.train.EntityTrainBase train) {
+                jp.ngt.rtm.entity.train.EntityBogie nearest = null;
+                double best = 16.0D; //4 ブロック以内
+                for (int i = 0; i < 2; i++) {
+                    jp.ngt.rtm.entity.train.EntityBogie bogie = train.getBogie(i);
+                    if (bogie != null) {
+                        double d = bogie.distanceToSqr(this.getX(), this.getY(), this.getZ());
+                        if (d < best) {
+                            best = d;
+                            nearest = bogie;
+                        }
+                    }
+                }
+                if (nearest != null) {
+                    return nearest.interact(player, hand);
+                }
+            }
+            return InteractionResult.PASS;
+        }
         //作り直し: EntityFloor に乗せる旧方式は視点固定バグの温床だったため、
         //列車本体へ座席オフセット付きで直接乗せる (運転席と同じ経路 = 視点フリー)。
         EntityVehicleBase<?> vehicle = this.getVehicle();

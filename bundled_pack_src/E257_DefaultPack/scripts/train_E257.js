@@ -90,7 +90,9 @@ var doorLParts = null;
 var doorRParts = null;
 var lampLParts = null;   //ドアランプ (開扉中のみ点灯表示)
 var lampRParts = null;
-var rollParts = null;    //方向幕 (mat3、交互表示の発光オーバーレイ対象)
+var rollSideParts = null;   //側面方向幕 (単一オブジェクト、テクスチャ交互)
+var rollFront1Parts = null; //前面方向幕 表示1 (front1/front2 は交互にどちらか一方のみ表示)
+var rollFront2Parts = null;
 var seatBaseL = null;    //固定台座 (memo: p_seat_base のみ固定)
 var seatBaseR = null;
 var seatTopL = null;     //回転部
@@ -146,7 +148,9 @@ function init(modelSet, modelObj) {
     var body = [];
     var lampL = [];
     var lampR = [];
-    var rolls = [];
+    var rollsSide = [];
+    var rollsFront1 = [];
+    var rollsFront2 = [];
     var groups = modelObj.model.groupObjects;
     for (var i = 0; i < groups.size(); i++) {
         var objName = groups.get(i).name;
@@ -177,14 +181,21 @@ function init(modelSet, modelObj) {
         //ドアランプ (***_doorlamp_Lon / Ron) は開扉中のみ表示
         if (lower.indexOf("doorlamp_lon") >= 0) { lampL.push(objName); continue; }
         if (lower.indexOf("doorlamp_ron") >= 0) { lampR.push(objName); continue; }
-        //方向幕 (roll_*** / ***_side_roll) は交互発光の対象にも登録 (本体描画にも含める)
-        if (lower.indexOf("roll_") == 0 || lower.indexOf("_side_roll") >= 0) rolls.push(objName);
+        //前面方向幕: front1/front2 は同位置の交互表示ペアなので本体から外して片方ずつ描く
+        if (lower.indexOf("roll_") == 0) {
+            if (lower.indexOf("front1") >= 0) { rollsFront1.push(objName); continue; }
+            if (lower.indexOf("front2") >= 0) { rollsFront2.push(objName); continue; }
+        }
+        //側面方向幕は単一オブジェクト: 本体にも描き、発光テクスチャを交互に重ねる
+        if (lower.indexOf("_side_roll") >= 0) rollsSide.push(objName);
         body.push(objName);
     }
     bodyParts = toParts(body);
     lampLParts = lampL.length > 0 ? toParts(lampL) : null;
     lampRParts = lampR.length > 0 ? toParts(lampR) : null;
-    rollParts = rolls.length > 0 ? toParts(rolls) : null;
+    rollSideParts = rollsSide.length > 0 ? toParts(rollsSide) : null;
+    rollFront1Parts = rollsFront1.length > 0 ? toParts(rollsFront1) : null;
+    rollFront2Parts = rollsFront2.length > 0 ? toParts(rollsFront2) : null;
 
     doorLParts = toParts(car.doorsL);
     doorRParts = toParts(car.doorsR);
@@ -242,13 +253,17 @@ function render(entity, pass, partialTicks) {
     //車体 (固定部)
     bodyParts.render(renderer);
 
-    //方向幕の交互表示 (mat3_light1/2 を約3秒ごとに切替、発光オーバーレイ)
-    if (rollParts != null) {
-        var phase = Math.floor(new Date().getTime() / 3000) % 2;
-        renderer.bindTexture(phase == 0 ? rollTex1 : rollTex2);
-        rollParts.render(renderer);
-        renderer.bindTexture(null);
+    //方向幕の交互表示 (約3秒周期): 前面は front1/front2 を交互に片方だけ表示、
+    //側面は単一オブジェクトに発光テクスチャ (mat3_light1/2) を交互に重ねる
+    var phase = Math.floor(new Date().getTime() / 3000) % 2;
+    var frontRoll = (phase == 0) ? rollFront1Parts : rollFront2Parts;
+    if (frontRoll != null) {
+        frontRoll.render(renderer);
     }
+    renderer.bindTexture(phase == 0 ? rollTex1 : rollTex2);
+    if (frontRoll != null) frontRoll.render(renderer);
+    if (rollSideParts != null) rollSideParts.render(renderer);
+    renderer.bindTexture(null);
 
     //ドア (memo: 1/3/11号車は-Z方向、4/6号車は+Z方向、移動量0.89。本家同様 sigmoid 補間)
     var dL = renderer.sigmoid(renderer.getDoorMovementL(entity));

@@ -912,8 +912,9 @@ public final class MqoModelLoader {
         }
 
         List<Batch> out = new ArrayList<>();
+        applyObjectWideSmoothing(byGroup.values(), smoothing);
         for (BatchBuilder bb : byGroup.values()) {
-            if (!bb.positions.isEmpty()) out.add(bb.bake(smoothing));
+            if (!bb.positions.isEmpty()) out.add(bb.bake(false));
         }
         List<ResourceLocation> materialTextures = new ArrayList<>(materialOrder.size());
         for (int i = 0; i < materialOrder.size(); i++) {
@@ -1018,9 +1019,10 @@ public final class MqoModelLoader {
 
         List<Batch> out = new ArrayList<>();
         LinkedHashSet<ResourceLocation> uniqueTextures = new LinkedHashSet<>();
+        applyObjectWideSmoothing(byGroup.values(), smoothing);
         for (BatchBuilder bb : byGroup.values()) {
             if (!bb.positions.isEmpty()) {
-                Batch batch = bb.bake(smoothing);
+                Batch batch = bb.bake(false);
                 out.add(batch);
                 uniqueTextures.add(batch.texture);
             }
@@ -2734,6 +2736,27 @@ public final class MqoModelLoader {
          */
         default boolean mayModify(String groupName) {
             return true;
+        }
+    }
+
+    /**
+     * スムージングをメタセコイア同様「オブジェクト (グループ) 単位」で適用する。
+     * バッチはグループ×マテリアル×半透明で分割されるため、バッチ内だけの平滑化だと
+     * 同一オブジェクト内のマテリアル境界 (窓ガラスと塗装面等) に法線の継ぎ目が残り、
+     * 頂点法線を使うシェーダーパックで面のカクつきとして見える。
+     */
+    private static void applyObjectWideSmoothing(Collection<BatchBuilder> builders, boolean smoothing) {
+        if (!smoothing || builders == null || builders.isEmpty()) {
+            return;
+        }
+        Map<String, List<BatchBuilder>> byObject = new LinkedHashMap<>();
+        for (BatchBuilder bb : builders) {
+            if (bb != null && !bb.positions.isEmpty()) {
+                byObject.computeIfAbsent(bb.groupName, k -> new ArrayList<>()).add(bb);
+            }
+        }
+        for (List<BatchBuilder> cluster : byObject.values()) {
+            applySmoothNormalsAcrossBatches(cluster);
         }
     }
 
