@@ -3761,6 +3761,17 @@ public final class MqoModelLoader {
                         RenderType renderType = needsBlend
                             ? (useCull ? RenderType.entityTranslucentCull(texture) : RenderType.entityTranslucent(texture))
                             : (useCull ? RenderType.entityCutout(texture) : RenderType.entityCutoutNoCull(texture));
+                        //静的 VBO 高速経路: 頂点データ/シェーダー/ライトが BufferSource と同一
+                        //条件のときだけ使う (= 見た目完全不変で毎フレームの頂点プッシュを省く)。
+                        //列車 (E257 等の大型 MQO + 座席複製) の FPS 低下対策。
+                        if (!needsBlend && groupTransform == null && depthBias == 0.0F
+                            && overlay == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
+                            && scriptRed == 255 && scriptGreen == 255 && scriptBlue == 255 && scriptAlpha == 255
+                            && (scriptRenderer == null || !scriptRenderer.hasUvWindow())
+                            && !com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()
+                            && drawBatchWithEntityVbo(batch, renderType, poseStack, packedLight)) {
+                            continue;
+                        }
                         VertexConsumer consumer = buffer.getBuffer(renderType);
                         PoseStack.Pose pose = poseStack.last();
                         Matrix4f mat = pose.pose();
@@ -4001,6 +4012,74 @@ public final class MqoModelLoader {
                         .setOverlay(overlay)
                         .setLight(0x00F000F0)
                         .setNormal(0.0F, 1.0F, 0.0F);
+                }
+            }
+        }
+
+        private static java.lang.reflect.Field shaderLightDirsField;
+        private static boolean shaderLightDirsFailed;
+
+        /**
+         * 静的 VBO によるバッチ描画 (エンティティ経路の高速版)。
+         * BufferSource 経路は法線を CPU で pose 変換してからシェーダーに渡す
+         * (シェーダーは法線を変換しない) ため、未変換法線の VBO ではライト方向
+         * ユニフォームを pose の逆回転で回して数学的に等価にする — 見た目は不変。
+         *
+         * @return true = VBO で描画した (呼び出し元は通常経路をスキップ)
+         */
+        private static boolean drawBatchWithEntityVbo(Batch batch, RenderType renderType,
+                                                      PoseStack poseStack, int packedLight) {
+            com.mojang.blaze3d.vertex.VertexBuffer vbo = batch.getOrBuildEntityVbo(packedLight);
+            if (vbo == null || vbo.isInvalid()) {
+                return false;
+            }
+            java.lang.reflect.Field field = shaderLightDirsField;
+            if (field == null) {
+                if (shaderLightDirsFailed) {
+                    return false;
+                }
+                try {
+                    field = RenderSystem.class.getDeclaredField("shaderLightDirections");
+                    field.setAccessible(true);
+                    shaderLightDirsField = field;
+                } catch (Throwable t) {
+                    shaderLightDirsFailed = true;
+                    return false;
+                }
+            }
+            org.joml.Vector3f origL0 = null;
+            org.joml.Vector3f origL1 = null;
+            try {
+                Object dirsObj = field.get(null);
+                if (!(dirsObj instanceof org.joml.Vector3f[] dirs)
+                    || dirs.length < 2 || dirs[0] == null || dirs[1] == null) {
+                    return false;
+                }
+                origL0 = new org.joml.Vector3f(dirs[0]);
+                origL1 = new org.joml.Vector3f(dirs[1]);
+                org.joml.Matrix3f invRot = new org.joml.Matrix3f(poseStack.last().normal()).transpose();
+                RenderSystem.setShaderLights(
+                    invRot.transform(new org.joml.Vector3f(origL0)),
+                    invRot.transform(new org.joml.Vector3f(origL1)));
+                renderType.setupRenderState();
+                try {
+                    net.minecraft.client.renderer.ShaderInstance shader = RenderSystem.getShader();
+                    if (shader == null) {
+                        return false;
+                    }
+                    Matrix4f mv = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(poseStack.last().pose());
+                    vbo.bind();
+                    vbo.drawWithShader(mv, RenderSystem.getProjectionMatrix(), shader);
+                    com.mojang.blaze3d.vertex.VertexBuffer.unbind();
+                    return true;
+                } finally {
+                    renderType.clearRenderState();
+                }
+            } catch (Throwable t) {
+                return false;
+            } finally {
+                if (origL0 != null) {
+                    RenderSystem.setShaderLights(origL0, origL1);
                 }
             }
         }
@@ -4417,6 +4496,53 @@ public final class MqoModelLoader {
          * 頂点で VBO を構築 (depthBias=0.001 等の light/display グループも GPU 化される)。
          * bias 値ごとに別 VBO をキャッシュ。
          */
+        //エンティティ経路 (ライトマップ付き NEW_ENTITY) の静的 VBO。
+        //頂点データ/シェーダー/ライトは BufferSource 経路と完全に同一 = 見た目不変で
+        //毎フレームの CPU 頂点プッシュ (列車1両で数十万頂点) を丸ごと省く。
+        //ライト値は頂点に焼くため、変わったときだけ再アップロードする。
+        private com.mojang.blaze3d.vertex.VertexBuffer entityVbo;
+        private int entityVboLight = Integer.MIN_VALUE;
+        private boolean entityVboFailed;
+
+        com.mojang.blaze3d.vertex.VertexBuffer getOrBuildEntityVbo(int packedLight) {
+            if (entityVboFailed || vertexCount <= 0) {
+                return null;
+            }
+            if (entityVbo != null && entityVboLight == packedLight && !entityVbo.isInvalid()) {
+                return entityVbo;
+            }
+            try {
+                com.mojang.blaze3d.vertex.BufferBuilder bb = com.mojang.blaze3d.vertex.Tesselator.getInstance().begin(
+                    com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
+                    com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY);
+                for (int i = 0; i < vertexCount; i++) {
+                    int o = i * 8;
+                    bb.addVertex(data[o], data[o + 1], data[o + 2])
+                        .setColor(255, 255, 255, 255)
+                        .setUv(data[o + 6], data[o + 7])
+                        .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                        .setLight(packedLight)
+                        .setNormal(data[o + 3], data[o + 4], data[o + 5]);
+                }
+                com.mojang.blaze3d.vertex.MeshData mesh = bb.build();
+                if (mesh == null) {
+                    return null;
+                }
+                if (entityVbo == null || entityVbo.isInvalid()) {
+                    entityVbo = new com.mojang.blaze3d.vertex.VertexBuffer(
+                        com.mojang.blaze3d.vertex.VertexBuffer.Usage.STATIC);
+                }
+                entityVbo.bind();
+                entityVbo.upload(mesh);
+                com.mojang.blaze3d.vertex.VertexBuffer.unbind();
+                entityVboLight = packedLight;
+                return entityVbo;
+            } catch (Throwable t) {
+                entityVboFailed = true;
+                return null;
+            }
+        }
+
         com.mojang.blaze3d.vertex.VertexBuffer getOrBuildFullbrightVbo() {
             return getOrBuildFullbrightVbo(0.0F);
         }

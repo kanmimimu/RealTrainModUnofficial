@@ -18,6 +18,8 @@
     {"modelFile": "dt64_3175.mqo", "textures": [["mat1", "textures/DT64.png"]]}
   ],
   "playerPos": [[0.8, 0.6, 9.0]],
+  "rollsignNames": ["あずさ-かいじ"],
+  "customButtons": [["ライト光量 弱", "ライト光量 中", "ライト光量 強"]],
   "slotPos": [
     [-0.8, -0.5, 5.40, 2],
     [0.8, -0.5, 5.40, 2],

@@ -375,8 +375,17 @@ function render(entity, pass, partialTicks) {
         } catch (err2) {
         }
         if (lightOn != 0) {
+            //カスタムボタン0 = ライト光量 (弱/中/強)。加算合成なので重ね描きで光が強くなる
+            var strength = 1;
+            try {
+                strength = entity.getResourceState().getDataMap().getInt("Button0") + 1;
+            } catch (err3) {
+            }
+            var lit = (tdir == 0) ? headLightParts : tailLightParts;
             renderer.bindTexture(tdir == 0 ? headLightTex : tailLightTex);
-            ((tdir == 0) ? headLightParts : tailLightParts).render(renderer);
+            for (var s = 0; s < strength; s++) {
+                lit.render(renderer);
+            }
             renderer.bindTexture(null);
         }
     }

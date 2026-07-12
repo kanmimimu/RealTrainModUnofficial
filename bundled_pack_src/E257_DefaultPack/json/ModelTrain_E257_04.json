@@ -13,6 +13,7 @@
     "bogiePos": [[0.0, 0.0, 7.075], [0.0, 0.0, -7.075]],
     "trainDistance": 10.25
   },
+  "rollsignNames": ["あずさ-かいじ"],
   "bogieModel3": [
     {"modelFile": "dt64_3175.mqo", "textures": [["mat1", "textures/DT64.png"]]},
     {"modelFile": "dt64_3175.mqo", "textures": [["mat1", "textures/DT64.png"]]}
