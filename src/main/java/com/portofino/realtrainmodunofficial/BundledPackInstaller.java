@@ -50,6 +50,11 @@ public final class BundledPackInstaller {
                     RealTrainModUnofficial.LOGGER.info("Moved bundled pack from mods to {}: {}", DefaultAssetsFolder.NAME, fileName);
                 }
             }
+            //パック作者の Readme 等 (zip 以外) も zip と同じフォルダに置く
+            for (Path extra : BundledPackStore.listBundledExtras(category)) {
+                Path target = assetsDir.resolve(extra.getFileName().toString());
+                Files.copy(extra, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+            }
         }
     }
 

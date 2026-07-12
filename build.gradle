@@ -150,6 +150,12 @@ tasks.named('jar', Jar).configure {
     from(buildE257DefaultPack.flatMap { it.archiveFile }) {
         into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
     }
+    // パック作者の Readme は zip の中だけでなく、展開先フォルダ (rtm_default_assets) の
+    // zip と同じ場所にも置く。BundledPackInstaller が zip 以外もそこへコピーする。
+    from('bundled_pack_src/E257_DefaultPack/Readme.txt') {
+        into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
+        rename { 'E257_DefaultPack_Readme.txt' }
+    }
     from {
         configurations.jsRuntime
                 .filter { it.isDirectory() || it.name.endsWith('.jar') }

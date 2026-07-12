@@ -47,6 +47,29 @@ public final class BundledPackStore {
         }
     }
 
+    /**
+     * 同梱パックに付属する zip 以外のファイル (パック作者の Readme 等)。
+     * 展開先フォルダ (rtm_default_assets) に zip と並べて置くために使う。
+     */
+    public static List<Path> listBundledExtras(String category) {
+        List<Path> result = new ArrayList<>();
+        try {
+            Path dir = ModList.get().getModFileById(RealTrainModUnofficial.MODID).getFile()
+                .findResource("assets", RealTrainModUnofficial.MODID, ROOT, category);
+            if (dir == null || !Files.isDirectory(dir)) {
+                return result;
+            }
+            try (var stream = Files.list(dir)) {
+                stream.filter(Files::isRegularFile)
+                    .filter(path -> !isArchive(path))
+                    .forEach(result::add);
+            }
+        } catch (Exception e) {
+            RealTrainModUnofficial.LOGGER.warn("Could not list bundled {} extras", category, e);
+        }
+        return result;
+    }
+
     public static Path resolveBundledPack(String packName) {
         if (packName == null || packName.isBlank()) {
             return null;
