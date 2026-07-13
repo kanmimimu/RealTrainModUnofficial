@@ -70,6 +70,12 @@ public class TrainEntity extends Entity {
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> REVERSER =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.INT);
+    /**
+     * 転換クロスシートの向き。0 = 前向き / 1 = 後ろ向き / -1 = 未設定 (進行方向に従う)。
+     * プレイヤーが乗り込んだときの向きで決まる。
+     */
+    private static final EntityDataAccessor<Integer> SEAT_DIRECTION =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DESTINATION_INDEX =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> SOUND_INDEX =
@@ -315,6 +321,8 @@ public class TrainEntity extends Entity {
         builder.define(PANTOGRAPH_UP, true);
         builder.define(REVERSE, false);
         builder.define(REVERSER, 1);
+        //-1 = まだ誰も座っていない (進行方向に従う)
+        builder.define(SEAT_DIRECTION, -1);
         builder.define(DESTINATION_INDEX, 0);
         builder.define(SOUND_INDEX, 0);
         builder.define(BODY_ROLL, 0.0F);
@@ -423,6 +431,39 @@ public class TrainEntity extends Entity {
         entityData.set(REVERSER, clamped);
         entityData.set(REVERSE, clamped < 0);
     }
+    /**
+     * 転換クロスシートの向き。<b>0 = 前向き / 1 = 後ろ向き (180°転換)</b>。
+     * <p>
+     * 本家は進行方向 (レバーサー) で切り替えていたが、こちらは
+     * <b>プレイヤーが乗り込んだときの向き</b>に合わせて自動転換する。
+     * 乗った瞬間の向きで固定するので、着席後に振り向いても座席は回らない。
+     * <p>
+     * まだ誰も乗っていない編成は、従来どおり進行方向に従う。
+     */
+    public float getSeatDirection() {
+        int dir = entityData.get(SEAT_DIRECTION);
+        if (dir < 0) {
+            //未設定: 進行方向に合わせる (従来の挙動)
+            return getReverser() >= 0 ? 0.0F : 1.0F;
+        }
+        return dir;
+    }
+
+    /**
+     * プレイヤーが乗り込んだ向きで、編成全体の座席を転換する。
+     * 車体の向きに対して 90°以上ずれていれば「後ろ向きに座った」とみなす。
+     */
+    public void updateSeatDirectionFor(Player player) {
+        if (player == null || level().isClientSide) {
+            return;
+        }
+        float relative = Mth.wrapDegrees(player.getYRot() - getYRot());
+        int dir = Math.abs(relative) > 90.0F ? 1 : 0;
+        for (TrainEntity car : getFormationTrainsForDisplay()) {
+            car.entityData.set(SEAT_DIRECTION, dir);
+        }
+    }
+
     public boolean isReverse() { return getReverser() < 0; }
     public void setReverse(boolean value) { setReverser(value ? -1 : 1); }
     public int getDestinationIndex() { return entityData.get(DESTINATION_INDEX); }
@@ -4593,8 +4634,65 @@ public class TrainEntity extends Entity {
         return isInteriorLightOn() ? 1.0F : 0.0F;
     }
 
+    /**
+     * 前照灯/尾灯の出し分け用。
+     * <p>
+     * <b>0 = この車両が進行方向の先頭 (前照灯/白) / 1 = それ以外 (尾灯/赤)</b>
+     * <p>
+     * 以前は {@code getReverser() >= 0 ? 0 : 1} を返していた。しかしレバーサーは編成全体で
+     * 共有される (setReverserForFormation) ため<b>全車が同じ値</b>になり、前進中は全車が
+     * 前照灯・後進中は全車が尾灯になっていた。結果、尾灯テクスチャ (***_light2.png) が
+     * 一度も使われず「light2 が出ない」状態だった。
+     * <p>
+     * 連結リストの先頭 (index 0) が前進時の先頭。後進時は末尾が先頭になる。
+     */
     public float getTrainDirection() {
-        return getReverser() >= 0 ? 0.0F : 1.0F;
+        return isLeadingCar() ? 0.0F : 1.0F;
+    }
+
+    /**
+     * 本家 {@code RenderVehicleBase.renderBodyLight} の {@code isFrontEmpty} 相当。
+     * 進行方向側に連結相手がいない = この車両が編成の先頭。
+     */
+    public boolean isLeadingCar() {
+        updateFormationPositionCache();
+        return leadingCarCache;
+    }
+
+    /**
+     * 本家の {@code isBackEmpty} 相当。進行方向と逆側に連結相手がいない = 編成の最後尾。
+     * 単行の場合は先頭かつ最後尾になる。
+     */
+    public boolean isTrailingCar() {
+        updateFormationPositionCache();
+        return trailingCarCache;
+    }
+
+    /**
+     * 描画は毎フレーム走るので、編成の走査は 1 tick に 1 回で足りる。
+     */
+    private int formationPositionCacheTick = -1;
+    private boolean leadingCarCache = true;
+    private boolean trailingCarCache = true;
+
+    private void updateFormationPositionCache() {
+        if (tickCount == formationPositionCacheTick) {
+            return;
+        }
+        formationPositionCacheTick = tickCount;
+        List<TrainEntity> formation = getFormationTrainsForDisplay();
+        if (formation.size() <= 1) {
+            //単行は先頭かつ最後尾
+            leadingCarCache = true;
+            trailingCarCache = true;
+            return;
+        }
+        //連結リストの先頭 (index 0) が前進時の先頭。後進時は末尾が先頭になる。
+        boolean forward = getReverser() >= 0;
+        TrainEntity leading = forward ? formation.get(0) : formation.get(formation.size() - 1);
+        TrainEntity trailing = forward ? formation.get(formation.size() - 1) : formation.get(0);
+        leadingCarCache = this == leading;
+        trailingCarCache = this == trailing;
     }
 
     // 旧 RTM の Render スクリプトは entity.getRotation() で車体 yaw を取得する。
@@ -4606,8 +4704,14 @@ public class TrainEntity extends Entity {
         return getTrainDirection();
     }
 
+    /**
+     * 進行方向そのもの (0 = 前進 / 1 = 後進)。名前のとおり「動く向き」を返す。
+     * <p>
+     * {@link #getTrainDirection()} は「この車両が編成の先頭か」(前照灯/尾灯の判定) に
+     * 変わったので、こちらは従来どおりレバーサー基準のままにしてある。
+     */
     public float getMoveDir() {
-        return getTrainDirection();
+        return getReverser() >= 0 ? 0.0F : 1.0F;
     }
 
     public TrainEntity getConnectedTrain(int dir) {
@@ -5797,6 +5901,8 @@ public class TrainEntity extends Entity {
             this.canAddPassenger(player)
         );
         if (player.startRiding(seatEntity, true)) {
+            //転換クロスシート: 座った向きに合わせて編成全体の座席を転換する
+            updateSeatDirectionFor(player);
             RealTrainModUnofficial.LOGGER.info(
                 "Player '{}' mounted vehicle '{}' at seat {}",
                 player.getName().getString(),

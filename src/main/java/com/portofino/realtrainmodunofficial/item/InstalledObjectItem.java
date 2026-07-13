@@ -72,6 +72,78 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         return fallback;
     }
 
+    /**
+     * レールに載せる設置物 (列車検知器) の姿勢。
+     *
+     * @param yaw            レールの向き
+     * @param pitch          レールの勾配 (yaw の後に掛ける = モデル局所のX回転)
+     * @param roll           レールのカント (yaw の後に掛ける = モデル局所のZ回転)
+     * @param offX/offY/offZ 描画原点 (placePos + (0.5, 0, 0.5)) からレール上の点までの差分
+     */
+    private record RailSnap(float yaw, float pitch, float roll, double offX, double offY, double offZ) {
+    }
+
+    /**
+     * 本家 ItemInstalledObject.setEntityOnRail の移植。
+     * <p>
+     * クリックしたブロックがレールなら、そのレール曲線上で最も近い点を求め、そこへモデルを
+     * 載せる (位置・向き・勾配・カント)。本家は向きをプレイヤーの視線と揃うように反転させるので
+     * それも再現する。レールでなければ null (通常の設置になる)。
+     */
+    @javax.annotation.Nullable
+    private static RailSnap computeRailSnap(Level level, BlockPos railPos, BlockPos placePos, Player player) {
+        jp.ngt.rtm.rail.util.RailMap rm = jp.ngt.rtm.rail.TileEntityLargeRailBase.getRailMapFromCoordinates(
+                level, null, railPos.getX(), railPos.getY(), railPos.getZ());
+        if (rm == null) {
+            return null;
+        }
+        final int split = 128;
+        int index = rm.getNearlestPoint(split, railPos.getX() + 0.5D, railPos.getZ() + 0.5D);
+        if (index < 0) {
+            index = 0;
+        }
+        double[] rpos = rm.getRailPos(split, index);
+        //本家: getRailPos は {z, x} の順。レール面から少しだけ浮かせる。
+        double posX = rpos[1];
+        double posZ = rpos[0];
+        double posY = rm.getRailHeight(split, index) + 0.0625D;
+
+        //本家: プレイヤーの向きとレールの向きが 90°以上ずれていたら 180°反転させる
+        //(勾配とカントの符号も一緒に反転する)。
+        float railYaw = rm.getRailYaw(split, index);
+        float playerFacing = -player.getYRot() + 180.0F;
+        boolean invert = Math.abs(net.minecraft.util.Mth.wrapDegrees(railYaw - playerFacing)) > 90.0F;
+        float sign = invert ? -1.0F : 1.0F;
+        if (invert) {
+            railYaw += 180.0F;
+        }
+
+        //レール角と設置物レンダラの角度は座標系が違う。
+        //  列車 (レールに正しく沿う): YP(railYaw) → XP(-railPitch) → ZP(cant)
+        //  設置物:                    YP(180 - yaw) → XP(mountPitch) → ZP(mountRoll)
+        //同じ姿勢にするには yaw = 180 - railYaw を渡す (そのまま渡すと 180°ずれる)。
+        float yaw = 180.0F - railYaw;
+        float pitch = -rm.getRailPitch(split, index) * sign;
+        float roll = rm.getRailRoll(split, index) * sign;
+
+        return new RailSnap(yaw, pitch, roll,
+                posX - (placePos.getX() + 0.5D),
+                posY - placePos.getY(),
+                posZ - (placePos.getZ() + 0.5D));
+    }
+
+    /**
+     * 本家 ItemInstalledObject の看板向き:
+     * {@code floor(normalizeAngle(yaw + 180) / 90 + 0.5) & 3}
+     */
+    private static byte signDirectionOf(float yaw) {
+        float a = (yaw + 180.0F) % 360.0F;
+        if (a < 0.0F) {
+            a += 360.0F;
+        }
+        return (byte) (net.minecraft.util.Mth.floor(a / 90.0F + 0.5F) & 3);
+    }
+
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
@@ -119,11 +191,23 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         float placeMountPitch = 0.0F;
         boolean wallMounted = false;
         boolean upsideDown = false;
-        //碍子: 本家 ItemInstalledObject 準拠 — クリック面 (meta 0-5) だけを保存し、
-        //描画は本家 RenderElectricalWiring と同じ (ブロック中心ピボット+面回転)。
+        //碍子/看板: 本家 ItemInstalledObject 準拠 — クリック面 (meta 0-5) だけを保存し、
+        //描画は本家と同じ (ブロック中心ピボット+面回転)。
         //持ち上げ/横倒しハックは廃止 (当たり判定に対してモデルがずれる原因だった)。
-        boolean honkeFaceMount = category == InstalledObjectCategory.INSULATOR;
-        if (!honkeFaceMount
+        //看板は本家 BlockSignBoard も「面に貼り付くが板は立ったまま」なので、
+        //汎用の壁挿し(90°横倒し)ロジックに乗せてはいけない。
+        boolean honkeFaceMount = category == InstalledObjectCategory.INSULATOR
+                || category == InstalledObjectCategory.SIGNBOARD;
+        //列車検知器: 本家 ItemInstalledObject.setEntityOnRail 準拠で、クリックしたレールの
+        //曲線上に載せる (位置・向き・勾配・カント)。汎用の壁挿し/逆さ設置には乗せない。
+        RailSnap railSnap = category == InstalledObjectCategory.TRAIN_DETECTOR
+                ? computeRailSnap(level, context.getClickedPos(), placePos, player)
+                : null;
+        if (railSnap != null) {
+            placeYaw = railSnap.yaw();
+            placeMountPitch = railSnap.pitch();
+        } else if (!honkeFaceMount
+                && category != InstalledObjectCategory.TRAIN_DETECTOR
                 && category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL) {
             if (clickedFace == net.minecraft.core.Direction.DOWN) {
                 upsideDown = true;
@@ -139,10 +223,18 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
             if (level.getBlockEntity(placePos) instanceof InstalledObjectBlockEntity blockEntity) {
                 blockEntity.setDefinition(definition.getId(), category, placeYaw);
                 blockEntity.setMountPitch(placeMountPitch);
-                if (honkeFaceMount) {
+                if (railSnap != null) {
+                    //レール曲線上の点にモデルを載せる (レンダラの原点は placePos + (0.5, 0, 0.5))
+                    blockEntity.setRenderOffset(railSnap.offX(), railSnap.offY(), railSnap.offZ());
+                    blockEntity.setMountRoll(railSnap.roll());
+                } else if (honkeFaceMount) {
                     //本家 meta = クリック面 (1.7.10 side と 1.21 Direction.ordinal は同一)
                     blockEntity.setMountFace(clickedFace.ordinal());
                     blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
+                    if (category == InstalledObjectCategory.SIGNBOARD) {
+                        //本家 ItemInstalledObject: direction = 設置したプレイヤーの向き (0-3)。
+                        blockEntity.setSignDirection(signDirectionOf(player.getYRot()));
+                    }
                 } else if (category == InstalledObjectCategory.SIGNAL) {
                     // 当たり判定はそのままで、見た目だけ「クリックした柱」の中へ押し込む。
                     // 本家は信号が柱ブロックを置き換えてそこに描くため、横面設置のみ押し込む。

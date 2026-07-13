@@ -2968,7 +2968,51 @@ public final class MqoModelLoader {
     public static final class MqoModel {
         // RTM scripts use pass 0 (opaque), 1 (transparent), and "pass > 1" (emissive/fullbright).
         // Running more than 3 passes would repeat emissive content needlessly.
-        private static final int LEGACY_SCRIPT_PASS_COUNT = 3;
+        /**
+         * レガシースクリプトを何パス走らせるか。
+         * <p>
+         * 発光パス (pass >= 2) は JSON の "Light" マテリアルが持つ light テクスチャに対応する:
+         * <pre>
+         *   pass 2 -> emissiveTextures[0] = ***_light0.png (室内灯)
+         *   pass 3 -> emissiveTextures[1] = ***_light1.png (前照灯)
+         *   pass 4 -> emissiveTextures[2] = ***_light2.png (尾灯)
+         * </pre>
+         * ここが 3 (= pass 0,1,2 だけ) だったため、<b>前照灯と尾灯のパスが一度も走らず</b>、
+         * light1/light2 が永久に描かれていなかった。
+         */
+        private static final int LEGACY_SCRIPT_PASS_COUNT = 5;
+
+        /**
+         * 発光パスを描くか。本家 {@code RenderVehicleBase.renderBodyLight} と同じ条件式。
+         * <pre>
+         *   isFrontEmpty = 進行方向側に連結相手がいない (= 先頭車)
+         *   isBackEmpty  = 進行方向と逆側に連結相手がいない (= 最後尾)
+         *   pass 3 (前照灯) : mode == 1 && isFrontEmpty                 || mode == 2
+         *   pass 4 (尾灯)   : mode == 1 && !isFrontEmpty && isBackEmpty || mode == 2
+         * </pre>
+         * つまり <b>先頭車だけが白、最後尾車だけが赤</b>、中間車はどちらも点かない。
+         * mode == 2 は「両灯点灯」で、全車が前照灯と尾灯の両方を出す。
+         */
+        private static boolean shouldRenderEmissivePass(Object entity, int pass) {
+            if (!(entity instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity train)) {
+                //列車以外 (車/設置物) は従来どおり
+                return true;
+            }
+            int mode = train.getLightMode();
+            switch (pass) {
+                case 2:
+                    //室内灯
+                    return train.isInteriorLightOn();
+                case 3:
+                    //前照灯
+                    return mode == 2 || (mode == 1 && train.isLeadingCar());
+                case 4:
+                    //尾灯
+                    return mode == 2 || (mode == 1 && !train.isLeadingCar() && train.isTrailingCar());
+                default:
+                    return true;
+            }
+        }
         private final List<Batch> batches;
         private final Map<String, List<Batch>> batchesByNormalizedGroup;
 
@@ -3406,6 +3450,88 @@ public final class MqoModelLoader {
         // 確保 + sort コストを排除する。ParsedGroupSet.presentGroupNames は
         // 同一 Set インスタンスのまま渡されるため、ヒット率はほぼ 100%。
         private final java.util.IdentityHashMap<Set<String>, List<Batch>> renderListCache = new java.util.IdentityHashMap<>();
+
+        /**
+         * 本家 {@code ModelObject.renderWithTexture(entity, RenderPass.LIGHT/LIGHT_FRONT/LIGHT_BACK, ...)} 相当。
+         * <p>
+         * 本家はマテリアルごとにループし、{@code Light} フラグの付いていないマテリアル
+         * ({@code TextureSet.doLighting == false}) を {@code continue} で飛ばした上で、
+         * 残ったマテリアルの面を {@code subTextures[pass - 2]} (= ***_light0/1/2.png) に
+         * 差し替えて<b>車体ごと</b>描き直す。何が光るかはグループ名ではなく
+         * 発光テクスチャのアルファが決める (ランプ以外は透明)。
+         * <p>
+         * ここでは Batch (= グループ×マテリアル) 単位で同じことをする。
+         * {@code emissiveTextureForPass} が null のバッチ = 発光しないマテリアル。
+         *
+         * @param legacyPass 2 = LIGHT(室内灯等) / 3 = LIGHT_FRONT(前照灯) / 4 = LIGHT_BACK(尾灯)
+         */
+        public void renderNamedGroupsEmissive(PoseStack poseStack, MultiBufferSource buffer,
+                                              int packedLight, int overlay,
+                                              Set<String> normalizedGroupNames, int legacyPass) {
+            if (normalizedGroupNames == null || normalizedGroupNames.isEmpty() || legacyPass < 2) {
+                return;
+            }
+            // 本家 RenderVehicleBase: i > 0 (前照灯/尾灯) のみ disableLighting + setLightmapMaxBrightness
+            // + blend(SRC_ALPHA, ONE_MINUS_SRC_ALPHA) + glColor4f(1,1,1,0.8)。
+            // i == 0 (LIGHT) は通常のライティングのまま不透明で描く単なるテクスチャ差し替え。
+            boolean lit = legacyPass >= 3;
+            int light = lit ? net.minecraft.client.renderer.LightTexture.FULL_BRIGHT : packedLight;
+            float alpha = lit ? 0.8F : 1.0F;
+            // 発光パスは車体と「完全に同一の面」を描き直す。本家 (1.7.10 の即時描画 + GL_LEQUAL) は
+            // 後から描いた方が必ず勝つので問題にならなかったが、1.21 のバッファ描画では同一 RenderType
+            // 内で coplanar なクアッドの前後関係が不定になり、車体とライトテクスチャが
+            // 「ポリゴンが重なってチラつく」状態になる。法線方向に僅かに押し出して層を分ける。
+            // pass ごとに段差をつけて、発光パス同士でも争わないようにする。
+            float depthBias = 0.0015F * (legacyPass - 1);
+            PoseStack.Pose pose = poseStack.last();
+            Matrix4f mat = pose.pose();
+            Matrix3f norm = pose.normal();
+            float[] normalOut = new float[3];
+            for (String name : normalizedGroupNames) {
+                List<Batch> groupBatches = batchesByNormalizedGroup.get(name);
+                if (groupBatches == null || groupBatches.isEmpty()) {
+                    continue;
+                }
+                for (Batch batch : groupBatches) {
+                    ResourceLocation tex = batch.emissiveTextureForPass(legacyPass);
+                    if (tex == null) {
+                        // Light フラグの無いマテリアル (本家の doLighting == false と同じ)
+                        continue;
+                    }
+                    VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucent(tex));
+                    for (int i = 0; i < batch.vertexCount; i++) {
+                        int o = i * 8;
+                        float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
+                        float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
+                        float u = batch.data[o + 6], v = batch.data[o + 7];
+                        float inv = (float) (1.0D / Math.sqrt(Math.max(1.0E-8F, nx * nx + ny * ny + nz * nz)));
+                        x += nx * inv * depthBias;
+                        y += ny * inv * depthBias;
+                        z += nz * inv * depthBias;
+                        float tnx = norm.m00() * nx + norm.m10() * ny + norm.m20() * nz;
+                        float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
+                        float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
+                        normalizeNormal(tnx, tny, tnz, normalOut);
+                        vc.addVertex(mat, x, y, z)
+                            .setColor(1.0F, 1.0F, 1.0F, alpha)
+                            .setUv(u, v)
+                            .setOverlay(overlay)
+                            .setLight(light)
+                            .setNormal(normalOut[0], normalOut[1], normalOut[2]);
+                    }
+                }
+            }
+        }
+
+        /** このモデルに発光 (Light) マテリアルのバッチが 1 つでもあるか。 */
+        public boolean hasEmissiveBatches() {
+            for (Batch b : batches) {
+                if (b.emissiveTextures.length > 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
 
 
@@ -3872,6 +3998,8 @@ public final class MqoModelLoader {
                     for (int pass = 0; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
                         if (!(entity instanceof TrainEntity) && shouldSkipObservedLegacyPass(pass)) continue;
                         if (pass >= 2 && scriptRenderer != null && !scriptRenderer.hasEmissivePassContent()) continue;
+                        //室内灯/前照灯/尾灯は、点いているものだけ描く
+                        if (pass >= 2 && !shouldRenderEmissivePass(entity, pass)) continue;
                         poseStack.pushPose();
                         try {
                             executeScript(poseStack, buffer, packedLight, overlay, pass, entity);
@@ -3948,6 +4076,8 @@ public final class MqoModelLoader {
                 if (hasScript) {
                     for (int pass = 0; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
                         if (pass >= 2 && scriptRenderer != null && !scriptRenderer.hasEmissivePassContent()) continue;
+                        //室内灯/前照灯/尾灯は、点いているものだけ描く
+                        if (pass >= 2 && !shouldRenderEmissivePass(entity, pass)) continue;
                         // スクリプトが poseStack を破壊する事例 (rotate/translate を push/pop なしで多用、
                         // NaN を渡す等) に対する安全網。push/pop で囲んで corruption を局所化する。
                         poseStack.pushPose();

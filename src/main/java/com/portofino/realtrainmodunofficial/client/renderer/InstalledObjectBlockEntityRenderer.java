@@ -6,9 +6,12 @@ import com.mojang.math.Axis;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.client.ClientRenderProfiler;
 import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
+import com.portofino.realtrainmodunofficial.client.signboard.SignboardTextRenderer;
+import com.portofino.realtrainmodunofficial.client.signboard.SolidTexture;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
+import com.portofino.realtrainmodunofficial.signboard.SignboardText;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -125,8 +128,13 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         applyAdjustments(poseStack, blockEntity);
                         poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
                         // 壁挿し碍子は横倒し(mountPitch)にする。0なら通常の縦置き。
+                        // 列車検知器ではレールの勾配(mountPitch)とカント(mountRoll)になる。
+                        // どちらも yaw の後なのでモデル局所の回転 (= レールに沿った傾き)。
                         if (blockEntity.getMountPitch() != 0.0F) {
                             poseStack.mulPose(Axis.XP.rotationDegrees(blockEntity.getMountPitch()));
+                        }
+                        if (blockEntity.getMountRoll() != 0.0F) {
+                            poseStack.mulPose(Axis.ZP.rotationDegrees(blockEntity.getMountRoll()));
                         }
                         poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
                         poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
@@ -778,48 +786,190 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         return false;
     }
 
+    /**
+     * 本家 RenderSignBoard の移植。
+     * <p>
+     * 本家の看板は「板1枚」ではなく <b>厚みのある箱</b> (width x height x depth) で、
+     * ブロック中心を原点に置き、設置面 (mountFace) の側へ寄せて描く。
+     * <ul>
+     *   <li>backTexture=0 … 表も裏も同じテクスチャ (裏は左右反転)</li>
+     *   <li>backTexture=1 … テクスチャの左半分が表、右半分が裏</li>
+     *   <li>backTexture=2 … 表はテクスチャ、裏は単色 (color)</li>
+     * </ul>
+     * 側面 4 面は color から 0x101010 引いた色で塗る (本家準拠の「縁」)。
+     */
     private void renderSignboard(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
                                  PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
         String signTexture = definition.getSignTexture();
-        if (signTexture == null || signTexture.isBlank()) {
-            renderSignboardOutline(definition, poseStack, buffer);
-            return;
-        }
-        ResourceLocation texture = MqoModelLoader.resolvePackTexture(definition.getPackName(), signTexture);
+        ResourceLocation texture = signTexture == null || signTexture.isBlank()
+            ? null
+            : MqoModelLoader.resolvePackTexture(definition.getPackName(), signTexture);
         if (texture == null) {
             renderSignboardOutline(definition, poseStack, buffer);
             return;
         }
 
-        double halfWidth = definition.getWidth() * 0.5D;
-        double height = definition.getHeight();
-        double halfDepth = Math.max(0.02D, definition.getDepth() * 0.5D);
-        int frame = definition.getSignFrame();
+        float halfWidth = definition.getWidth() * 0.5F;
+        float halfHeight = definition.getHeight() * 0.5F;
+        float halfDepth = Math.max(0.01F, definition.getDepth() * 0.5F);
+        int frame = Math.max(1, definition.getSignFrame());
+        int cycle = Math.max(1, definition.getAnimationCycle());
         int backTex = definition.getBackTexture();
-        // RTM: frame>1 の場合、最初の1フレーム分だけ表示 (V: 0 → 1/frame)
-        float vMax = frame > 1 ? (1.0F / frame) : 1.0F;
+        int dir = blockEntity.getSignDirection();
+        int mountFace = blockEntity.getMountFace();
+
+        //本家: frame>1 ならカウンタで V をずらしてコマ送りする。
+        float minV = 0.0F;
+        float maxV = 1.0F;
+        if (frame > 1) {
+            int f = (blockEntity.getSignCounter() / cycle) % frame;
+            minV = (float) f / frame;
+            maxV = (float) (f + 1) / frame;
+        }
+
         poseStack.pushPose();
-        poseStack.translate(0.5D, 0.0D, 0.5D);
+        poseStack.translate(0.5D, 0.5D, 0.5D);
         Vec3 renderOffset = blockEntity.getRenderOffset();
         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
-        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
-        VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
+        applyAdjustments(poseStack, blockEntity);
+        poseStack.mulPose(Axis.YP.rotationDegrees(dir * -90.0F));
+        applySignboardMountOffset(poseStack, mountFace, dir, halfWidth, halfHeight, halfDepth);
+
         PoseStack.Pose pose = poseStack.last();
+        VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
+        //本家: backTexture==1 はテクスチャを左右に割って表/裏に貼る。
+        float frontMaxU = backTex == 1 ? 0.5F : 1.0F;
+        float backMinU = backTex == 1 ? 0.5F : 0.0F;
 
-        // 前面
-        addSignVertex(consumer, pose, -halfWidth, height, -halfDepth, 0.0F, 0.0F, packedOverlay, packedLight, -1.0F);
-        addSignVertex(consumer, pose, -halfWidth, 0.0D, -halfDepth, 0.0F, vMax, packedOverlay, packedLight, -1.0F);
-        addSignVertex(consumer, pose, halfWidth, 0.0D, -halfDepth, 1.0F, vMax, packedOverlay, packedLight, -1.0F);
-        addSignVertex(consumer, pose, halfWidth, height, -halfDepth, 1.0F, 0.0F, packedOverlay, packedLight, -1.0F);
+        // 表 (+Z 側)
+        signVertex(consumer, pose, halfWidth, -halfHeight, halfDepth, frontMaxU, maxV, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
+        signVertex(consumer, pose, halfWidth, halfHeight, halfDepth, frontMaxU, minV, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
+        signVertex(consumer, pose, -halfWidth, halfHeight, halfDepth, 0.0F, minV, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
+        signVertex(consumer, pose, -halfWidth, -halfHeight, halfDepth, 0.0F, maxV, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
 
-        // 背面: backTexture=0 の場合は省略
-        if (backTex != 0) {
-            addSignVertex(consumer, pose, halfWidth, height, halfDepth, 0.0F, 0.0F, packedOverlay, packedLight, 1.0F);
-            addSignVertex(consumer, pose, halfWidth, 0.0D, halfDepth, 0.0F, vMax, packedOverlay, packedLight, 1.0F);
-            addSignVertex(consumer, pose, -halfWidth, 0.0D, halfDepth, 1.0F, vMax, packedOverlay, packedLight, 1.0F);
-            addSignVertex(consumer, pose, -halfWidth, height, halfDepth, 1.0F, 0.0F, packedOverlay, packedLight, 1.0F);
+        // 裏 (-Z 側)。backTexture==2 のときだけ単色なので後段でまとめて塗る。
+        if (backTex != 2) {
+            signVertex(consumer, pose, -halfWidth, -halfHeight, -halfDepth, 1.0F, maxV, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, -1.0F);
+            signVertex(consumer, pose, -halfWidth, halfHeight, -halfDepth, 1.0F, minV, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, -1.0F);
+            signVertex(consumer, pose, halfWidth, halfHeight, -halfDepth, backMinU, minV, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, -1.0F);
+            signVertex(consumer, pose, halfWidth, -halfHeight, -halfDepth, backMinU, maxV, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, -1.0F);
         }
+
+        // 単色部分 (側面 4 面 + backTexture==2 の裏面)
+        int color = definition.getColor();
+        VertexConsumer solid = buffer.getBuffer(RenderType.entityCutoutNoCull(SolidTexture.white()));
+        if (backTex == 2) {
+            signVertex(solid, pose, -halfWidth, -halfHeight, -halfDepth, 0.0F, 1.0F, packedLight, packedOverlay, color, 0.0F, 0.0F, -1.0F);
+            signVertex(solid, pose, -halfWidth, halfHeight, -halfDepth, 0.0F, 0.0F, packedLight, packedOverlay, color, 0.0F, 0.0F, -1.0F);
+            signVertex(solid, pose, halfWidth, halfHeight, -halfDepth, 1.0F, 0.0F, packedLight, packedOverlay, color, 0.0F, 0.0F, -1.0F);
+            signVertex(solid, pose, halfWidth, -halfHeight, -halfDepth, 1.0F, 1.0F, packedLight, packedOverlay, color, 0.0F, 0.0F, -1.0F);
+        }
+        //本家: 縁は板の色より少し暗くする。
+        int edgeColor = Math.max(0, color - 0x101010);
+        // 上面
+        signQuad(solid, pose, packedLight, packedOverlay, edgeColor, 0.0F, 1.0F, 0.0F,
+            halfWidth, halfHeight, halfDepth, halfWidth, halfHeight, -halfDepth,
+            -halfWidth, halfHeight, -halfDepth, -halfWidth, halfHeight, halfDepth);
+        // 下面
+        signQuad(solid, pose, packedLight, packedOverlay, edgeColor, 0.0F, -1.0F, 0.0F,
+            -halfWidth, -halfHeight, halfDepth, -halfWidth, -halfHeight, -halfDepth,
+            halfWidth, -halfHeight, -halfDepth, halfWidth, -halfHeight, halfDepth);
+        // 右面 (+X)
+        signQuad(solid, pose, packedLight, packedOverlay, edgeColor, 1.0F, 0.0F, 0.0F,
+            halfWidth, -halfHeight, -halfDepth, halfWidth, halfHeight, -halfDepth,
+            halfWidth, halfHeight, halfDepth, halfWidth, -halfHeight, halfDepth);
+        // 左面 (-X)
+        signQuad(solid, pose, packedLight, packedOverlay, edgeColor, -1.0F, 0.0F, 0.0F,
+            -halfWidth, -halfHeight, halfDepth, -halfWidth, halfHeight, halfDepth,
+            -halfWidth, halfHeight, -halfDepth, -halfWidth, -halfHeight, -halfDepth);
+
+        renderSignboardTexts(blockEntity, definition, poseStack, buffer,
+            halfWidth, halfHeight, halfDepth, backTex, packedLight, packedOverlay);
+
         poseStack.popPose();
+    }
+
+    /**
+     * 本家 RenderSignBoard の meta/dir 分岐そのまま: 板を設置面へ寄せる。
+     * meta は設置時にクリックした面 (Direction.ordinal(): DOWN=0, UP=1, N=2, S=3, W=4, E=5)。
+     */
+    private static void applySignboardMountOffset(PoseStack poseStack, int meta, int dir,
+                                                  float halfWidth, float halfHeight, float halfDepth) {
+        if (meta < 0) {
+            //旧データ (設置面なし)。中心のまま置く。
+            return;
+        }
+        if (meta == 0) {
+            //天井から吊るす
+            poseStack.translate(0.0F, 0.5F - halfHeight, 0.0F);
+        } else if (meta == 1) {
+            //床から立てる
+            poseStack.translate(0.0F, halfHeight - 0.5F, 0.0F);
+        } else if ((dir == 1 && meta == 4) || (dir == 3 && meta == 5)
+            || (dir == 0 && meta == 3) || (dir == 2 && meta == 2)) {
+            poseStack.translate(0.0F, 0.0F, halfDepth - 0.5F);
+        } else if ((dir == 1 && meta == 3) || (dir == 3 && meta == 2)
+            || (dir == 0 && meta == 5) || (dir == 2 && meta == 4)) {
+            poseStack.translate(halfWidth - 0.5F, 0.0F, 0.0F);
+        } else {
+            poseStack.translate(0.5F - halfWidth, 0.0F, 0.0F);
+        }
+    }
+
+    /**
+     * 本家: 板に貼り付けた文字を描く。表と裏の振り分けは backTexture による。
+     */
+    private static void renderSignboardTexts(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
+                                             PoseStack poseStack, MultiBufferSource buffer,
+                                             float halfWidth, float halfHeight, float halfDepth,
+                                             int backTex, int packedLight, int packedOverlay) {
+        List<SignboardText> texts = blockEntity.getSignTexts();
+        if (texts.isEmpty()) {
+            return;
+        }
+        String ttSetting = blockEntity.getSignTtSetting();
+        //板の面より僅かに手前に出して Z ファイティングを避ける (本家も +0.01)。
+        float z = halfDepth + 0.01F;
+        //backTexture==1 は「テクスチャの左半分=表、右半分=裏」。エディタのキャンバスは
+        //幅 width*2 (表と裏を横に並べたもの) なので、表/裏の境目は posU == width。
+        //
+        //※本家 RenderSignBoard はここを width/2 で判定していたが、それだと表の右半分に
+        //  置いた文字が裏面送りになり、裏面側の座標変換 (posU - 1.5*width) で板の外へ出て
+        //  しまう。本家のエディタ座標系と裏面の式のどちらとも噛み合わないので、本家のバグ
+        //  とみなして width で判定している。
+        float backThreshold = definition.getWidth();
+
+        for (SignboardText text : texts) {
+            SignboardTextRenderer.Frame frame = SignboardTextRenderer.frameFor(text, ttSetting);
+            if (!frame.shouldDraw()) {
+                continue;
+            }
+            VertexConsumer consumer = buffer.getBuffer(RenderType.entityTranslucent(frame.image().getTexture()));
+            float w = frame.width();
+            float h = text.size;
+
+            boolean onFront = backTex != 1 || text.posU < backThreshold;
+            if (onFront) {
+                //posU は板の左端から、posV は板の上端から。
+                frame.image().render(poseStack.last(), consumer,
+                    text.posU - halfWidth, halfHeight - text.posV, z, w, h,
+                    frame.minU(), 0.0F, frame.maxU(), 1.0F, packedLight, packedOverlay);
+            }
+
+            boolean onBack = backTex == 0 || (backTex == 1 && text.posU >= backThreshold);
+            if (onBack) {
+                poseStack.pushPose();
+                poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
+                float x = text.posU - halfWidth;
+                if (backTex == 1) {
+                    x -= definition.getWidth();
+                }
+                frame.image().render(poseStack.last(), consumer,
+                    x, halfHeight - text.posV, z, w, h,
+                    frame.minU(), 0.0F, frame.maxU(), 1.0F, packedLight, packedOverlay);
+                poseStack.popPose();
+            }
+        }
     }
 
     private void renderSignboardOutline(InstalledObjectDefinition definition, PoseStack poseStack, MultiBufferSource buffer) {
@@ -836,15 +986,26 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         );
     }
 
-    private static void addSignVertex(VertexConsumer consumer, PoseStack.Pose pose,
-                                      double x, double y, double z, float u, float v,
-                                      int packedOverlay, int packedLight, float normalZ) {
-        consumer.addVertex(pose.pose(), (float) x, (float) y, (float) z)
-            .setColor(255, 255, 255, 255)
+    private static void signQuad(VertexConsumer consumer, PoseStack.Pose pose, int packedLight, int packedOverlay, int color,
+                                 float nx, float ny, float nz,
+                                 float x1, float y1, float z1, float x2, float y2, float z2,
+                                 float x3, float y3, float z3, float x4, float y4, float z4) {
+        signVertex(consumer, pose, x1, y1, z1, 0.0F, 1.0F, packedLight, packedOverlay, color, nx, ny, nz);
+        signVertex(consumer, pose, x2, y2, z2, 1.0F, 1.0F, packedLight, packedOverlay, color, nx, ny, nz);
+        signVertex(consumer, pose, x3, y3, z3, 1.0F, 0.0F, packedLight, packedOverlay, color, nx, ny, nz);
+        signVertex(consumer, pose, x4, y4, z4, 0.0F, 0.0F, packedLight, packedOverlay, color, nx, ny, nz);
+    }
+
+    private static void signVertex(VertexConsumer consumer, PoseStack.Pose pose,
+                                   float x, float y, float z, float u, float v,
+                                   int packedLight, int packedOverlay, int color,
+                                   float nx, float ny, float nz) {
+        consumer.addVertex(pose.pose(), x, y, z)
+            .setColor((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, 255)
             .setUv(u, v)
             .setOverlay(packedOverlay)
             .setLight(packedLight)
-            .setNormal(0.0F, 0.0F, normalZ);
+            .setNormal(pose, nx, ny, nz);
     }
 
     private void renderActiveLights(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,

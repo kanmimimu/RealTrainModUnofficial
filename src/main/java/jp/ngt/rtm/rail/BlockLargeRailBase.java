@@ -86,20 +86,21 @@ public class BlockLargeRailBase extends BaseEntityBlock {
 
     protected VoxelShape getRailShape(BlockGetter level, BlockPos pos, boolean preventMob) {
         BlockEntity be = level.getBlockEntity(pos);
-        float height2 = THICKNESS;
-        if (be instanceof TileEntityLargeRailBase rail) {
+        if (!(be instanceof TileEntityLargeRailBase rail)) {
+            return Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, THICKNESS, 1.0D);
+        }
+        if (preventMob) {
+            //Mob の通せんぼ用の壁。歩き心地は関係ないので本家どおり平均高さ + 256 の1枚箱。
             float[] fa = rail.getBlockHeights(pos.getX(), pos.getY(), pos.getZ(), THICKNESS, true);
-            float sum = 0.0F;
-            for (int i = 0; i < 4; ++i) {
-                sum += fa[i];
-            }
-            height2 = sum * 0.25F;
+            float height2 = (fa[0] + fa[1] + fa[2] + fa[3]) * 0.25F;
             if (height2 < THICKNESS) {
                 height2 = THICKNESS;
             }
+            return Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, height2 + 256.0D, 1.0D);
         }
-        double top = preventMob ? height2 + 256.0D : height2;
-        return Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, top, 1.0D);
+        //坂は「1ブロック=平らな箱1つ」だと段差になるので、ブロック内を細かく割って
+        //レール面に沿わせる (TileEntityLargeRailBase.getRailCollisionShape)。
+        return rail.getRailCollisionShape(pos.getX(), pos.getY(), pos.getZ(), THICKNESS);
     }
 
     /**

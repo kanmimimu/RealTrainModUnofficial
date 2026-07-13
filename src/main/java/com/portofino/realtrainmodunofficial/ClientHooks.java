@@ -82,6 +82,16 @@ public final class ClientHooks {
         invokeClient("openScriptBlockScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
+    /** 看板エディタ: 看板を素手で右クリック (本家 GuiSignboard) */
+    public static void openSignboardScreen(BlockPos pos) {
+        invokeClient("openSignboardScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 列車検知器の設定: 検知器を素手で右クリック */
+    public static void openDetectorConfigScreen(BlockPos pos) {
+        invokeClient("openDetectorConfigScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
     public static void stopCrossingGateSound(Level level, BlockPos pos) {
         invokeClient("stopCrossingGateSound", new Class<?>[]{Level.class, BlockPos.class}, level, pos);
     }

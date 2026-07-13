@@ -46,8 +46,10 @@ public class RealTrainModUnofficial {
                 //(本家は通常マーカーが8方位対応のため斜めバリアント不要)
                 output.accept(RealTrainModUnofficialItems.MARKER_SWITCH_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.LIGHT_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.SIGNBOARD_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.INSULATOR_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.TRAIN_DETECTOR_ITEM.get());
                 //架線柱 はユーザー要望で削除 (NGTO Builder 等で代替。登録は既存ワールド互換のため残置)
                 output.accept(RealTrainModUnofficialItems.TICKET_GATE_ITEM.get());
                 //入力コネクタ/出力コネクタ/信号変換器 はユーザー要望で削除

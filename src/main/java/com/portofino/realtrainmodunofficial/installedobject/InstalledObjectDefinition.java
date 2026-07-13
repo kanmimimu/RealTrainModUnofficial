@@ -32,6 +32,34 @@ public class InstalledObjectDefinition {
     // ワイヤー用パラメータ(WireConfig 相当)。コンストラクタ後に setWireParams で設定。
     private float sectionLength = 0.5F;
     private float deflectionCoefficient = 0.0F;
+    // 看板用パラメータ(本家 SignboardConfig 相当)。コンストラクタ後に setSignboardParams で設定。
+    // animationCycle: frame を1コマ進めるのに要する tick 数。
+    // color: 板の側面/背面の色 (0 のときは本家既定の 0x101010)。
+    // lightValue: 0以上=常時その明るさ / -16=ランダム点滅 / 負=レッドストーン通電時に -lightValue。
+    private int animationCycle = 1;
+    private int color = 0;
+    private int lightValue = 0;
+
+    public int getAnimationCycle() {
+        return animationCycle;
+    }
+
+    public int getColor() {
+        return color;
+    }
+
+    public int getLightValue() {
+        return lightValue;
+    }
+
+    /**
+     * 本家 SignboardConfig.init() 準拠の既定値補正。
+     */
+    public void setSignboardParams(int animationCycle, int color, int lightValue) {
+        this.animationCycle = animationCycle <= 0 ? 1 : animationCycle;
+        this.color = color < 0 ? 0x101010 : color;
+        this.lightValue = lightValue;
+    }
 
     public float getSectionLength() {
         return sectionLength;

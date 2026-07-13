@@ -33,4 +33,17 @@ public class RealTrainModUnofficialClient {
         VehicleModelPackManager.INSTANCE.initialize(Minecraft.getInstance().getResourceManager());
         PackRequirementWarnings.refresh();
     }
+
+    /**
+     * ワールドを抜けたら看板まわりのキャッシュを捨てる。
+     * <p>
+     * 看板の文字は OS フォントを焼いた GL テクスチャなので、放っておくとワールドを
+     * 出入りするたびに溜まっていく。時刻表も破棄して、ユーザーが
+     * config/realtrainmodunofficial/timetable/ に置いた tt_*.csv を再入場で拾えるようにする。
+     */
+    @SubscribeEvent
+    static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
+        com.portofino.realtrainmodunofficial.client.signboard.FontImage.clearCache();
+        com.portofino.realtrainmodunofficial.client.signboard.tt.TimeTableManager.INSTANCE.invalidate();
+    }
 }

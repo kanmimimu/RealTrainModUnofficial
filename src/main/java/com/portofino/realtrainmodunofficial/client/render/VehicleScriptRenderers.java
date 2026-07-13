@@ -17,7 +17,9 @@ import jp.ngt.ngtlib.renderer.model.PolygonModel;
 import jp.ngt.ngtlib.renderer.model.TextureSet;
 import jp.ngt.ngtlib.renderer.model.Vertex;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
+import jp.ngt.rtm.entity.train.util.TrainState;
 import jp.ngt.rtm.render.ModelObject;
+import jp.ngt.rtm.render.RenderPass;
 import jp.ngt.rtm.render.VehiclePartsRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -169,32 +171,104 @@ public final class VehicleScriptRenderers {
         public boolean render(Object entity, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel bodyModel) {
+            //本家 RenderVehicleBase.doRender: 通常描画 (RenderPass.NORMAL) → 発光描画 (renderBodyLight)
+            GLRecorder normal = record(entity, RenderPass.NORMAL.id, partialTick);
+            if (normal == null || normal.isEmpty()) {
+                return false;
+            }
+            PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
+            replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
+                    RenderPass.NORMAL.id);
+            renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
+                    bodyModel, graph);
+            return true;
+        }
+
+        /**
+         * 本家 {@code RenderVehicleBase.renderBodyLight} の忠実移植。
+         * <pre>
+         *   dir         = 進行方向 (0:前 / 1:後)
+         *   mode        = ライト状態 (0:消灯 / 1:前照灯 / 2:前照灯+尾灯)
+         *   isFrontEmpty = 進行方向側に連結相手がいない (= 先頭車)
+         *   isBackEmpty  = 逆側に連結相手がいない       (= 最後尾車)
+         *
+         *   i=0 (LIGHT       / _light0) : mode == 0 || mode == 1
+         *   i=1 (LIGHT_FRONT / _light1) : (mode == 1 && isFrontEmpty)                  || mode == 2
+         *   i=2 (LIGHT_BACK  / _light2) : (mode == 1 && !isFrontEmpty && isBackEmpty)  || mode == 2
+         * </pre>
+         * 先頭車だけが前照灯、最後尾車だけが尾灯、中間車はどちらも点かない。
+         */
+        private void renderBodyLight(Object entity, float partialTick, PoseStack poseStack,
+                                     MultiBufferSource buffer, int packedLight, int packedOverlay,
+                                     MqoModelLoader.MqoModel bodyModel, PolygonModel graph) {
+            if (!(entity instanceof EntityTrainBase train)) {
+                return;
+            }
+            //発光 (Light) マテリアルを 1 つも持たないパックは発光パス自体が無意味。
+            //点灯/消灯を別ジオメトリで持つ旧式パックはここに来ない。
+            if (bodyModel == null || !bodyModel.hasEmissiveBatches()) {
+                return;
+            }
+            int dir = train.getTrainDirection();
+            int mode = train.getTrainStateData(TrainState.TrainStateType.State_Light.id);
+            boolean frontEmpty = train.getConnectedTrain(dir) == null;
+            boolean backEmpty = train.getConnectedTrain(1 - dir) == null;
+
+            for (int i = 0; i < 3; i++) {
+                boolean doRender = switch (i) {
+                    case 0 -> mode == 0 || mode == 1;
+                    case 1 -> (mode == 1 && frontEmpty) || mode == 2;
+                    default -> (mode == 1 && !frontEmpty && backEmpty) || mode == 2;
+                };
+                if (!doRender) {
+                    continue;
+                }
+                int pass = RenderPass.LIGHT.id + i;
+                GLRecorder rec = record(entity, pass, partialTick);
+                if (rec == null || rec.isEmpty()) {
+                    continue;
+                }
+                replay(rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, pass);
+            }
+        }
+
+        /** スクリプトの render(entity, pass, partialTick) を 1 パスぶん記録する。 */
+        private GLRecorder record(Object entity, int pass, float partialTick) {
             GLRecorder rec = new GLRecorder();
             GLRecorder.activate(rec);
             try {
                 this.renderer.currentMatId = 0;
-                this.renderer.render(entity, 0, partialTick);
+                this.renderer.currentPass = pass;
+                this.renderer.render(entity, pass, partialTick);
             } catch (Throwable t) {
                 if (!this.warnedRenderFail) {
                     this.warnedRenderFail = true;
                     RealTrainModUnofficial.LOGGER.warn("Vehicle script render failed", t);
                 }
+                return null;
             } finally {
+                this.renderer.currentPass = 0;
                 GLRecorder.deactivate();
             }
-            if (rec.isEmpty()) {
-                return false;
-            }
-            replay(rec, poseStack, buffer, packedLight, packedOverlay, bodyModel,
-                    this.modelObject != null ? this.modelObject.model : null);
-            return true;
+            return rec;
         }
     }
 
+    static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
+                       int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
+                       PolygonModel bodyGraph) {
+        replay(rec, poseStack, buffer, packedLight, packedOverlay, model, bodyGraph, RenderPass.NORMAL.id);
+    }
+
+    /**
+     * @param legacyPass 本家 RenderPass の id。2 以上 (LIGHT/LIGHT_FRONT/LIGHT_BACK) のとき、
+     *                   スクリプトが描いたグループを ***_light0/1/2.png に差し替えて重ねる
+     *                   (本家 ModelObject.renderWithTexture と同じ)。
+     */
     @SuppressWarnings("unchecked")
     static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                                int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
-                               PolygonModel bodyGraph) {
+                               PolygonModel bodyGraph, int legacyPass) {
         int light = packedLight;
         ResourceLocation overrideTex = null;
         //スクリプトの glColor4f (発光オーバーレイの強度等に使用)
@@ -237,6 +311,11 @@ public final class VehicleScriptRenderers {
                                 drawModelGroup(bodyGraph, String.valueOf(name), poseStack, buffer,
                                         light, packedOverlay, overrideTex, colR, colG, colB, colA);
                             }
+                        } else if (model != null && legacyPass >= RenderPass.LIGHT.id) {
+                            //発光パス: Light マテリアルの面だけを ***_light0/1/2.png で描き直す
+                            //(本家 ModelObject.renderWithTexture と同じ。グループ名は見ない)
+                            model.renderNamedGroupsEmissive(poseStack, buffer, light, packedOverlay,
+                                    (Set<String>) names, legacyPass);
                         } else if (model != null) {
                             //translucent=false は全バッチ描画 (renderSelectedBatches のフィルタ仕様)
                             model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);

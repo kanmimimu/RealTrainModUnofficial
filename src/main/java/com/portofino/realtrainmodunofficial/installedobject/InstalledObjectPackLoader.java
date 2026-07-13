@@ -69,6 +69,11 @@ public final class InstalledObjectPackLoader {
         long connectors = LOADED.stream().filter(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT
                 || d.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT).count();
         RealTrainModUnofficial.LOGGER.info("Loaded {} installed object definition(s) ({} connectors)", LOADED.size(), connectors);
+        //カテゴリ別の内訳。「看板の選択画面が空」等の切り分けがログだけでできるようにしておく。
+        java.util.Map<InstalledObjectCategory, Long> byCategory = LOADED.stream()
+                .collect(java.util.stream.Collectors.groupingBy(InstalledObjectDefinition::getCategory,
+                        java.util.stream.Collectors.counting()));
+        RealTrainModUnofficial.LOGGER.info("  by category: {}", byCategory);
     }
 
     private static void loadFromModJar() {
@@ -378,8 +383,12 @@ public final class InstalledObjectPackLoader {
         String name = file.replace(".json", "");
         String id = InstalledObjectCategory.SIGNBOARD.name().toLowerCase(Locale.ROOT) + ":" + packName + ":" + name;
         int frame = (int) getDouble(obj, "frame", 1.0);
-        int backTexture = (int) getDouble(obj, "backTexture", 1.0);
-        LOADED.add(new InstalledObjectDefinition(
+        //本家 SignboardConfig.backTexture は初期化子が無く init() でも補正されないので、
+        //キーが無いときの既定は 0 (= 表と同じテクスチャを裏にも貼る)。1 にすると
+        //backTexture を書いていない設定 (ngt_b01/b02/b03/c01/test01) でテクスチャが
+        //左半分だけ引き伸ばされてしまう。
+        int backTexture = (int) getDouble(obj, "backTexture", 0.0);
+        InstalledObjectDefinition def = new InstalledObjectDefinition(
             id,
             name,
             packName,
@@ -401,7 +410,14 @@ public final class InstalledObjectPackLoader {
             Vec3.ZERO,
             frame,
             backTexture
-        ));
+        );
+        //本家 SignboardConfig: アニメ周期 / 板の側面色 / 発光量。
+        def.setSignboardParams(
+            (int) getDouble(obj, "animationCycle", 1.0),
+            (int) getDouble(obj, "color", 0.0),
+            (int) getDouble(obj, "lightValue", 0.0)
+        );
+        LOADED.add(def);
     }
 
     private static String normalizeSignboardTexture(String texture) {
@@ -492,6 +508,12 @@ public final class InstalledObjectPackLoader {
         }
         if (containsAny(hay, "signboard", "sign_board", "billboard", "看板")) {
             return InstalledObjectCategory.SIGNBOARD;
+        }
+        //本家 列車検知器: ModelMachine_TrainDetector_01.json の machineType は "Antenna_Receive"。
+        //(送信側 "Antenna_Send" = ATC 地上子は未移植なので、従来どおり汎用 ModelMachine 扱いのまま)
+        //照明の受け皿より先に判定しないと、検知器が照明カテゴリに落ちて選択に出てこない。
+        if (containsAny(hay, "antenna_receive", "traindetector", "train_detector", "列車検知", "電車検知")) {
+            return InstalledObjectCategory.TRAIN_DETECTOR;
         }
         // 照明系(明確なキーワードを持つものだけ)。これで照明カテゴリが何でも箱にならない。
         if (containsAny(hay, "light", "lamp", "lantern", "照明", "ライト", "beacon")) {

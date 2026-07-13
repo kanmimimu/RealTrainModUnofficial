@@ -53,12 +53,16 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     }
 
     // 照明カテゴリかつレッドストーンで点灯中のときブロック光源レベル15を返す。
+    // 看板は本家 BlockSignBoard.getLightValue 準拠 (設定の lightValue による)。
     @Override
     public int getLightEmission(BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos) {
-        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
-            && be.getCategory() == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.LIGHT
-            && be.isPowered()) {
-            return 15;
+        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
+            if (be.getCategory() == InstalledObjectCategory.LIGHT && be.isPowered()) {
+                return 15;
+            }
+            if (be.getCategory() == InstalledObjectCategory.SIGNBOARD) {
+                return be.getSignboardLightEmission();
+            }
         }
         return super.getLightEmission(state, level, pos);
     }
@@ -126,6 +130,22 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be && be.isSpeaker()) {
             if (level.isClientSide) {
                 com.portofino.realtrainmodunofficial.ClientHooks.openSpeakerScreen(pos);
+            }
+            return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
+        }
+        //本家 BlockSignBoard.onBlockActivated: 素手で右クリック → 看板エディタ (GuiSignboard)。
+        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
+            && be.getCategory() == InstalledObjectCategory.SIGNBOARD) {
+            if (level.isClientSide) {
+                com.portofino.realtrainmodunofficial.ClientHooks.openSignboardScreen(pos);
+            }
+            return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
+        }
+        //列車検知器: 素手で右クリック → 出力先の座標と動作(置く/消す)の設定 GUI。
+        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
+            && be.getCategory() == InstalledObjectCategory.TRAIN_DETECTOR) {
+            if (level.isClientSide) {
+                com.portofino.realtrainmodunofficial.ClientHooks.openDetectorConfigScreen(pos);
             }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }

@@ -25,6 +25,21 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
     //クライアントアニメ (本家 updateAnimation が更新、スクリプトが参照)
     public int seatRotation;
+
+    /**
+     * 転換クロスシートの回転量を -1.0 〜 1.0 で返す。
+     * <p>
+     * 本家の描画スクリプトは MC 1.10.2 以前では公開フィールド {@code entity.seatRotation}
+     * (-45 〜 45) を 45 で割って使い、それ以降のバージョンではこのメソッドを呼ぶ
+     * (例: 小田急 30000 形の {@code render_seat})。これが無いと <b>スクリプト側で例外になり、
+     * 座席が回らないどころか以降の描画が丸ごと打ち切られる</b>。
+     * <p>
+     * 値は {@code updateAnimation} が進行方向 ({@code getTrainDirection()}) に向かって
+     * 毎 tick 1 ずつ動かすので、転換は瞬時ではなく滑らかに進む。
+     */
+    public float getSeatRotation() {
+        return (float) this.seatRotation / (float) MAX_SEAT_ROTATION;
+    }
     public int doorMoveL;
     public int doorMoveR;
     public int pantograph_F;

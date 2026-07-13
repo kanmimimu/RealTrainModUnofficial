@@ -74,11 +74,24 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> LIGHT_ITEM = ITEMS.register(
         "light", () -> new InstalledObjectItem(InstalledObjectCategory.LIGHT)
     );
+    // 看板(signboard): 本家RTM の看板アイテム。パックの SignBoard_*.json からテクスチャと
+    // 板のサイズ(width/height/depth)を読み、文字(SignboardText)を貼り付けられる。
+    public static final DeferredItem<InstalledObjectItem> SIGNBOARD_ITEM = ITEMS.register(
+        "signboard", () -> new InstalledObjectItem(InstalledObjectCategory.SIGNBOARD)
+    );
     public static final DeferredItem<InstalledObjectItem> INSULATOR_ITEM = ITEMS.register(
         "insulator", () -> new InstalledObjectItem(InstalledObjectCategory.INSULATOR)
     );
     public static final DeferredItem<InstalledObjectItem> SIGNAL_ITEM = ITEMS.register(
         "signal", () -> new InstalledObjectItem(InstalledObjectCategory.SIGNAL)
+    );
+    // 列車検知器(train_detector): 本家 RTM の列車検知器 (EntityTrainDetector)。
+    // レールの上に置くと、真下のレールに列車が乗っているかを見る。検知したら
+    // 指定座標のレッドストーンブロックを置く/消す (座標と動作は右クリックの GUI で設定)。
+    // ※旧「電車検知ブロック(TrainDetectorBlock)」とは別物。あちらは範囲内の列車を
+    //   AABB で探す独自実装で、アイテムは削除済み。
+    public static final DeferredItem<InstalledObjectItem> TRAIN_DETECTOR_ITEM = ITEMS.register(
+        "train_detector", () -> new InstalledObjectItem(InstalledObjectCategory.TRAIN_DETECTOR)
     );
     public static final DeferredItem<InstalledObjectItem> OVERHEAD_LINE_POLE_ITEM = ITEMS.register(
         "overhead_line_pole", () -> new InstalledObjectItem(InstalledObjectCategory.OVERHEAD_LINE_POLE)

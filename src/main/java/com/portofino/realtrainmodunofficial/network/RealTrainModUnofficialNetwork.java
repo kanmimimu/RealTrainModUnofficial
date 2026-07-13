@@ -35,5 +35,9 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(SignalControllerPayload.TYPE, SignalControllerPayload.STREAM_CODEC, SignalControllerPayload::handleOnServer);
         //本家 GuiChangeOffset (設置物の微調整)
         registrar.playToServer(ChangeOffsetPayload.TYPE, ChangeOffsetPayload.STREAM_CODEC, ChangeOffsetPayload::handleOnServer);
+        //本家 GuiSignboard (看板の文字)
+        registrar.playToServer(SaveSignboardPayload.TYPE, SaveSignboardPayload.STREAM_CODEC, SaveSignboardPayload::handleOnServer);
+        //本家 列車検知器 (出力先の座標と 置く/消す)
+        registrar.playToServer(ConfigureDetectorPayload.TYPE, ConfigureDetectorPayload.STREAM_CODEC, ConfigureDetectorPayload::handleOnServer);
     }
 }

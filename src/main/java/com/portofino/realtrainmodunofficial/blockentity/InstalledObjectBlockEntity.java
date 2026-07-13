@@ -7,17 +7,25 @@ import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCateg
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
 import com.portofino.realtrainmodunofficial.signal.SignalAspect;
 import com.portofino.realtrainmodunofficial.signal.SignalNetworkSavedData;
+import com.portofino.realtrainmodunofficial.signboard.SignboardText;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class InstalledObjectBlockEntity extends BlockEntity {
@@ -27,7 +35,11 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     private String category = InstalledObjectCategory.LIGHT.name();
     private float yaw;
     // 壁(横面)挿し時に碍子を横倒しにするためのピッチ(度)。0=通常(縦置き)。
+    // 列車検知器ではレールの勾配に使う (レンダラでは yaw の後 = モデル局所のX回転)。
     private float mountPitch;
+    // yaw の後に掛けるロール(度)。列車検知器をレールのカント(横傾き)に合わせるために使う。
+    // 0 が既定なので、これを使わない設置物の見た目は変わらない。
+    private float mountRoll;
     // 本家 meta 相当のクリック面 (0-5)。-1 = 旧方式
     private int mountFace = -1;
     // 本家 TileEntityPlaceable の微調整 (GuiChangeOffset): 追加回転とスケール。
@@ -54,6 +66,60 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     private int speakerRange = 32;
     private final Map<String, String> scriptData = new HashMap<>();
 
+    // ---- 看板 (本家 TileEntitySignBoard / ResourceStateSignboard) ----
+    /**
+     * 板に貼り付けた文字。看板エディタ (SignboardScreen) で編集する。
+     */
+    private final List<SignboardText> signTexts = new ArrayList<>();
+    /**
+     * 時刻表の参照設定。本家形式 "tt=<file>,station=<駅名>,track=<番線>"。
+     */
+    private String signTtSetting = DEFAULT_TT_SETTING;
+    /**
+     * 本家 direction (0-3)。設置時のプレイヤー向きで、板の面が向く方角を決める。
+     */
+    private byte signDirection;
+    /**
+     * クライアント: フレームアニメ用カウンタ (frame * animationCycle で1周)。
+     */
+    private int signCounter;
+    /**
+     * サーバー: lightValue == -16 (ランダム点滅) 用の現在の明るさ。保存も同期もしない
+     * (明るさ自体はライトエンジン経由でクライアントへ届く)。
+     */
+    private int signFlicker;
+    /**
+     * サーバー: 最後にライトエンジンへ渡した明るさ。保存しないので、BE が作り直された
+     * 最初の tick では必ず -1 になり、設置直後やチャンク再読込でも必ず一度は再計算される。
+     */
+    private int signLastLight = -1;
+
+    // ---- 列車検知器 (本家 EntityTrainDetector) ----
+    /**
+     * 検知したときにレッドストーンブロックを置く/消す座標。未設定なら null (何もしない)。
+     */
+    private BlockPos detectorTarget;
+    /**
+     * true  = 列車を検知したら「置く」 (居なくなったら消す)
+     * false = 列車を検知したら「消す」 (居なくなったら置く)
+     */
+    private boolean detectorPlaceOnDetect = true;
+    /**
+     * 真下のレールに列車が乗っているか。クライアントにも同期して GUI に出す。
+     */
+    private boolean detectorTrainOnRail;
+
+    private static final String DEFAULT_TT_SETTING = "tt=tt_sample.csv,station=西京,track=-1";
+    private static final RandomSource SIGN_RANDOM = RandomSource.create();
+    /**
+     * 本家 EntityTrainDetector: 自分の位置から真下に最大 8 ブロックまでレールを探す。
+     */
+    private static final int DETECTOR_RAIL_SEARCH_DEPTH = 8;
+    /**
+     * 検知の間隔(tick)。毎tickでなくても列車の検知には十分。
+     */
+    private static final int DETECTOR_INTERVAL = 5;
+
     public InstalledObjectBlockEntity(BlockPos pos, BlockState blockState) {
         super(RealTrainModUnofficialBlockEntities.INSTALLED_OBJECT.get(), pos, blockState);
     }
@@ -65,6 +131,7 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         tag.putString("Category", category);
         tag.putFloat("Yaw", yaw);
         tag.putFloat("MountPitch", mountPitch);
+        tag.putFloat("MountRoll", mountRoll);
         tag.putInt("MountFace", mountFace);
         tag.putFloat("AdjustRoll", adjustRoll);
         tag.putFloat("AdjustPitch", adjustPitch);
@@ -96,6 +163,24 @@ public class InstalledObjectBlockEntity extends BlockEntity {
             scriptData.forEach(scriptDataTag::putString);
             tag.put("ScriptData", scriptDataTag);
         }
+        //看板: 本家 ResourceStateSignboard と同じキー名なので、本家ワールドのデータも読める。
+        if (!signTexts.isEmpty()) {
+            ListTag list = new ListTag();
+            for (SignboardText text : signTexts) {
+                list.add(text.save());
+            }
+            tag.put("Texts", list);
+        }
+        tag.putString("TimeTableSetting", signTtSetting);
+        tag.putByte("SignDir", signDirection);
+        //列車検知器
+        if (detectorTarget != null) {
+            tag.putInt("DetectorTargetX", detectorTarget.getX());
+            tag.putInt("DetectorTargetY", detectorTarget.getY());
+            tag.putInt("DetectorTargetZ", detectorTarget.getZ());
+        }
+        tag.putBoolean("DetectorPlaceOnDetect", detectorPlaceOnDetect);
+        tag.putBoolean("DetectorTrainOnRail", detectorTrainOnRail);
     }
 
     @Override
@@ -105,6 +190,7 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         category = tag.contains("Category") ? tag.getString("Category") : InstalledObjectCategory.LIGHT.name();
         yaw = tag.getFloat("Yaw");
         mountPitch = tag.getFloat("MountPitch");
+        mountRoll = tag.getFloat("MountRoll");
         mountFace = tag.contains("MountFace") ? tag.getInt("MountFace") : -1;
         adjustRoll = tag.getFloat("AdjustRoll");
         adjustPitch = tag.getFloat("AdjustPitch");
@@ -135,6 +221,22 @@ public class InstalledObjectBlockEntity extends BlockEntity {
                 scriptData.put(key, scriptDataTag.getString(key));
             }
         }
+        //看板
+        signTexts.clear();
+        if (tag.contains("Texts")) {
+            ListTag list = tag.getList("Texts", Tag.TAG_COMPOUND);
+            for (int i = 0; i < list.size(); i++) {
+                signTexts.add(SignboardText.load(list.getCompound(i)));
+            }
+        }
+        signTtSetting = tag.contains("TimeTableSetting") ? tag.getString("TimeTableSetting") : DEFAULT_TT_SETTING;
+        signDirection = tag.getByte("SignDir");
+        //列車検知器
+        detectorTarget = tag.contains("DetectorTargetX")
+                ? new BlockPos(tag.getInt("DetectorTargetX"), tag.getInt("DetectorTargetY"), tag.getInt("DetectorTargetZ"))
+                : null;
+        detectorPlaceOnDetect = !tag.contains("DetectorPlaceOnDetect") || tag.getBoolean("DetectorPlaceOnDetect");
+        detectorTrainOnRail = tag.getBoolean("DetectorTrainOnRail");
     }
 
     @Override
@@ -179,6 +281,18 @@ public class InstalledObjectBlockEntity extends BlockEntity {
 
     public void setMountPitch(float mountPitch) {
         this.mountPitch = mountPitch;
+        setChanged();
+    }
+
+    /**
+     * yaw の後に掛けるロール(度)。列車検知器のカント用。
+     */
+    public float getMountRoll() {
+        return mountRoll;
+    }
+
+    public void setMountRoll(float mountRoll) {
+        this.mountRoll = mountRoll;
         setChanged();
     }
 
@@ -307,6 +421,157 @@ public class InstalledObjectBlockEntity extends BlockEntity {
 
     public boolean isPowered() {
         return powered;
+    }
+
+    // ---- 看板 ----
+
+    /**
+     * 板に貼られている文字。描画側から触るので変更不可で返す。
+     */
+    public List<SignboardText> getSignTexts() {
+        return Collections.unmodifiableList(signTexts);
+    }
+
+    public String getSignTtSetting() {
+        return signTtSetting;
+    }
+
+    /**
+     * 看板エディタ (SignboardScreen) の保存。サーバー側で呼ばれる。
+     */
+    public void setSignboardData(List<SignboardText> texts, String ttSetting) {
+        signTexts.clear();
+        if (texts != null) {
+            signTexts.addAll(texts);
+        }
+        signTtSetting = ttSetting == null || ttSetting.isBlank() ? DEFAULT_TT_SETTING : ttSetting;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    /**
+     * 本家 direction (0-3)。板が向く方角。
+     */
+    public byte getSignDirection() {
+        return signDirection;
+    }
+
+    public void setSignDirection(byte direction) {
+        this.signDirection = (byte) (direction & 3);
+        setChanged();
+    }
+
+    /**
+     * クライアント: フレームアニメの現在位置 (0 .. frame*animationCycle-1)。
+     */
+    public int getSignCounter() {
+        return signCounter;
+    }
+
+    /**
+     * 本家 BlockSignBoard.getLightValue の移植。
+     * <ul>
+     *   <li>lightValue &gt;= 0 … 常にその明るさ</li>
+     *   <li>lightValue == -16 … ランダム点滅 (0,3,6,9,12,15)</li>
+     *   <li>lightValue &lt; 0 … レッドストーン通電時に -lightValue</li>
+     * </ul>
+     */
+    public int getSignboardLightEmission() {
+        InstalledObjectDefinition definition = getDefinition();
+        if (definition == null) {
+            return 0;
+        }
+        int value = definition.getLightValue();
+        if (value >= 0) {
+            return Math.min(15, value);
+        }
+        if (value == -16) {
+            return signFlicker;
+        }
+        return powered ? Math.min(15, -value) : 0;
+    }
+
+    // ---- 列車検知器 ----
+
+    /**
+     * 検知時にレッドストーンブロックを操作する座標。未設定なら null。
+     */
+    @javax.annotation.Nullable
+    public BlockPos getDetectorTarget() {
+        return detectorTarget;
+    }
+
+    /**
+     * true = 検知したら「置く」 / false = 検知したら「消す」。
+     */
+    public boolean isDetectorPlaceOnDetect() {
+        return detectorPlaceOnDetect;
+    }
+
+    /**
+     * 真下のレールに列車が乗っているか (GUI 表示用)。
+     */
+    public boolean isDetectorTrainOnRail() {
+        return detectorTrainOnRail;
+    }
+
+    /**
+     * 検知器の設定 (GUI から)。サーバー側で呼ばれる。
+     */
+    public void configureDetector(@javax.annotation.Nullable BlockPos target, boolean placeOnDetect) {
+        this.detectorTarget = target == null ? null : target.immutable();
+        this.detectorPlaceOnDetect = placeOnDetect;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            //設定を変えた瞬間に対象ブロックを今の在線状態に合わせる。
+            applyDetectorOutput(level, detectorTrainOnRail);
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    /**
+     * 本家 EntityTrainDetector 準拠: 自分の真下 8 ブロック以内で最初に見つかったレールの
+     * 在線状態を返す。レールが無ければ false。
+     */
+    private static boolean detectTrainOnRailBelow(Level level, BlockPos pos) {
+        for (int i = 0; i < DETECTOR_RAIL_SEARCH_DEPTH; i++) {
+            BlockPos p = pos.below(i);
+            if (!level.isLoaded(p)) {
+                continue;
+            }
+            if (level.getBlockEntity(p) instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase rail) {
+                return rail.isTrainOnRail();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 検知結果を対象座標のレッドストーンブロックに反映する。
+     * <p>
+     * <b>建築物を壊さないため、置くのは対象が空気のときだけ・消すのは対象がレッドストーン
+     * ブロックのときだけ</b>にしてある。それ以外のブロックには一切触れない。
+     * <p>
+     * 毎回「あるべき状態」と突き合わせるので、チャンクを読み直した後やプレイヤーが手で
+     * 壊した後でも自動で復旧する。
+     */
+    private void applyDetectorOutput(Level level, boolean detected) {
+        BlockPos target = detectorTarget;
+        if (target == null || level.isClientSide || !level.isLoaded(target)) {
+            return;
+        }
+        //置くモード: 検知中 = レッドストーンブロックあり / 消すモード: 検知中 = なし
+        boolean wantRedstone = detected == detectorPlaceOnDetect;
+        BlockState current = level.getBlockState(target);
+        if (wantRedstone) {
+            if (current.isAir()) {
+                level.setBlockAndUpdate(target, Blocks.REDSTONE_BLOCK.defaultBlockState());
+            }
+        } else if (current.is(Blocks.REDSTONE_BLOCK)) {
+            level.setBlockAndUpdate(target, Blocks.AIR.defaultBlockState());
+        }
     }
 
     public int getBarMoveCount() {
@@ -531,6 +796,12 @@ public class InstalledObjectBlockEntity extends BlockEntity {
 
     public static void tick(Level level, BlockPos pos, BlockState state, InstalledObjectBlockEntity be) {
         if (level.isClientSide) {
+            //看板: 本家 TileEntitySignBoard.update — フレームアニメを進める。
+            if (be.getCategory() == InstalledObjectCategory.SIGNBOARD) {
+                InstalledObjectDefinition signDef = be.getDefinition();
+                int period = signDef == null ? 1 : Math.max(1, signDef.getSignFrame() * signDef.getAnimationCycle());
+                be.signCounter = (be.signCounter + 1) % period;
+            }
             // sound_Running を持つ設置オブジェクト(スピーカー/サイレン/踏切など)は種別を問わず、
             // powered の間ループ再生する。実際の再生可否(powered・音名)は CrossingGateSoundManager 側で判定。
             InstalledObjectDefinition definition = be.getDefinition();
@@ -540,6 +811,50 @@ public class InstalledObjectBlockEntity extends BlockEntity {
             } else {
                 ClientHooks.stopCrossingGateSound(level, pos);
             }
+            return;
+        }
+        //看板: 本家 TileEntitySignBoard.update — レッドストーン状態とランダム点滅を更新し、
+        //明るさが変わったらライトエンジンに再計算させる。
+        //
+        //設置直後は setBlock の時点でまだ BE が空 (definitionId 未設定) なので、
+        //そのままだと明るさ 0 がチャンクに焼き付いてしまう。ここで「最後に出した明るさ」と
+        //比較しておくと、設置直後・チャンク再読込・テクスチャ変更のいずれでも拾える
+        //(signLastLight は保存しないので、BE が作られた最初の tick では必ず不一致になる)。
+        if (be.getCategory() == InstalledObjectCategory.SIGNBOARD) {
+            InstalledObjectDefinition signDef = be.getDefinition();
+            int lightValue = signDef == null ? 0 : signDef.getLightValue();
+            boolean redstone = level.getBestNeighborSignal(pos) > 0;
+            if (be.powered != redstone) {
+                be.powered = redstone;
+                be.setChanged();
+            }
+            if (lightValue == -16) {
+                //本家: ランダム点滅 (0,3,6,9,12,15)
+                be.signFlicker = SIGN_RANDOM.nextInt(6) * 3;
+            }
+            int light = be.getSignboardLightEmission();
+            if (light != be.signLastLight) {
+                be.signLastLight = light;
+                level.getLightEngine().checkBlock(pos);
+            }
+            return;
+        }
+        //列車検知器: 本家 EntityTrainDetector — 真下のレールの在線を見る。
+        //本家は配線網へ STOP/PROCEED を流していたが、RTMU の配線は信号機に届かないので、
+        //代わりに「指定座標のレッドストーンブロックを置く/消す」で出力する
+        //(座標と動作は右クリックの GUI で設定)。
+        if (be.getCategory() == InstalledObjectCategory.TRAIN_DETECTOR) {
+            if ((level.getGameTime() + pos.asLong()) % DETECTOR_INTERVAL != 0L) {
+                return;
+            }
+            boolean onRail = detectTrainOnRailBelow(level, pos);
+            if (be.detectorTrainOnRail != onRail) {
+                be.detectorTrainOnRail = onRail;
+                be.setChanged();
+                level.sendBlockUpdated(pos, state, state, 3);
+            }
+            //毎回「あるべき状態」に合わせる (壊された/チャンクを読み直した場合も復旧する)
+            be.applyDetectorOutput(level, onRail);
             return;
         }
         //本家 electric: 入力コネクタ = レッドストーンを監視して配線網へ伝播

@@ -1,12 +1,12 @@
 {
-  "trainName": "E257_03",
-  "displayName": "E257系0番台 3号車 クハ257-100",
+  "trainName": "E257_01",
+  "displayName": "E257系0番台 1号車 クハ257-0",
   "trainModel2": {
     "modelFile": "E257.mqo",
-    "rendererPath": "../scripts/train_E257.js",
+    "rendererPath": "scripts/train_E257.js",
     "smoothing": true,
     "textures": [
-      ["mat1", "textures/mat1_03.png", "AlphaBlend"],
+      ["mat1", "textures/mat1_01.png", "AlphaBlend"],
       ["mat2", "textures/mat2_0.png", "Light", "textures/mat2_0_light0.png", "textures/mat2_0_light1.png", "textures/mat2_0_light2.png"],
       ["mat3", "textures/mat3.png", "Light", "textures/mat3_light0.png", "textures/mat3_light1.png", "textures/mat3_light2.png"]
     ],

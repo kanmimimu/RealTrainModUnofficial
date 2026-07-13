@@ -3,7 +3,7 @@
   "displayName": "E257系0番台 11号車 クハ256-0",
   "trainModel2": {
     "modelFile": "E257.mqo",
-    "rendererPath": "../scripts/train_E257.js",
+    "rendererPath": "scripts/train_E257.js",
     "smoothing": true,
     "textures": [
       ["mat1", "textures/mat1_11.png", "AlphaBlend"],

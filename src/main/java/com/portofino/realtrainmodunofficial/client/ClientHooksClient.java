@@ -97,6 +97,22 @@ public final class ClientHooksClient {
             new com.portofino.realtrainmodunofficial.client.screen.SpeakerScreen(pos));
     }
 
+    public static void openSignboardScreen(BlockPos pos) {
+        if (Minecraft.getInstance().level != null
+            && Minecraft.getInstance().level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
+            Minecraft.getInstance().setScreen(
+                new com.portofino.realtrainmodunofficial.client.screen.SignboardScreen(be));
+        }
+    }
+
+    public static void openDetectorConfigScreen(BlockPos pos) {
+        if (Minecraft.getInstance().level != null
+            && Minecraft.getInstance().level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
+            Minecraft.getInstance().setScreen(
+                new com.portofino.realtrainmodunofficial.client.screen.TrainDetectorConfigScreen(be));
+        }
+    }
+
     public static void openScriptBlockScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(new ScriptBlockScreen(pos));
     }

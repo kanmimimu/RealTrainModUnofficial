@@ -122,9 +122,15 @@ public abstract class RailMap {
             double z = point[0];
             double slope = Math.toRadians(this.getRailYaw(split, j));
             double height = this.getRailHeight(split, j);
-            //Remaster 調整: 本家は (int)height だが、道床ブロックをレール面の1ブロック下に
-            //埋めて敷く (地形をトリミングし、当たり判定の天面がレール面に一致する)。
-            int y = (int) height - 1;
+            //本家 RailMap.createRailList と同じく「レール面のあるブロック」に置く。
+            //
+            //以前は -1 して1ブロック下に埋めていたが、当たり判定の高さは
+            //  BlockLargeRailBase.getRailShape → TileEntityLargeRailBase.getBlockHeights
+            //  = (レール面Y − ブロックY)
+            //で決まるため、ブロックを1つ下げるとその分だけ箱が丸ごと1ブロック高くなる。
+            //平坦なレールでは地面を食うので気付きにくいが、坂ではブロック境界をまたぐ列で
+            //2ブロック近い高さの箱になり、「坂の当たり判定がブロック」になっていた。
+            int y = (int) height;
             int x0 = Mth.floor(x);
             int z0 = Mth.floor(z);
 
@@ -298,8 +304,10 @@ public abstract class RailMap {
         this.createRailList(prop);
         boolean flag = true;
         for (int[] rail : this.rails) {
-            //道床は地面に埋めるため、障害物判定はレール面 (ベッド行の1つ上) で行う
-            BlockPos pos = new BlockPos(rail[0], rail[1] + 1, rail[2]);
+            //本家 canPlaceRail と同じく、レールブロックを置く位置そのもので障害物を見る。
+            //(以前はレールブロックを1つ下に埋めていたので +1 してレール面を見ていた。
+            // createRailList を本家準拠 (= レール面のブロックに置く) に戻したので +1 は不要)
+            BlockPos pos = new BlockPos(rail[0], rail[1], rail[2]);
             BlockState state = world.getBlockState(pos);
             Block block = state.getBlock();
             boolean b0 = state.isAir()

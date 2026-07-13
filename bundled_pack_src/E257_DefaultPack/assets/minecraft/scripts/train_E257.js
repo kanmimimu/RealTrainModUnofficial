@@ -3,8 +3,30 @@
 //グループ規則は同梱の編成表/メモに従う (末尾[obj]=グループ空オブジェクト、中身は グループ名_***)。
 var renderClass = "jp.ngt.rtm.render.VehiclePartsRenderer";
 
+//GL11: 本家(1.12.2)は LWJGL を import して使う。RTMU(1.21) はスクリプト環境が先に
+//GL11 = GL11Facade を束縛しており、importPackage は未定義名しか束縛しないので上書きされない。
+//=> この 1 行で両対応になる。
+importPackage(Packages.org.lwjgl.opengl);
+
 var PartsClass = Java.type("jp.ngt.rtm.render.Parts");
-var RLClass = Java.type("jp.ngt.mccompat.ResourceLocation");
+
+//発光まわり (室内灯のフルブライト) は本家に renderer.setBrightness/enableLighting が無いので、
+//両方に存在する GLHelper へ逃がす。前照灯/尾灯は MOD 側の発光パスが描くので
+//スクリプトからテクスチャを貼る必要はない (貼ると自動発光が無効化される)。
+var GLHelperClass = null;
+try { GLHelperClass = Java.type("jp.ngt.ngtlib.renderer.GLHelper"); } catch (e3) {}
+
+/** 自己発光 (フルブライト) にする */
+function setFullBright() {
+    try { renderer.setBrightness(FULLBRIGHT); return; } catch (err) {}
+    try { if (GLHelperClass != null) GLHelperClass.setLightmapMaxBrightness(); } catch (err2) {}
+}
+
+/** 環境光へ戻す (RTMU の GLHelper.enableLighting は no-op なので renderer 側を優先) */
+function restoreLight() {
+    try { renderer.enableLighting(); return; } catch (err) {}
+    try { if (GLHelperClass != null) GLHelperClass.enableLighting(); } catch (err2) {}
+}
 
 //号車ごとの構成定義 (1/3/4/6/11号車のみ)
 //prefixes: この前置詞で始まるオブジェクトを表示
@@ -108,14 +130,12 @@ var leverParts = {};
 var notchParts = {};
 //パンタ可動 Parts (PANTA 構造に対応)
 var pantaParts = null;
-//前照灯/尾灯の発光オーバーレイテクスチャ (透明地に光っている部分のみ)
-var headLightTex = new RLClass("minecraft", "textures/mat2_0_light1.png");
-var tailLightTex = new RLClass("minecraft", "textures/mat2_0_light2.png");
-//室内灯が点いた状態の内装テクスチャ (加算発光用)
-var interiorGlowTex = new RLClass("minecraft", "textures/mat2_0_light0.png");
-var NGTUtilClientClass = Java.type("jp.ngt.ngtlib.util.NGTUtilClient");
-var headLightParts = null;
-var tailLightParts = null;
+
+function clamp(v, min, max) {
+    if (v < min) return min;
+    if (v > max) return max;
+    return v;
+}
 
 function toParts(list) {
     return renderer.registerParts(new PartsClass(Java.to(list, "java.lang.String[]")));
@@ -130,9 +150,22 @@ function buildPantaParts(node) {
     };
 }
 
+//名前でグループを探す。
+//本家の PolygonModel には getGroupObject(String) が無く groupObjects (List) しか無いので、
+//両対応のためリストから線形に探す。
+function findGroup(model, name) {
+    var groups = model.groupObjects;
+    if (groups == null) return null;
+    for (var i = 0; i < groups.size(); i++) {
+        var g = groups.get(i);
+        if (g != null && g.name == name) return g;
+    }
+    return null;
+}
+
 //グループの頂点 X 中心 (座席の回転ピボット確定用)
 function groupCenterX(model, name) {
-    var g = model.getGroupObject(name);
+    var g = findGroup(model, name);
     if (g == null || g.faces.size() == 0) return null;
     var min = 1.0e9;
     var max = -1.0e9;
@@ -172,6 +205,9 @@ function init(modelSet, modelObj) {
         if (lower.indexOf("[obj]") >= 0) continue;
         if (lower.indexOf("door") == 0 || lower.indexOf("p_seat_") == 0) continue;
         if (lower.indexOf("lever_") == 0 || lower.indexOf("notch_") == 0 || lower.indexOf("brake_") == 0) continue;
+        //※前照灯/尾灯のレンズは本体に含めたままにする。
+        //  消灯時は基本テクスチャの「消えたレンズ」として描かれ、点灯時は MOD 側の発光パスが
+        //  同じ面に light1/light2 を重ねる。本体から外すと消灯時にレンズが穴になる。
 
         var excluded = false;
         for (var e = 0; e < car.excludes.length; e++) {
@@ -246,12 +282,6 @@ function init(modelSet, modelObj) {
     if (car.panta) {
         pantaParts = buildPantaParts(PANTA);
     }
-
-    //前照灯/尾灯 (先頭車のみ)
-    if (car.lightsHead != null) {
-        headLightParts = toParts(car.lightsHead);
-        tailLightParts = toParts(car.lightsTail);
-    }
 }
 
 //本家 BasicVehiclePartsRenderer.renderParts と同じ入れ子変換
@@ -311,7 +341,18 @@ function render(entity, pass, partialTicks) {
     if (dR > 0.0 && lampRParts != null) lampRParts.render(renderer);
 
     //レバーサー (回転方向): 座席の向きにも使う
-    var dir = 1;
+    //
+    //getTrainStateData(10) は「1 - レバーサー値」なので:
+    //   前進 (レバーサー +1) -> 0
+    //   中立 (レバーサー  0) -> 1
+    //   後進 (レバーサー -1) -> 2
+    //以前は 0=中立 / 1=前進 と取り違えていて、前進と中立が入れ替わっていた
+    //(後進=2 だけ偶然合っていた)。
+    var DIR_FORWARD = 0;
+    var DIR_NEUTRAL = 1;
+    var DIR_BACKWARD = 2;
+
+    var dir = DIR_FORWARD;
     var notch = 0;
     var interiorLit = false;
     if (entity != null) {
@@ -324,41 +365,62 @@ function render(entity, pass, partialTicks) {
     }
 
     //内装: 室内灯ON中はフルブライト (車内だけ光る特殊発光)
-    if (interiorLit) renderer.setBrightness(FULLBRIGHT);
+    if (interiorLit) setFullBright();
     interiorParts.render(renderer);
 
     //客席 (memo: 基本座席を z=0 に格納、シートピッチ 0.96 で号車ごとに並べる。
-    //台座 p_seat_base のみ固定、他は回転中心 x±0.8 で転換 — 後進時に180°)
-    var seatYaw = (dir == 2) ? 180.0 : 0.0;
+    //台座 p_seat_base のみ固定、他は回転中心 x±0.8 で転換)
+    //
+    //転換クロスシートは本家 (小田急30000形 render_seat) と同じ方式で回す:
+    //  ・entity.getSeatRotation() は -1 〜 0 〜 1 の連続値で、進行方向が変わると
+    //    毎 tick 少しずつ動く。これを 0 〜 1 に直して 180° に写す。
+    //  ・奇数列と偶数列で位相をずらし (係数 1.739 / 遅延 0.425)、全席が同時に回らず
+    //    波打つように転換する。実車の転換動作に近く、隣の座席と干渉しにくい。
+    //  ・左右は回転方向が逆 (L は +θ、R は -θ)。
+    //  ・回転は「±2θ を 0.05 ずらした 2 つの軸で相殺してから θ」で掛ける。回転量は
+    //    差し引き θ のままだが、軸のずれのぶん座席が横に少し滑る。本家がそうしている
+    //    ので、そのまま踏襲する (転換中に背もたれが隣とめり込まない)。
+    var seatState = 0.0;
+    if (entity != null) {
+        seatState = entity.getSeatRotation();
+    }
+    seatState = (seatState + 1.0) / 2.0;  // -1〜1 → 0〜1
+
+    var seatRotate1 = clamp(seatState * 1.739, 0.0, 1.0) * 180.0;
+    var seatRotate2 = clamp((seatState - 0.425) * 1.739, 0.0, 1.0) * 180.0;
+
     for (var row = 0; row < car.seatRows; row++) {
+        var z = car.seatZ - SEAT_PITCH * row;
+        var a = (row % 2 == 0) ? seatRotate1 : seatRotate2;
+
+        //台座は回らない
         GL11.glPushMatrix();
-        GL11.glTranslatef(0.0, 0.0, car.seatZ - SEAT_PITCH * row);
+        GL11.glTranslatef(0.0, 0.0, z);
         seatBaseL.render(renderer);
         seatBaseR.render(renderer);
-        if (seatYaw != 0.0) {
-            //座席自身の中心 (x=±0.8) を軸に回転: T(pivot)・R・T(-pivot)
-            GL11.glPushMatrix();
-            GL11.glTranslatef(seatPivotL, 0.0, 0.0);
-            GL11.glRotatef(seatYaw, 0.0, 1.0, 0.0);
-            GL11.glTranslatef(-seatPivotL, 0.0, 0.0);
-            seatTopL.render(renderer);
-            GL11.glPopMatrix();
-            GL11.glPushMatrix();
-            GL11.glTranslatef(seatPivotR, 0.0, 0.0);
-            GL11.glRotatef(seatYaw, 0.0, 1.0, 0.0);
-            GL11.glTranslatef(-seatPivotR, 0.0, 0.0);
-            seatTopR.render(renderer);
-            GL11.glPopMatrix();
-        } else {
-            seatTopL.render(renderer);
-            seatTopR.render(renderer);
-        }
+        GL11.glPopMatrix();
+
+        GL11.glPushMatrix();
+        renderer.rotate(a * -2.0, 'Y', seatPivotL - 0.05, 0.0, z);
+        renderer.rotate(a * 2.0, 'Y', seatPivotL, 0.0, z);
+        renderer.rotate(a, 'Y', seatPivotL, 0.0, z);
+        GL11.glTranslatef(0.0, 0.0, z);
+        seatTopL.render(renderer);
+        GL11.glPopMatrix();
+
+        GL11.glPushMatrix();
+        renderer.rotate(a * 2.0, 'Y', seatPivotR + 0.05, 0.0, z);
+        renderer.rotate(a * -2.0, 'Y', seatPivotR, 0.0, z);
+        renderer.rotate(-a, 'Y', seatPivotR, 0.0, z);
+        GL11.glTranslatef(0.0, 0.0, z);
+        seatTopR.render(renderer);
         GL11.glPopMatrix();
     }
 
     //マスコン (レバーサー: getTrainStateData(10)、ノッチ: getNotch())
     if (car.mascon != "none" && entity != null) {
-        var lever = (dir == 0) ? leverParts["n"] : ((dir == 2) ? leverParts["b"] : leverParts["f"]);
+        var lever = (dir == DIR_BACKWARD) ? leverParts["b"]
+                : ((dir == DIR_NEUTRAL) ? leverParts["n"] : leverParts["f"]);
         if (lever != null) lever.render(renderer);
         var notchKey = (notch >= 0) ? ("n" + Math.min(notch, 5)) : ("b" + Math.min(-notch - 1, 8));
         var notchP = notchParts[notchKey];
@@ -366,23 +428,25 @@ function render(entity, pass, partialTicks) {
     }
 
     //内装フルブライト終了 (以降は環境光に戻す)
-    if (interiorLit) renderer.setBrightness(-1);
+    //
+    //setBrightness(-1) は「復帰」ではなく packedLight = -1 (0xFFFFFFFF = 全部最大) を
+    //セットしてしまうので、室内灯ON中はこれ以降 (マスコン/前照灯/パンタ) も
+    //フルブライトのままになっていた。環境光へ戻すのは enableLighting()。
+    if (interiorLit) restoreLight();
 
-    //前照灯/尾灯 (ライトON時): 進行方向が先頭なら前照灯 (白)、逆向きなら尾灯 (赤)
-    if (headLightParts != null && entity != null) {
-        var lightOn = 0;
-        var tdir = 0;
-        try {
-            lightOn = entity.getTrainStateData(5);
-            tdir = entity.getTrainDirection();
-        } catch (err2) {
-        }
-        if (lightOn != 0) {
-            renderer.bindTexture(tdir == 0 ? headLightTex : tailLightTex);
-            ((tdir == 0) ? headLightParts : tailLightParts).render(renderer);
-            renderer.bindTexture(null);
-        }
-    }
+    //前照灯/尾灯は<b>スクリプトでは描かない</b>。
+    //
+    //JSON のマテリアル定義が
+    //    ["mat2", "textures/mat2_0.png", "Light", ***_light0, ***_light1, ***_light2]
+    //のように "Light" 型なので、MOD 側が発光パスで自動的に重ねる:
+    //    pass 2 -> light0 (室内灯) / pass 3 -> light1 (前照灯) / pass 4 -> light2 (尾灯)
+    //light1/light2 は 99% が透明のオーバーレイで、ランプの部分だけが光っている。
+    //
+    //ここで renderer.bindTexture() を使って手動で貼ると、MOD 側の
+    //「スクリプトがテクスチャを貼っていない場合のみ発光テクスチャを使う」条件に引っかかって
+    //自動発光が無効化され、しかもテクスチャ解決に失敗すると真っ白なフォールバックが
+    //貼られてしまう (= 白い塊)。前照灯/尾灯の点灯とヘッド/テールの出し分けは MOD 側
+    //(TrainEntity.getLightMode / getTrainDirection) が判定する。
 
     //パンタグラフ可動 (4/6号車、本家 childParts 方式の入れ子回転)
     if (pantaParts != null) {

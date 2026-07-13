@@ -1776,6 +1776,14 @@ public class TrainScriptSystem {
             return train == null ? 0.0F : train.getSeatRotation();
         }
 
+        /**
+         * 転換クロスシートの向き。0 = 前向き / 1 = 後ろ向き。
+         * プレイヤーが乗り込んだ向きで決まる (本家は進行方向で切り替えていた)。
+         */
+        public float getSeatDirection() {
+            return train == null ? 0.0F : train.getSeatDirection();
+        }
+
         public Object getFormation() {
             return train == null ? null : train.getFormation();
         }
@@ -3808,6 +3816,12 @@ public class TrainScriptSystem {
             if (!(currentEntity instanceof TrainEntity train)) {
                 return packedLight;
             }
+            //pass 3/4 = 前照灯/尾灯の発光パス。ここに来るグループは
+            //filterLegacyScriptEmissiveGroups でランプ系だけに絞られている。
+            //ランプは自己発光なので環境光ではなくフルブライトで描く (夜でも光る)。
+            if (currentPass >= 3) {
+                return 0xF000F0;
+            }
             if (lightmapMaxForced) {
                 return packedLight;
             }
@@ -4009,10 +4023,20 @@ public class TrainScriptSystem {
             }
             String lower = groupName.toLowerCase(Locale.ROOT);
             if (train != null) {
-                // For train vehicles, legacy pass > 1 must not turn exterior body/light
-                // meshes into daylight/fullbright flashes. Interior light is the only
-                // train-wide emissive surface here; headlights and destination signs are
-                // rendered normally in pass 0/1 and should not brighten the shell.
+                //pass 3 = 前照灯 (***_light1.png) / pass 4 = 尾灯 (***_light2.png)。
+                //
+                //本家 (ModelObject.renderWithTexture) はここでグループ名を一切見ない。
+                //発光パスの絞り込みは「マテリアルに Light フラグが付いているか」だけで行い、
+                //Light マテリアルの面を車体ごと light テクスチャで描き直す。何が光るかは
+                //light テクスチャのアルファが決める (ランプ以外は透明)。
+                //RTM のパックはこの前提で作られているので (EXE も E257 も pass > 1 で
+                //body.render() を呼ぶ)、名前でランプだけに絞ると何も描かれなくなる。
+                //どのパスを走らせるかは MqoModelLoader.shouldRenderEmissivePass が
+                //本家 renderBodyLight と同じ条件 (ライト状態 / 先頭車 / 最後尾車) で決める。
+                if (currentPass >= 3) {
+                    return true;
+                }
+                //pass 2 = 室内灯。車体を明るくしないよう内装グループだけ。
                 return interiorOn && isInteriorEmissionGroup(lower);
             }
             if (isLegacyDisplayGroup(lower)) {

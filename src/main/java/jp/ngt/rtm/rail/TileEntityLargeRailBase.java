@@ -34,6 +34,22 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
      */
     private float[] blockHeights;
 
+    /**
+     * 当たり判定をブロック内で何分割するか (N×N のマス目)。
+     * <p>
+     * Minecraft の当たり判定 (VoxelShape) は軸平行な箱しか作れないので、斜面そのものは
+     * 表現できない。1ブロック=1つの平らな箱にすると坂が「1ブロックごとの段差」になるため、
+     * ブロック内を細かく割って階段状に近似する。N=4 なら段差は勾配の 1/4 になり、
+     * プレイヤーの自動ステップ(0.6)より十分小さくなるので実質スロープとして歩ける。
+     */
+    private static final int SHAPE_SPLIT = 4;
+
+    /**
+     * 当たり判定の形状キャッシュ。blockHeights を作り直したら捨てる。
+     * 当たり判定は毎tick何度も引かれるので、毎回 N×N 個の箱を union すると重い。
+     */
+    private net.minecraft.world.phys.shapes.VoxelShape cachedShape;
+
     public TileEntityLargeRailBase(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
     }
@@ -51,6 +67,7 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         this.startPoint[2] = nbt.getInt("spZ");
         //同期/再読込時に高さキャッシュを無効化 (当たり判定が古い値に固着しないように)
         this.blockHeights = null;
+        this.cachedShape = null;
         this.finishSetupBlockBounds = false;
     }
 
@@ -153,6 +170,57 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
     }
 
     /**
+     * 坂に沿った当たり判定。
+     * <p>
+     * 本家は「1ブロック = 4隅の平均高さの平らな箱」1つなので、坂だとブロックごとの段差になる。
+     * ここではブロック内を {@link #SHAPE_SPLIT}×{@link #SHAPE_SPLIT} のマス目に割り、4隅の高さを
+     * 双線形補間してマスごとに箱を積むことで、階段の刻みを勾配の 1/N まで細かくしている
+     * (VoxelShape は軸平行な箱しか作れないので、斜面そのものは表現できない)。
+     * <p>
+     * マス内は「4隅の最大」を採るので、当たり判定がレール面より下がることはない。
+     *
+     * @param thickness 最低の厚み (本家 BlockLargeRailBase.THICKNESS = 1/16)
+     */
+    public net.minecraft.world.phys.shapes.VoxelShape getRailCollisionShape(int x, int y, int z, float thickness) {
+        net.minecraft.world.phys.shapes.VoxelShape shape = this.cachedShape;
+        if (shape != null) {
+            return shape;
+        }
+
+        float[] fa = this.getBlockHeights(x, y, z, thickness, true);
+        shape = net.minecraft.world.phys.shapes.Shapes.empty();
+        for (int i = 0; i < SHAPE_SPLIT; i++) {
+            for (int j = 0; j < SHAPE_SPLIT; j++) {
+                double u0 = (double) i / SHAPE_SPLIT;
+                double u1 = (double) (i + 1) / SHAPE_SPLIT;
+                double v0 = (double) j / SHAPE_SPLIT;
+                double v1 = (double) (j + 1) / SHAPE_SPLIT;
+                double h = Math.max(
+                        Math.max(interpolateHeight(fa, u0, v0), interpolateHeight(fa, u1, v0)),
+                        Math.max(interpolateHeight(fa, u0, v1), interpolateHeight(fa, u1, v1)));
+                if (h < thickness) {
+                    h = thickness;
+                }
+                shape = net.minecraft.world.phys.shapes.Shapes.or(shape,
+                        net.minecraft.world.phys.shapes.Shapes.box(u0, 0.0D, v0, u1, h, v1));
+            }
+        }
+        shape = shape.optimize();
+        this.cachedShape = shape;
+        return shape;
+    }
+
+    /**
+     * 4隅の高さ {xNzP, xPzP, xPzN, xNzN} を双線形補間する。
+     * u: 0=xN, 1=xP / v: 0=zN, 1=zP
+     */
+    private static double interpolateHeight(float[] fa, double u, double v) {
+        double zn = fa[3] + (fa[2] - fa[3]) * u;//zN 側の辺: xN → xP
+        double zp = fa[0] + (fa[1] - fa[0]) * u;//zP 側の辺: xN → xP
+        return zn + (zp - zn) * v;
+    }
+
+    /**
      * {xNzP, xPzP, xPzN, xNzN}
      */
     public float[] getBlockHeights(int x, int y, int z, float defaultHeight, boolean useCache) {
@@ -165,6 +233,7 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
             if (fa != null) {
                 if (useCache) {
                     this.blockHeights = fa;
+                    this.cachedShape = null;
                     if (this.level != null && !this.level.isClientSide) {
                         this.finishSetupBlockBounds = true;
                     }
@@ -179,6 +248,7 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
                 if (fa != null) {
                     if (useCache) {
                         this.blockHeights = fa;
+                        this.cachedShape = null;
                     }
                     return fa;
                 }
