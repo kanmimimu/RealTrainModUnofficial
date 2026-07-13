@@ -60,9 +60,16 @@ public class TrainControlScreen extends Screen {
             addArrowButton(left + 4, top + 52, "<", "noop");
             addButton(left + 28, top + 52, 120, "チャンクロード", "noop", 0);
             addArrowButton(left + 152, top + 52, ">", "noop");
-            addArrowButton(left + 4, top + 76, "<", "prev_destination");
-            addButton(left + 28, top + 76, 120, destinationLabel(), "next_destination", 0);
-            addArrowButton(left + 152, top + 76, ">", "next_destination");
+            //方向幕: 持っていないパックでは null と出して押せなくする
+            if (rollsignCount() == 0) {
+                addArrowButton(left + 4, top + 76, "<", "noop");
+                addButton(left + 28, top + 76, 120, "方向幕 null", "noop", 0);
+                addArrowButton(left + 152, top + 76, ">", "noop");
+            } else {
+                addArrowButton(left + 4, top + 76, "<", "prev_destination");
+                addButton(left + 28, top + 76, 120, destinationLabel(), "next_destination", 0);
+                addArrowButton(left + 152, top + 76, ">", "next_destination");
+            }
             //アナウンスも方向幕と同じ回し方にする (最後まで行ったら最初に戻る)。
             //アナウンスを持たないパックでは null と出して、押せなくする。
             if (announcementCount() == 0) {
@@ -235,11 +242,18 @@ public class TrainControlScreen extends Screen {
         return "アナウンス " + (index + 1);
     }
 
+    /** このパックが持つ方向幕のコマ数。0 なら方向幕なし。 */
+    private int rollsignCount() {
+        return train.getResourceState().getResourceSet().getConfig().rollsignNames.length;
+    }
+
     private String destinationLabel() {
-        String[] rollsignNames = train.getResourceState().getResourceSet().getConfig().rollsignNames;
-        int count = Math.max(1, rollsignNames.length);
-        String name = rollsignNames.length == 0 ? "なし" : rollsignNames[Math.floorMod(train.getDestinationIndex(), count)];
-        return "方向幕 " + name;
+        int count = rollsignCount();
+        if (count == 0) {
+            return "方向幕 null";
+        }
+        String[] names = train.getResourceState().getResourceSet().getConfig().rollsignNames;
+        return "方向幕 " + names[Math.floorMod(train.getDestinationIndex(), count)];
     }
 
     private void send(String action, int value) {

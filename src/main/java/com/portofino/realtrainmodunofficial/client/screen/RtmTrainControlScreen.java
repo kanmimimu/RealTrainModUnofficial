@@ -67,11 +67,22 @@ public class RtmTrainControlScreen extends Screen {
             addArrowButton(left + 4, top + 52, "<", "toggle_chunk_loader", 0);
             addButton(left + 28, top + 52, 120, "チャンクロード" + (loaderOn ? " ON" : " OFF"), "toggle_chunk_loader", 0);
             addArrowButton(left + 152, top + 52, ">", "toggle_chunk_loader", 0);
-            int dest = train.getTrainStateData(TrainStateType.State_Destination.id);
-            int destCount = Math.max(1, rollsignNames().length);
-            addArrowButton(left + 4, top + 76, "<", "set_destination", Math.floorMod(dest - 1, destCount));
-            addButton(left + 28, top + 76, 120, destinationLabel(), "set_destination", (dest + 1) % destCount);
-            addArrowButton(left + 152, top + 76, ">", "set_destination", (dest + 1) % destCount);
+            //方向幕: 持っていないパックでは null と出して押せなくする
+            int destCount = rollsignNames().length;
+            if (destCount == 0) {
+                addArrowButton(left + 4, top + 76, "<", "noop", 0);
+                addButton(left + 28, top + 76, 120, "方向幕 null", "noop", 0);
+                addArrowButton(left + 152, top + 76, ">", "noop", 0);
+            } else {
+                int dest = Math.floorMod(
+                        train.getTrainStateData(TrainStateType.State_Destination.id), destCount);
+                addArrowButton(left + 4, top + 76, "<", "set_destination",
+                        Math.floorMod(dest - 1, destCount));
+                addButton(left + 28, top + 76, 120, destinationLabel(), "set_destination",
+                        Math.floorMod(dest + 1, destCount));
+                addArrowButton(left + 152, top + 76, ">", "set_destination",
+                        Math.floorMod(dest + 1, destCount));
+            }
             //アナウンスも方向幕と同じ回し方にする。
             //以前は上限も循環も無く、パックのアナウンス数を超えて増え続けていた。
             int announceCount = announcementCount();
@@ -191,10 +202,11 @@ public class RtmTrainControlScreen extends Screen {
 
     private String destinationLabel() {
         String[] names = rollsignNames();
-        int count = Math.max(1, names.length);
-        int dest = Math.floorMod(train.getTrainStateData(TrainStateType.State_Destination.id), count);
-        String name = names.length == 0 ? "なし" : names[dest];
-        return "方向幕 " + name;
+        if (names.length == 0) {
+            return "方向幕 null";
+        }
+        int dest = Math.floorMod(train.getTrainStateData(TrainStateType.State_Destination.id), names.length);
+        return "方向幕 " + names[dest];
     }
 
     private void send(String action, int value) {
