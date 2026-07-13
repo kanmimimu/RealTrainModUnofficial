@@ -63,9 +63,17 @@ public class TrainControlScreen extends Screen {
             addArrowButton(left + 4, top + 76, "<", "prev_destination");
             addButton(left + 28, top + 76, 120, destinationLabel(), "next_destination", 0);
             addArrowButton(left + 152, top + 76, ">", "next_destination");
-            addArrowButton(left + 4, top + 100, "<", "prev_sound");
-            addButton(left + 28, top + 100, 120, announcementLabel(), "next_sound", 0);
-            addArrowButton(left + 152, top + 100, ">", "next_sound");
+            //アナウンスも方向幕と同じ回し方にする (最後まで行ったら最初に戻る)。
+            //アナウンスを持たないパックでは null と出して、押せなくする。
+            if (announcementCount() == 0) {
+                addArrowButton(left + 4, top + 100, "<", "noop");
+                addButton(left + 28, top + 100, 120, "アナウンス null", "noop", 0);
+                addArrowButton(left + 152, top + 100, ">", "noop");
+            } else {
+                addArrowButton(left + 4, top + 100, "<", "prev_sound");
+                addButton(left + 28, top + 100, 120, announcementLabel(), "next_sound", 0);
+                addArrowButton(left + 152, top + 100, ">", "next_sound");
+            }
         } else if (selectedTab == ControlTab.FUNCTION) {
             VehicleDefinition definition = VehicleRegistry.getById(train.getVehicleId());
             List<List<String>> options = resolveCustomButtonOptions(definition);
@@ -196,11 +204,26 @@ public class TrainControlScreen extends Screen {
     }
 
     /**
+     * このパックが持つアナウンスの数。0 ならアナウンス機能なし。
+     * <p>
+     * 表示名 (sound_Announcement の 1 列目) は省略されることがあるので、数は<b>音声の数</b>で
+     * 数える。名前だけで数えると、名前が無いアナウンスを取りこぼす。
+     */
+    private int announcementCount() {
+        VehicleDefinition definition = VehicleRegistry.getById(train.getVehicleId());
+        return definition == null ? 0 : definition.getAnnouncementSounds().size();
+    }
+
+    /**
      * 本家 sound_Announcement は [[表示名, 音声パス], ...] なので、指定された表示名を出す。
      * 名前が未指定 / パック未登録のときだけ従来の「アナウンス N」にフォールバックする。
      */
     private String announcementLabel() {
-        int index = train.getSoundIndex();
+        int count = announcementCount();
+        if (count == 0) {
+            return "アナウンス null";
+        }
+        int index = Math.floorMod(train.getSoundIndex(), count);
         VehicleDefinition definition = VehicleRegistry.getById(train.getVehicleId());
         List<String> names = definition != null ? definition.getAnnouncementNames() : List.of();
         if (index >= 0 && index < names.size()) {
@@ -277,10 +300,10 @@ public class TrainControlScreen extends Screen {
     }
 
     private int resolveNextSoundIndex(int delta) {
-        VehicleDefinition definition = VehicleRegistry.getById(train.getVehicleId());
-        int size = definition == null ? 0 : definition.getAnnouncementSounds().size();
+        int size = announcementCount();
         if (size <= 0) {
-            return Math.max(0, train.getSoundIndex() + delta);
+            //アナウンスが無いパックで番号だけが際限なく増えないようにする
+            return 0;
         }
         return Math.floorMod(train.getSoundIndex() + delta, size);
     }

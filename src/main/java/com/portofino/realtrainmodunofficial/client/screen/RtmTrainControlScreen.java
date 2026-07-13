@@ -72,10 +72,24 @@ public class RtmTrainControlScreen extends Screen {
             addArrowButton(left + 4, top + 76, "<", "set_destination", Math.floorMod(dest - 1, destCount));
             addButton(left + 28, top + 76, 120, destinationLabel(), "set_destination", (dest + 1) % destCount);
             addArrowButton(left + 152, top + 76, ">", "set_destination", (dest + 1) % destCount);
-            int announce = train.getTrainStateData(TrainStateType.State_Announcement.id);
-            addArrowButton(left + 4, top + 100, "<", "set_announcement", Math.max(0, announce - 1));
-            addButton(left + 28, top + 100, 120, announcementLabel(announce), "set_announcement", announce + 1);
-            addArrowButton(left + 152, top + 100, ">", "set_announcement", announce + 1);
+            //アナウンスも方向幕と同じ回し方にする。
+            //以前は上限も循環も無く、パックのアナウンス数を超えて増え続けていた。
+            int announceCount = announcementCount();
+            if (announceCount == 0) {
+                //アナウンスを持たないパック: 空欄ではなく null と出して、押せなくする
+                addArrowButton(left + 4, top + 100, "<", "noop", 0);
+                addButton(left + 28, top + 100, 120, "アナウンス null", "noop", 0);
+                addArrowButton(left + 152, top + 100, ">", "noop", 0);
+            } else {
+                int announce = Math.floorMod(
+                        train.getTrainStateData(TrainStateType.State_Announcement.id), announceCount);
+                addArrowButton(left + 4, top + 100, "<", "set_announcement",
+                        Math.floorMod(announce - 1, announceCount));
+                addButton(left + 28, top + 100, 120, announcementLabel(announce), "set_announcement",
+                        Math.floorMod(announce + 1, announceCount));
+                addArrowButton(left + 152, top + 100, ">", "set_announcement",
+                        Math.floorMod(announce + 1, announceCount));
+            }
         } else if (selectedTab == ControlTab.FUNCTION) {
             VehicleDefinition definition = VehicleRegistry.getById(train.getModelName());
             List<List<String>> options = definition != null ? definition.getCustomButtonOptions() : List.of();
@@ -146,6 +160,17 @@ public class RtmTrainControlScreen extends Screen {
 
     private String pantographLabel() {
         return train.getTrainStateData(TrainStateType.State_Pantograph.id) != 0 ? "パンタ 上" : "パンタ 下";
+    }
+
+    /**
+     * このパックが持つアナウンスの数。0 ならアナウンス機能なし。
+     * <p>
+     * 表示名 (sound_Announcement の 1 列目) は省略されることがあるので、
+     * 数は<b>音声の数</b>で数える。名前だけで数えると、名前が無いアナウンスを取りこぼす。
+     */
+    private int announcementCount() {
+        VehicleDefinition definition = VehicleRegistry.getById(train.getModelName());
+        return definition == null ? 0 : definition.getAnnouncementSounds().size();
     }
 
     /**
