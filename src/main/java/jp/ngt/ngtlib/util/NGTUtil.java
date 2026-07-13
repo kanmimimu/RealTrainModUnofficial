@@ -32,17 +32,48 @@ public final class NGTUtil {
 
     /**
      * 本家: クライアントプレイヤー (Client Only, スクリプト用)
+     * <p>
+     * ★ このクラスから {@code net.minecraft.client.*} を<b>直接参照してはいけない</b>。
+     * <p>
+     * 以前ここは {@code Minecraft.getInstance().player} を直接返していた。フィールドの型は
+     * {@code LocalPlayer} で戻り値は {@code Player} なので、JVM の<b>検証器が代入互換性を
+     * 確かめるために LocalPlayer を読み込む</b>。専用サーバーではクライアントクラスが存在
+     * しないため、{@code NGTUtil} は<b>クラスのロード時点で</b> NoClassDefFoundError になり、
+     * このクラスのどのメソッドも呼べなくなる (連結処理の {@code NGTUtil.reverse} が巻き添えで
+     * 落ち、編成が壊れて列車が消えていた)。
+     * <p>
+     * メソッド解決は遅延なので「呼ばなければ安全」ではない。<b>戻り値やフィールドの型として
+     * 現れるだけで検証時にロードされる</b>。そのためクライアント専用の処理は
+     * {@link NGTUtilClient} 側に置き、こちらからは dist を見てリフレクションで呼ぶ。
      */
     public static net.minecraft.world.entity.player.Player getClientPlayer() {
-        return net.minecraft.client.Minecraft.getInstance().player;
+        Object player = invokeClientOnly("getClientPlayer");
+        return player instanceof net.minecraft.world.entity.player.Player p ? p : null;
     }
 
     /**
      * 本家: クライアントワールド (Client Only, スクリプト用)
      */
     public static Object getClientWorld() {
-        net.minecraft.world.level.Level level = net.minecraft.client.Minecraft.getInstance().level;
-        return level != null ? new jp.ngt.mccompat.WorldCompat(level) : null;
+        return invokeClientOnly("getClientWorld");
+    }
+
+    /**
+     * クライアント専用処理を {@link NGTUtilClient} に投げる。専用サーバーでは何もしない。
+     * <p>
+     * リフレクションなのは、このクラスの<b>バイトコードにクライアント型を一切登場させない</b>
+     * ため。クラス名を文字列で持てば、専用サーバーでは NGTUtilClient がロードされない。
+     */
+    private static Object invokeClientOnly(String methodName) {
+        if (net.neoforged.fml.loading.FMLEnvironment.dist != net.neoforged.api.distmarker.Dist.CLIENT) {
+            return null;
+        }
+        try {
+            Class<?> clientUtil = Class.forName("jp.ngt.ngtlib.util.NGTUtilClient");
+            return clientUtil.getMethod(methodName).invoke(null);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     /**

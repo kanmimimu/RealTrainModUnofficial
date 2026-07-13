@@ -414,9 +414,12 @@ public class RtmTrainControlScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
+    //タブのアイコン (左から順に並ぶ)。アイテムのテクスチャ自体は本家 RTM と同一なので
+    //触らない (入れ替えるとインベントリ内の全アイテムの見た目が変わってしまう)。
+    //ここで持たせるアイテムだけを差し替えて、タブの絵柄を変える。
     private enum ControlTab {
-        SETTING(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.WRENCH_ITEM.get())),
-        FUNCTION(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.CROWBAR_ITEM.get())),
+        SETTING(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.CROWBAR_ITEM.get())),
+        FUNCTION(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.WRENCH_ITEM.get())),
         FORMATION(TAB_FORMATION_TEXTURE, new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get())),
         INVENTORY(TAB_INVENTORY_TEXTURE, new ItemStack(Blocks.CHEST));
 

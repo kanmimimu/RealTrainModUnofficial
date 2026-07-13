@@ -27,6 +27,23 @@ public final class NGTUtilClient {
     }
 
     /**
+     * クライアントプレイヤー。{@link NGTUtil#getClientPlayer()} からリフレクションで呼ばれる。
+     * <p>
+     * {@code NGTUtil} 側に置くと、戻り値の型と {@code Minecraft.player} (LocalPlayer) の
+     * 代入互換性を JVM の検証器が確かめるために LocalPlayer を読み込み、専用サーバーで
+     * NGTUtil ごとロードできなくなる。クライアント専用のこちらに置くこと。
+     */
+    public static net.minecraft.world.entity.player.Player getClientPlayer() {
+        return Minecraft.getInstance().player;
+    }
+
+    /** クライアントワールド。{@link NGTUtil#getClientWorld()} からリフレクションで呼ばれる。 */
+    public static Object getClientWorld() {
+        net.minecraft.world.level.Level level = Minecraft.getInstance().level;
+        return level != null ? new jp.ngt.mccompat.WorldCompat(level) : null;
+    }
+
+    /**
      * mccompat.ResourceLocation / 実 ResourceLocation の両方を受ける。
      * null でデフォルトテクスチャへ復帰。
      */
