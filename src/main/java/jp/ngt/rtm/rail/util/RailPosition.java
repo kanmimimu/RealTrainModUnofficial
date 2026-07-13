@@ -4,6 +4,7 @@ package jp.ngt.rtm.rail.util;
 import jp.ngt.ngtlib.math.NGTMath;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 
 /**
@@ -48,6 +49,20 @@ public final class RailPosition {
     public double posY;
     public double posZ;
 
+    /**
+     * 自由配置 (ペンマーカー) の点か。
+     * <p>
+     * 通常のマーカーは「ブロック + 8方向」で置くので、{@link #init()} が
+     * {@code blockX/Z + REVISION[direction]} から posX/posZ を導出できる。ペンマーカーは
+     * ブロック内の任意の位置に点を打つため、posX/posY/posZ が<b>一次情報</b>になる。
+     * このフラグが立っている間は init() が posX/posY/posZ を上書きしない。
+     * <p>
+     * 曲線 ({@link RailMapBasic}) は元々 posX/posY/posZ だけを見ているので、
+     * ここさえ守れば下流はそのまま動く。blockX/Y/Z は floor(pos) を入れておき、
+     * コアブロックの設置位置や始終点の隣接判定に使う。
+     */
+    public boolean freePos;
+
     public RailPosition(int x, int y, int z, int dir, int type) {
         this.blockX = x;
         this.blockY = y;
@@ -65,9 +80,37 @@ public final class RailPosition {
     }
 
     public void init() {
+        if (this.freePos) {
+            //ペンマーカーの点は posX/posY/posZ が一次情報。ここで潰さない。
+            return;
+        }
         this.posX = (double) this.blockX + 0.5D + (double) REVISION[this.direction & 7][0];
         this.posY = (double) this.blockY + (double) (this.height + 1) * 0.0625D;
         this.posZ = (double) this.blockZ + 0.5D + (double) REVISION[this.direction & 7][1];
+    }
+
+    /**
+     * ペンマーカー用: ブロック内の任意の位置に点を打つ。
+     *
+     * @param x     レール面のワールド座標
+     * @param yaw   曲線の接線 (度)。プレイヤーの視線、または吸着したレールから引き継ぐ
+     * @param pitch 接線の勾配 (度)
+     */
+    public static RailPosition free(double x, double y, double z, float yaw, float pitch, int switchType) {
+        int bx = Mth.floor(x);
+        int by = Mth.floor(y);
+        int bz = Mth.floor(z);
+        //direction は 8 方向しか無いので、互換のため最も近い方向を入れておく
+        //(曲線そのものは anchorYaw を使うので、丸めの誤差は形に出ない)
+        int dir = Math.floorMod(Math.round(NGTMath.wrapAngle(yaw) / 45.0F), 8);
+        RailPosition rp = new RailPosition(bx, by, bz, dir, switchType);
+        rp.freePos = true;
+        rp.posX = x;
+        rp.posY = y;
+        rp.posZ = z;
+        rp.anchorYaw = NGTMath.wrapAngle(yaw);
+        rp.anchorPitch = pitch;
+        return rp;
     }
 
     public void addHeight(double par1) {
@@ -95,6 +138,14 @@ public final class RailPosition {
         rp.constLimitWP = nbt.getFloat("Const_Limit_WP");
         rp.constLimitWN = nbt.getFloat("Const_Limit_WN");
         rp.anchorManual = nbt.getBoolean("A_Manual");
+        //ペンマーカーの点は posX/posY/posZ が一次情報なので、init() より先に復元して
+        //freePos を立てる (立っていれば init() は上書きしない)。
+        if (nbt.getBoolean("FreePos")) {
+            rp.freePos = true;
+            rp.posX = nbt.getDouble("PosX");
+            rp.posY = nbt.getDouble("PosY");
+            rp.posZ = nbt.getDouble("PosZ");
+        }
         rp.init();
         return rp;
     }
@@ -117,6 +168,12 @@ public final class RailPosition {
         nbt.putFloat("Const_Limit_WP", this.constLimitWP);
         nbt.putFloat("Const_Limit_WN", this.constLimitWN);
         nbt.putBoolean("A_Manual", this.anchorManual);
+        if (this.freePos) {
+            nbt.putBoolean("FreePos", true);
+            nbt.putDouble("PosX", this.posX);
+            nbt.putDouble("PosY", this.posY);
+            nbt.putDouble("PosZ", this.posZ);
+        }
         return nbt;
     }
 

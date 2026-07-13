@@ -35,20 +35,14 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
     private float[] blockHeights;
 
     /**
-     * 当たり判定をブロック内で何分割するか (N×N のマス目)。
+     * 当たり判定の形状キャッシュ。当たり判定は毎 tick 何度も引かれるので、
+     * 毎回マスごとの箱を union すると重い。
      * <p>
-     * Minecraft の当たり判定 (VoxelShape) は軸平行な箱しか作れないので、斜面そのものは
-     * 表現できない。1ブロック=1つの平らな箱にすると坂が「1ブロックごとの段差」になるため、
-     * ブロック内を細かく割って階段状に近似する。N=4 なら段差は勾配の 1/4 になり、
-     * プレイヤーの自動ステップ(0.6)より十分小さくなるので実質スロープとして歩ける。
-     */
-    private static final int SHAPE_SPLIT = 4;
-
-    /**
-     * 当たり判定の形状キャッシュ。blockHeights を作り直したら捨てる。
-     * 当たり判定は毎tick何度も引かれるので、毎回 N×N 個の箱を union すると重い。
+     * 実体はコア ({@link TileEntityLargeRailCore#getCollisionGrid}) が焼いた高さグリッドから
+     * 組み立てる。コアがレールを引き直したら {@code cachedShapeVersion} が古くなるので作り直す。
      */
     private net.minecraft.world.phys.shapes.VoxelShape cachedShape;
+    private int cachedShapeVersion = -1;
 
     public TileEntityLargeRailBase(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -182,42 +176,47 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
      * @param thickness 最低の厚み (本家 BlockLargeRailBase.THICKNESS = 1/16)
      */
     public net.minecraft.world.phys.shapes.VoxelShape getRailCollisionShape(int x, int y, int z, float thickness) {
+        TileEntityLargeRailCore core = this.getRailCore();
+        if (core == null) {
+            //まだコアが解決できていない (読み込み途中)。キャッシュせず薄い板で凌ぐ。
+            return net.minecraft.world.phys.shapes.Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, thickness, 1.0D);
+        }
         net.minecraft.world.phys.shapes.VoxelShape shape = this.cachedShape;
-        if (shape != null) {
+        if (shape != null && this.cachedShapeVersion == core.getCollisionVersion()) {
+            return shape;
+        }
+        this.cachedShapeVersion = core.getCollisionVersion();
+
+        float[] grid = core.getCollisionGrid(this.worldPosition);
+        if (grid == null) {
+            //レール曲線がこのブロックを通っていない (道床の外周など)。薄い板。
+            shape = net.minecraft.world.phys.shapes.Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, thickness, 1.0D);
+            this.cachedShape = shape;
             return shape;
         }
 
-        float[] fa = this.getBlockHeights(x, y, z, thickness, true);
+        int n = TileEntityLargeRailCore.COLLISION_SPLIT;
         shape = net.minecraft.world.phys.shapes.Shapes.empty();
-        for (int i = 0; i < SHAPE_SPLIT; i++) {
-            for (int j = 0; j < SHAPE_SPLIT; j++) {
-                double u0 = (double) i / SHAPE_SPLIT;
-                double u1 = (double) (i + 1) / SHAPE_SPLIT;
-                double v0 = (double) j / SHAPE_SPLIT;
-                double v1 = (double) (j + 1) / SHAPE_SPLIT;
-                double h = Math.max(
-                        Math.max(interpolateHeight(fa, u0, v0), interpolateHeight(fa, u1, v0)),
-                        Math.max(interpolateHeight(fa, u0, v1), interpolateHeight(fa, u1, v1)));
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i < n; i++) {
+                float surfaceY = grid[j * n + i];
+                //グリッドは絶対 Y。ブロック内のローカル高さに直す。
+                double h = surfaceY - y;
                 if (h < thickness) {
                     h = thickness;
                 }
+                if (h > 1.0D) {
+                    h = 1.0D;
+                }
                 shape = net.minecraft.world.phys.shapes.Shapes.or(shape,
-                        net.minecraft.world.phys.shapes.Shapes.box(u0, 0.0D, v0, u1, h, v1));
+                        net.minecraft.world.phys.shapes.Shapes.box(
+                                (double) i / n, 0.0D, (double) j / n,
+                                (double) (i + 1) / n, h, (double) (j + 1) / n));
             }
         }
         shape = shape.optimize();
         this.cachedShape = shape;
         return shape;
-    }
-
-    /**
-     * 4隅の高さ {xNzP, xPzP, xPzN, xNzN} を双線形補間する。
-     * u: 0=xN, 1=xP / v: 0=zN, 1=zP
-     */
-    private static double interpolateHeight(float[] fa, double u, double v) {
-        double zn = fa[3] + (fa[2] - fa[3]) * u;//zN 側の辺: xN → xP
-        double zp = fa[0] + (fa[1] - fa[0]) * u;//zP 側の辺: xN → xP
-        return zn + (zp - zn) * v;
     }
 
     /**

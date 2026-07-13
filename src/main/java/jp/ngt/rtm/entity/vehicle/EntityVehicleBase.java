@@ -23,23 +23,20 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public float rotationRoll;
     public float prevRotationRoll;
 
-    //クライアントアニメ (本家 updateAnimation が更新、スクリプトが参照)
-    public int seatRotation;
-
     /**
-     * 転換クロスシートの回転量を -1.0 〜 1.0 で返す。
+     * 転換クロスシートの回転量 (-{@link #MAX_SEAT_ROTATION} 〜 {@link #MAX_SEAT_ROTATION})。
+     * {@code updateAnimation} が進行方向へ毎 tick 1 ずつ動かすので、転換は滑らかに進む。
      * <p>
-     * 本家の描画スクリプトは MC 1.10.2 以前では公開フィールド {@code entity.seatRotation}
-     * (-45 〜 45) を 45 で割って使い、それ以降のバージョンではこのメソッドを呼ぶ
-     * (例: 小田急 30000 形の {@code render_seat})。これが無いと <b>スクリプト側で例外になり、
-     * 座席が回らないどころか以降の描画が丸ごと打ち切られる</b>。
+     * ★ このフィールドと同名の getter ({@code getSeatRotation()}) を<b>絶対に足さないこと</b>。
      * <p>
-     * 値は {@code updateAnimation} が進行方向 ({@code getTrainDirection()}) に向かって
-     * 毎 tick 1 ずつ動かすので、転換は瞬時ではなく滑らかに進む。
+     * パックの描画スクリプトは {@code entity.seatRotation / 45} でこの値を読む
+     * ({@code RTMCore.VERSION} が "1.7.10" を含むため、どのパックも legacy 経路に入る)。
+     * ところが Nashorn (Dynalink の BeansLinker) はプロパティ解決で<b>フィールドより getter を
+     * 優先する</b>ため、{@code getSeatRotation()} を定義すると {@code entity.seatRotation} が
+     * フィールドではなく getter を返すようになる。戻り値の尺度が変われば、スクリプト側の
+     * {@code / 45} が二重に効いて座席が動かなくなる (実際に小田急 30000 形で発生した)。
      */
-    public float getSeatRotation() {
-        return (float) this.seatRotation / (float) MAX_SEAT_ROTATION;
-    }
+    public int seatRotation;
     public int doorMoveL;
     public int doorMoveR;
     public int pantograph_F;

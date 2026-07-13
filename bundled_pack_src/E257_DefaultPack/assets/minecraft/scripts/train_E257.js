@@ -372,8 +372,10 @@ function render(entity, pass, partialTicks) {
     //台座 p_seat_base のみ固定、他は回転中心 x±0.8 で転換)
     //
     //転換クロスシートは本家 (小田急30000形 render_seat) と同じ方式で回す:
-    //  ・entity.getSeatRotation() は -1 〜 0 〜 1 の連続値で、進行方向が変わると
-    //    毎 tick 少しずつ動く。これを 0 〜 1 に直して 180° に写す。
+    //  ・entity.seatRotation は -45 〜 0 〜 45 の連続値 (public フィールド) で、進行方向が
+    //    変わると毎 tick 1 ずつ動く。45 で割って -1〜1 にし、0〜1 に直して 180° に写す。
+    //    ※ getSeatRotation() のような同名 getter を MOD 側に足してはいけない。Nashorn は
+    //      フィールドより getter を優先するので、entity.seatRotation の意味が変わってしまう。
     //  ・奇数列と偶数列で位相をずらし (係数 1.739 / 遅延 0.425)、全席が同時に回らず
     //    波打つように転換する。実車の転換動作に近く、隣の座席と干渉しにくい。
     //  ・左右は回転方向が逆 (L は +θ、R は -θ)。
@@ -382,7 +384,7 @@ function render(entity, pass, partialTicks) {
     //    ので、そのまま踏襲する (転換中に背もたれが隣とめり込まない)。
     var seatState = 0.0;
     if (entity != null) {
-        seatState = entity.getSeatRotation();
+        seatState = entity.seatRotation / 45.0;
     }
     seatState = (seatState + 1.0) / 2.0;  // -1〜1 → 0〜1
 

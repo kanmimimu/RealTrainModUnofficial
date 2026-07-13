@@ -130,7 +130,14 @@ public abstract class RailMap {
             //で決まるため、ブロックを1つ下げるとその分だけ箱が丸ごと1ブロック高くなる。
             //平坦なレールでは地面を食うので気付きにくいが、坂ではブロック境界をまたぐ列で
             //2ブロック近い高さの箱になり、「坂の当たり判定がブロック」になっていた。
-            int y = (int) height;
+            //
+            //★ (int) キャストは使わない。0 方向への切り捨てなので、負の Y で 1 つ上を指す。
+            //   本家は MC 1.12.2 (最低 y=0) だったため (int) と floor が同じで問題にならなかったが、
+            //   1.21 は y=-64 まである。フラットワールドの地表は y=-60 台なので、
+            //     height = -59.9375 → (int) = -59 (1ブロック上!) / floor = -60 (正しい)
+            //   となり、道床ブロックが丸ごと 1 ブロック上に置かれて当たり判定だけが浮いていた
+            //   (描画は railHeight を直に使うのでズレない → 「当たり判定だけ浮く」)。
+            int y = Mth.floor(height);
             int x0 = Mth.floor(x);
             int z0 = Mth.floor(z);
 
@@ -510,7 +517,7 @@ public abstract class RailMap {
             double[] point = this.getRailPos(split, j);
             int x = NGTMath.floor(point[1]);
             int z = NGTMath.floor(point[0]);
-            int y = (int) this.getRailHeight(split, j);
+            int y = NGTMath.floor(this.getRailHeight(split, j));//(int) は負の Y で 1 つ上を指すため不可
             BlockPos pos = new BlockPos(x, y, z);
             if (pos.equals(startNeighbor) || pos.equals(endNeighbor)) {
                 continue;
@@ -555,7 +562,7 @@ public abstract class RailMap {
             double[] point = this.getRailPos(split, j);
             int x = NGTMath.floor(point[1]);
             int z = NGTMath.floor(point[0]);
-            int y = (int) this.getRailHeight(split, j);
+            int y = NGTMath.floor(this.getRailHeight(split, j));//(int) は負の Y で 1 つ上を指すため不可
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     for (int dy = -1; dy <= 0; dy++) {

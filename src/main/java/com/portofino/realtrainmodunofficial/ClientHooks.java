@@ -50,6 +50,11 @@ public final class ClientHooks {
     }
 
     /** レールのカント設定: レンチでマーカーをシフト右クリック */
+    /** マーカーの位置調整 (レンチのモード 12): ブロック未満のずれを入れる */
+    public static void openMarkerOffsetScreen(Object marker) {
+        invokeClient("openMarkerOffsetScreen", new Class<?>[]{Object.class}, marker);
+    }
+
     public static void openMarkerCantScreen(Object marker) {
         invokeClient("openMarkerCantScreen", new Class<?>[]{Object.class}, marker);
     }

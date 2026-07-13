@@ -290,8 +290,43 @@ public class BlockMarker extends BaseEntityBlock {
      * 通常のレール<br>
      * y0 <= y1でなければならない
      */
+    /**
+     * そのブロックに<b>別のレールのコア</b>が既に居るか。
+     * <p>
+     * コアはレールの全情報 (RailPosition / RailProperty) を持っている唯一のブロックで、
+     * ここを {@code setBlock} で潰すと<b>そのレールが丸ごと消える</b>。通常マーカーは
+     * マーカーブロックの位置にコアを置くので衝突しないが、ペンマーカーは既存レールの端に
+     * 吸着できるため、吸着先がそのレールのコアだと踏み抜く。
+     */
+    public static boolean hasRailCore(Level world, int x, int y, int z) {
+        return world.getBlockEntity(new BlockPos(x, y, z)) instanceof TileEntityLargeRailCore;
+    }
+
+    /**
+     * ソートせずに 2 点でレールを敷く (ペンマーカー用)。
+     * <p>
+     * {@link #createRail} は blockY で並べ替えるため「どちらの点がコアになるか」を呼び出し側で
+     * 決められない。ペンは既存レールのコアを踏まない点をコアにしたいので、順序を保つ入口を出す。
+     * 曲線は両端の anchorYaw から作られ、どちらを始点にしても同じ形になる。
+     */
+    public static boolean createRailKeepOrder(Level world, RailPosition start, RailPosition end,
+                                              RailProperty prop, boolean makeRail, boolean isCreative) {
+        return createRail0(world, start, end, prop, makeRail, isCreative);
+    }
+
+    /** ソートせずに分岐/クロスを敷く (ペンマーカー用)。コアは (x,y,z) に置かれる。 */
+    public static boolean createSwitchAt(Level world, int x, int y, int z, List<RailPosition> list,
+                                         RailProperty prop, boolean makeRail, boolean isCreative) {
+        return createRail1(world, x, y, z, null, list, prop, makeRail, isCreative);
+    }
+
     private static boolean createRail0(Level world, RailPosition start, RailPosition end, RailProperty prop, boolean makeRail, boolean isCreative) {
         RailMapBasic railMap = new RailMapBasic(start, end, RailMapBasic.fixRTMRailMapVersionCurrent);
+
+        //コアの位置に別レールのコアが居るなら、置いた瞬間にそのレールが消える。敷設を中止する。
+        if (hasRailCore(world, start.blockX, start.blockY, start.blockZ)) {
+            return false;
+        }
 
         if (makeRail && railMap.canPlaceRail(world, isCreative, prop)) {
             railMap.setRail(world, RTMRailBlocks.LARGE_RAIL_BASE.get(), start.blockX, start.blockY, start.blockZ, prop);
@@ -331,6 +366,10 @@ public class BlockMarker extends BaseEntityBlock {
      * 分岐レール
      */
     private static boolean createRail1(Level world, int x, int y, int z, Player player, List<RailPosition> list, RailProperty prop, boolean makeRail, boolean isCreative) {
+        //コアの位置に別レールのコアが居るなら、置いた瞬間にそのレールが消える。敷設を中止する。
+        if (hasRailCore(world, x, y, z)) {
+            return false;
+        }
         RailMaker railMaker = new RailMaker(world, list, RailMapBasic.fixRTMRailMapVersionCurrent);
         SwitchType st = railMaker.getSwitch();
         if (st == null) {
@@ -362,6 +401,10 @@ public class BlockMarker extends BaseEntityBlock {
             railMapSwitch.setRail(world, RTMRailBlocks.LARGE_RAIL_BASE.get(), x, y, z, prop);
         }
         for (RailPosition rp : list) {
+            //既存レールのコアの上に分岐ベースを置くと、そのレールが消える。触らない。
+            if (hasRailCore(world, rp.blockX, rp.blockY, rp.blockZ)) {
+                continue;
+            }
             BlockPos rpPos = new BlockPos(rp.blockX, rp.blockY, rp.blockZ);
             world.setBlock(rpPos, RTMRailBlocks.LARGE_RAIL_SWITCH_BASE.get().defaultBlockState(), 3);
             TileEntityLargeRailSwitchBase switchBase = (TileEntityLargeRailSwitchBase) world.getBlockEntity(rpPos);

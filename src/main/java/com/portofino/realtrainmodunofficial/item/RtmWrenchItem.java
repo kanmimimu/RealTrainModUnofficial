@@ -38,7 +38,9 @@ import java.util.List;
  */
 public class RtmWrenchItem extends Item {
     //モード 9 (アンカー移動) 中はアンカー線を右クリックで掴んで動かす (MarkerBlockEntityRenderer)
-    private static final int[] MODE_CYCLE = {0, 1, 6, 7, 8, 9, 10, 11};
+    private static final int[] MODE_CYCLE = {0, 1, 6, 7, 8, 9, 10, 11, 12};
+    /** マーカーをブロック未満の位置に動かす (本家に無い。ペンマーカーの代わり)。 */
+    public static final int MODE_OFFSET = 12;
     public static final int MODE_ANCHOR = 9;
     /**
      * RailPosition.direction (8方位) → マーカー blockstate facing
@@ -79,6 +81,7 @@ public class RtmWrenchItem extends Item {
             case 9 -> "アンカー移動 (レール形状編集)";
             case 10 -> "隣接レール接続 切替";
             case 11 -> "レール→マーカー復元";
+            case 12 -> "マーカー位置調整";
             default -> "mode_" + mode;
         };
     }
@@ -256,6 +259,12 @@ public class RtmWrenchItem extends Item {
                 marker.fitNeighbor ^= true;
                 if (!level.isClientSide) {
                     player.displayClientMessage(Component.literal("隣接レール接続: " + (marker.fitNeighbor ? "ON" : "OFF")), true);
+                }
+            }
+            case MODE_OFFSET -> {
+                //ブロック未満の位置調整。ブロック単位でしか置けないマーカーの弱点を埋める。
+                if (level.isClientSide) {
+                    com.portofino.realtrainmodunofficial.ClientHooks.openMarkerOffsetScreen(marker);
                 }
             }
             default -> {

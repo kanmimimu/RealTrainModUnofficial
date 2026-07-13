@@ -131,5 +131,8 @@
   "realtrainmodunofficial.configuration.items": "アイテム一覧",
   "realtrainmodunofficial.configuration.logDirtBlock": "土ブロックをログ出力",
   "realtrainmodunofficial.configuration.magicNumberIntroduction": "マジックナンバーの説明文",
-  "realtrainmodunofficial.configuration.magicNumber": "マジックナンバー"
+  "realtrainmodunofficial.configuration.magicNumber": "マジックナンバー",
+  "screen.realtrainmodunofficial.marker_offset": "マーカー位置調整",
+  "screen.realtrainmodunofficial.marker_offset.reset": "既定に戻す",
+  "screen.realtrainmodunofficial.marker_offset.hint": "マーカーの既定位置からのずれ。単位は 1/16 ブロック。"
 }

@@ -9,6 +9,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -119,7 +120,141 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         if (this.isLoaded())//同期ができてない状態でのRailMapの生成を防ぐ
         {
             this.railmap = new RailMapBasic(this.railPositions[0], this.railPositions[1], this.fixRTMRailMapVersion);
+            this.collisionGrids = null;
+            this.collisionVersion++;
         }
+    }
+
+    // ===== 当たり判定 (レール曲線をサンプリングして焼く) =====
+
+    /**
+     * 列 (x, z) → その列の {@link #COLLISION_SPLIT}×{@link #COLLISION_SPLIT} マスごとの
+     * レール面の高さ (<b>絶対 Y</b>)。
+     * <p>
+     * Y を含めない「列」で持つのが要点。レール面はカントや勾配でブロック境界をまたぐので、
+     * ブロック単位で持つと面が隣のブロックに落ちた列でグリッドが引けず床が抜ける。
+     * 列で持てば、各レールブロックは「絶対 Y − 自分の Y」を [厚み, 1.0] に丸めるだけでよく、
+     * 面が自分より上ならブロックいっぱい、下なら薄板になる (勾配で積まれたブロックも正しい)。
+     */
+    private java.util.Map<Long, float[]> collisionGrids;
+
+    /**
+     * レールを引き直すたびに進む。各レールブロックは自分の形状キャッシュがこの世代の
+     * ものかを見て、古ければ作り直す。
+     */
+    private int collisionVersion;
+
+    /** 当たり判定をブロック内で何分割するか。 */
+    public static final int COLLISION_SPLIT = 4;
+
+    public int getCollisionVersion() {
+        return this.collisionVersion;
+    }
+
+    /**
+     * このレールの当たり判定グリッドを引く。無ければ作る。
+     *
+     * @return 指定ブロックの列のマスごとのレール面 (絶対 Y)。レールが通っていなければ null。
+     */
+    public float[] getCollisionGrid(BlockPos pos) {
+        java.util.Map<Long, float[]> grids = this.collisionGrids;
+        if (grids == null) {
+            grids = this.buildCollisionGrids();
+            this.collisionGrids = grids;
+        }
+        return grids.get(columnKey(pos.getX(), pos.getZ()));
+    }
+
+    private static long columnKey(int x, int z) {
+        return ((long) x << 32) | (z & 0xFFFFFFFFL);
+    }
+
+    /**
+     * レール曲線を直接サンプリングして、ブロックごとの高さグリッドを焼く。
+     * <p>
+     * 従来は {@code TileEntityLargeRailBase.getBlockHeights} が「ブロックの 4 隅から
+     * 最も近い曲線上の点」を探して高さを決め、それをブロック内で双線形補間していた。
+     * これは曲線が近くを何度も通る場所 (分岐・急曲線・レールの端) で誤った点を拾い、
+     * 当たり判定が実際のレール面から浮いたり沈んだりする。
+     * <p>
+     * ここでは逆に<b>曲線の側から</b>面を撒く。レール中心線に沿って進みながら、
+     * 各点で道床幅ぶん左右に張り出した面 (カントで傾く) をサンプリングし、
+     * 落ちたマスに高さを書き込む。当たり判定はレール面の定義そのものになるので、
+     * 「一番近い点」を推測する必要がなくなる。
+     */
+    private java.util.Map<Long, float[]> buildCollisionGrids() {
+        java.util.Map<Long, float[]> grids = new java.util.HashMap<>();
+        RailMap[] rms = this.getAllRailMaps();
+        if (rms == null) {
+            return grids;
+        }
+        //道床の外縁まで撒く。createRailList が置くレールブロックは中心から ±(ballastWidth>>1)。
+        double halfWidth = (this.getProperty().getBallastWidth() >> 1) + 0.5D;
+        //マスの取りこぼしが出ない程度に細かく撒く (マスは 1/COLLISION_SPLIT ブロック)。
+        double step = 1.0D / (COLLISION_SPLIT * 2);
+
+        for (RailMap rm : rms) {
+            if (rm == null) {
+                continue;
+            }
+            int split = Math.max(8, (int) (rm.getLength() / step));
+            for (int i = 0; i <= split; i++) {
+                double[] point = rm.getRailPos(split, i);
+                double cx = point[1];
+                double cz = point[0];
+                double height = rm.getRailHeight(split, i);
+                float yaw = rm.getRailYaw(split, i);
+                float cant = rm.getCant(split, i);
+                //レール方向の法線 (yaw + 90°) 方向へ張り出す
+                double rad = Math.toRadians(yaw + 90.0F);
+                double dx = Math.sin(rad);
+                double dz = Math.cos(rad);
+                //カントによる左右の高低差。getBlockHeights と同じ符号 (中心から距離 w で sin(cant) * w)
+                double cantSlope = jp.ngt.ngtlib.math.NGTMath.sin(cant);
+
+                for (double w = -halfWidth; w <= halfWidth + 1.0E-6D; w += step) {
+                    double sx = cx + dx * w;
+                    double sz = cz + dz * w;
+                    double sy = height + cantSlope * w;
+                    int bx = Mth.floor(sx);
+                    int bz = Mth.floor(sz);
+                    long key = columnKey(bx, bz);
+                    float[] grid = grids.get(key);
+                    if (grid == null) {
+                        grid = new float[COLLISION_SPLIT * COLLISION_SPLIT];
+                        java.util.Arrays.fill(grid, Float.NaN);
+                        grids.put(key, grid);
+                    }
+                    int gi = Mth.clamp((int) ((sx - bx) * COLLISION_SPLIT), 0, COLLISION_SPLIT - 1);
+                    int gj = Mth.clamp((int) ((sz - bz) * COLLISION_SPLIT), 0, COLLISION_SPLIT - 1);
+                    int idx = gj * COLLISION_SPLIT + gi;
+                    float cur = grid[idx];
+                    if (Float.isNaN(cur) || sy > cur) {
+                        grid[idx] = (float) sy;
+                    }
+                }
+            }
+        }
+
+        //撒き漏らしたマス (ブロックの角など) を、そのブロックの最大値で埋める。
+        //穴が残ると床が抜けて見えるので、レール面のあるブロックは必ず全面を塞ぐ。
+        for (float[] grid : grids.values()) {
+            float max = Float.NaN;
+            for (float v : grid) {
+                if (!Float.isNaN(v) && (Float.isNaN(max) || v > max)) {
+                    max = v;
+                }
+            }
+            if (Float.isNaN(max)) {
+                continue;
+            }
+            for (int i = 0; i < grid.length; i++) {
+                if (Float.isNaN(grid[i])) {
+                    grid[i] = max;
+                }
+            }
+        }
+        return grids;
     }
 
     /**

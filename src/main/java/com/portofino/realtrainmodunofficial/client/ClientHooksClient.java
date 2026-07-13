@@ -64,6 +64,13 @@ public final class ClientHooksClient {
     }
 
     /** レールのカント設定: レンチでマーカーをシフト右クリック */
+    public static void openMarkerOffsetScreen(Object marker) {
+        if (marker instanceof jp.ngt.rtm.rail.TileEntityMarker te) {
+            Minecraft.getInstance().setScreen(
+                new com.portofino.realtrainmodunofficial.client.screen.MarkerOffsetScreen(te));
+        }
+    }
+
     public static void openMarkerCantScreen(Object marker) {
         if (marker instanceof jp.ngt.rtm.rail.TileEntityMarker te) {
             Minecraft.getInstance().setScreen(
