@@ -215,25 +215,31 @@ public final class TrainControlKeyHandler {
             return;
         }
 
-        //jp.ngt 本家忠実列車: W/S 長押しでノッチ増減 (KaizPatchX 同様)。
-        //押した瞬間に 1 段、押しっぱなしで一定間隔ごとにさらに 1 段ずつ。
+        //jp.ngt 本家忠実列車: ノッチの<b>長押しリピートだけ</b>をここで出す。
+        //
+        //★1 回の押下で 2 段進んでいた原因:
+        //  ここは W/S (バニラの前後移動キー) を直接見て「押した瞬間にも 1 段」送っていた。
+        //  一方 onKeyInput → handleRtmTrainKeys も POWER_OFF/BRAKE_OFF の押下で 1 段送る。
+        //  既定値が POWER_OFF=S / BRAKE_OFF=W と<b>移動キーと同じ</b>なので、1 回押すと
+        //  両方から送られて 2 段進んでいた。
+        //
+        //  初回の 1 段は onKeyInput が担当し、ここはリピートのみ (shouldSendRepeat) にする。
+        //  監視するキーも移動キーではなくキーバインド自身にして、リバインドしてもズレないようにする。
         if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain
                 && !rtmTrain.hasSeat(mc.player)) {
-            boolean up = mc.options.keyUp.isDown();
-            boolean down = mc.options.keyDown.isDown();
-            if (up && !down) {
+            boolean powerHeld = TrainControlKeyMappings.POWER_OFF.isDown();
+            boolean brakeHeld = TrainControlKeyMappings.BRAKE_OFF.isDown();
+            if (powerHeld && !brakeHeld) {
                 rtmPowerHoldTicks = Math.max(0, rtmPowerHoldTicks + 1);
                 rtmBrakeHoldTicks = -1;
-                if (rtmPowerHoldTicks == 1 || shouldSendRepeat(rtmPowerHoldTicks)) {
-                    //W = 力行側 (ユーザー確認でこちらが mascon_brake 相当だった)
-                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_brake", 0));
+                if (shouldSendRepeat(rtmPowerHoldTicks)) {
+                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_power", 0));
                 }
-            } else if (down && !up) {
+            } else if (brakeHeld && !powerHeld) {
                 rtmBrakeHoldTicks = Math.max(0, rtmBrakeHoldTicks + 1);
                 rtmPowerHoldTicks = -1;
-                if (rtmBrakeHoldTicks == 1 || shouldSendRepeat(rtmBrakeHoldTicks)) {
-                    //S = ブレーキ側
-                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_power", 0));
+                if (shouldSendRepeat(rtmBrakeHoldTicks)) {
+                    PacketDistributor.sendToServer(new TrainControlPayload(rtmTrain.getId(), "mascon_brake", 0));
                 }
             } else {
                 rtmPowerHoldTicks = -1;

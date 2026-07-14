@@ -142,6 +142,20 @@ public class EntityBogie extends Entity {
         return !this.isRemoved();
     }
 
+    /**
+     * 当たり判定をレール面まで下げる。
+     *
+     * <p>本家の台車は {@code getYOffset() == 0} で<b>レール高さそのもの</b>に立ち、
+     * 当たり判定もそこから上へ伸びる。RTMU は台車の座標を車体と同じ基準に揃えるため
+     * {@code railHeight + TRAIN_HEIGHT} に置いており (updateBogiePos)、そのぶん
+     * <b>当たり判定だけが約 1.19 ブロック浮いて</b>いた (台車を殴る/掴む位置が実際の
+     * 台車より上にずれる)。判定を TRAIN_HEIGHT ぶん下げて本家と同じ「レールの上」に戻す。
+     */
+    @Override
+    protected AABB makeBoundingBox() {
+        return super.makeBoundingBox().move(0.0D, -EntityTrainBase.TRAIN_HEIGHT, 0.0D);
+    }
+
     private static long lastRailLostLog;
 
     /**

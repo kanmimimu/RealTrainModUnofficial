@@ -112,10 +112,13 @@ public class TrainItem extends Item {
 
         int i0 = rm0.getNearlestPoint(128, cp.getX() + 0.5D, cp.getZ() + 0.5D);
         float yw0 = Mth.wrapDegrees(rm0.getRailYaw(128, i0));
-        //本家 ItemTrain 準拠: -playerYaw をラップして「本家と逆向き」補正の +180 を掛ける。
-        //(+180 を未ラップで渡すと fixBogieYaw の |差| 判定が壊れて向きが適当になり脱線する)
+        //本家 ItemTrain: yaw = fixBogieYaw(-playerYaw, railYaw)
+        //
+        //fixBogieYaw は「レールの向き (yw0) か、その 180 度反対か」のうち第1引数に近い方を返す。
+        //つまり第1引数に 180 を足すと<b>選ばれる向きが反転する</b>。ここには本家に無い +180 が
+        //入っており、そのせいで本家と逆向きに列車が置かれていた。本家どおり -playerYaw を渡す。
         float yaw = jp.ngt.rtm.entity.train.EntityBogie.fixBogieYaw(
-                Mth.wrapDegrees(-player.getYRot() + 180.0F), yw0);
+                Mth.wrapDegrees(-player.getYRot()), yw0);
         float pitch = jp.ngt.rtm.entity.train.EntityBogie.fixBogiePitch(rm0.getRailPitch(128, i0), yw0, yaw);
         double posX = rm0.getRailPos(128, i0)[1];
         double posY = rm0.getRailHeight(128, i0) + jp.ngt.rtm.entity.train.EntityTrainBase.TRAIN_HEIGHT;
