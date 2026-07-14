@@ -8,9 +8,9 @@
 		"rendererPath": "scripts/RenderNM-23.js"
 	},
 	"bogieModel2": {
-      "modelFile": "ModelBogie_ft1.obj",
-      "textures": [["default", "textures/train/ft1.png"]]
-  },
+		"modelFile": "ModelBogie_ft1.obj",
+	"textures": [["default", "textures/train/ft1.png"]]
+	},
 
 	"buttonTexture": "textures/train/nm-23/button_nm-23.png",
 	"soundScriptPath": "scripts/sound_trailer.js",

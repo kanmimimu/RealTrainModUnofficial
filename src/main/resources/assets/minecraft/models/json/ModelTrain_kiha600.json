@@ -7,7 +7,7 @@
       "textures": [["default", "textures/train/kiha600/kiha600.png", "Light"]]
   },
   "bogieModel2": {
-      "modelFile": "compat/kaizpatchx/bogie_modelbogie.mqo",
+      "modelFile": "ModelBogie.class",
       "textures": [["default", "textures/train/bogie.png"]]
   },
 

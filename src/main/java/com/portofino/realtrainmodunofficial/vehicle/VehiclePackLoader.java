@@ -63,32 +63,43 @@ public class VehiclePackLoader {
     }
 
     private static void loadFromModJar() {
-        // 列車 (ModelTrain_*) は外部 pack zip のみから読み込む (デフォルト列車 223/c-toki 等を出さない
-        // ユーザー要望)。ただし自動車 (ModelVehicle_*) は RTM 標準車 (CV33 等) をデフォルトとして
-        // 同梱から読み込む (ユーザー要望「自動車のデフォルトモデルがあるはず」)。
+        // 本家の既定モデルを全て同梱する方針にしたので、列車 (ModelTrain_*) も自動車
+        // (ModelVehicle_*) も jar 内の assets/minecraft/models/json から読む。
+        // (以前は「デフォルト列車 223/c-toki 等を出さない」という要望で列車だけ除外していた)
         try {
             var modFileEntry = ModList.get().getModFileById(RealTrainModUnofficial.MODID);
             if (modFileEntry == null) return;
             var modFile = modFileEntry.getFile();
             Path jsonDir = modFile.findResource("assets", "minecraft", "models", "json");
             if (jsonDir == null || !Files.isDirectory(jsonDir)) return;
-            int[] count = {0};
+            int[] trains = {0};
+            int[] cars = {0};
             try (var stream = Files.list(jsonDir)) {
                 stream.filter(Files::isRegularFile)
-                    .filter(p -> {
-                        String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
-                        return n.startsWith("modelvehicle_") && n.endsWith(".json");
-                    })
                     .forEach(p -> {
+                        String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
+                        if (!n.endsWith(".json")) {
+                            return;
+                        }
+                        boolean isTrain = n.startsWith("modeltrain_");
+                        boolean isCar = n.startsWith("modelvehicle_");
+                        if (!isTrain && !isCar) {
+                            return;
+                        }
                         try {
                             parseTrainJson(Files.readAllBytes(p), RealTrainModUnofficial.MODID, p.getFileName().toString());
-                            count[0]++;
+                            if (isTrain) {
+                                trains[0]++;
+                            } else {
+                                cars[0]++;
+                            }
                         } catch (Exception e) {
                             RealTrainModUnofficial.LOGGER.warn("Failed to load bundled vehicle {}", p, e);
                         }
                     });
             }
-            RealTrainModUnofficial.LOGGER.info("Loaded {} bundled car (ModelVehicle_) definition(s)", count[0]);
+            RealTrainModUnofficial.LOGGER.info("Loaded {} bundled train (ModelTrain_) and {} bundled car (ModelVehicle_) definition(s)",
+                    trains[0], cars[0]);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not load bundled car definitions", e);
         }

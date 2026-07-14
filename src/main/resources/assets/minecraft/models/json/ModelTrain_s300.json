@@ -7,7 +7,7 @@
       "textures": [["mat1", "textures/train/s300/s300.png", "Light, AlphaBlend"]]
   },
   "bogieModel2": {
-      "modelFile": "compat/kaizpatchx/bogie_modelbogie.mqo",
+      "modelFile": "ModelBogie.class",
       "textures": [["default", "textures/train/bogie.png"]]
   },
 

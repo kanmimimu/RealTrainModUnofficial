@@ -8,9 +8,9 @@
 		"rendererPath": "scripts/RenderMechaCentipede.js"
 	},
 	"bogieModel2": {
-      "modelFile": "compat/kaizpatchx/bogie_modelbogie.mqo",
-      "textures": [["default", "textures/train/tp.png"]]
-  },
+		"modelFile": "ModelBogie.class",
+		"textures": [["default", "textures/train/tp.png"]]
+	},
 
   "buttonTexture": "textures/train/mecha_centipede/button_mecha_centipede.png",
   "sound_Stop": "",

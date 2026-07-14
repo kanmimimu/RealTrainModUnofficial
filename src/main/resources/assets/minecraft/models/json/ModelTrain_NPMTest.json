@@ -7,7 +7,7 @@
       "textures": [["default", "textures/train/df200/df200.png", "AlphaBlend"]]
   },
   "bogieModel2": {
-      "modelFile": "compat/kaizpatchx/bogie_testbogie.mqo",
+      "modelFile": "TestBogie.npm",
       "textures": [["default", "textures/train/fdt100.png"]]
   },
 

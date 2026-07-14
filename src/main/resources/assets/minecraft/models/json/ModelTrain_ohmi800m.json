@@ -12,7 +12,7 @@
       "rendererPath": "scripts/RenderOhmi220.js"
   },
   "bogieModel2": {
-      "modelFile": "compat/kaizpatchx/bogie_modelbogie.mqo",
+      "modelFile": "ModelBogie.class",
       "textures": [["default", "textures/train/bogie.png"]]
   },
 	"serverScriptPath": "scripts/server/ohmi220.js",

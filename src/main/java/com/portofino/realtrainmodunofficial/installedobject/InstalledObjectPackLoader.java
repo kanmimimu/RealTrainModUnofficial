@@ -176,7 +176,12 @@ public final class InstalledObjectPackLoader {
 
     private static boolean isSupportedArchive(Path path) {
         String fileName = path.getFileName().toString().toLowerCase(Locale.ROOT);
-        return fileName.endsWith(".zip") || fileName.endsWith(".jar");
+        if (!fileName.endsWith(".zip") && !fileName.endsWith(".jar")) {
+            return false;
+        }
+        //mods/ に置かれた自分自身の jar をパックとして読み直さない。
+        //読み直すと jar 同梱の本家定義が二重登録される (BundledPackStore.isOwnModJar 参照)。
+        return !BundledPackStore.isOwnModJar(path);
     }
 
     private static boolean looksLikeInstalledObjectPackDirectory(Path dir) {

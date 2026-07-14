@@ -8,7 +8,7 @@
       "rendererPath": "scripts/RenderTest6.js"
   },
   "bogieModel2": {
-      "modelFile": "compat/kaizpatchx/bogie_modelbogie.mqo",
+      "modelFile": "ModelBogie.class",
       "textures": [["default", "textures/train/tp.png"]]
   },
 

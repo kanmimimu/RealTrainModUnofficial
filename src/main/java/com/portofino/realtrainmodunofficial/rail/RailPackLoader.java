@@ -40,6 +40,7 @@ public class RailPackLoader {
     }
 
     private static void loadFromModJar() {
+        loadBuiltinRailsFromModJar();
         try {
             for (Path path : BundledPackStore.listBundledPacks("rail")) {
                 try (InputStream is = Files.newInputStream(path)) {
@@ -48,6 +49,42 @@ public class RailPackLoader {
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not load bundled rail packs from mod jar", e);
+        }
+    }
+
+    /**
+     * MOD の jar に同梱した本家レール定義 (assets/minecraft/models/json/ModelRail_*.json) を読む。
+     * <p>
+     * ここが無かったため、レール定義はパック zip からしか読めなかった。パックを入れていない
+     * 環境では選択できるレールが 1 つも無い状態になっていた
+     * (設置物 / 自動車は同じ場所を走査しているので、レールだけが取り残されていた)。
+     */
+    private static void loadBuiltinRailsFromModJar() {
+        try {
+            var modFileEntry = net.neoforged.fml.ModList.get().getModFileById(RealTrainModUnofficial.MODID);
+            if (modFileEntry == null) {
+                return;
+            }
+            Path jsonDir = modFileEntry.getFile().findResource("assets", "minecraft", "models", "json");
+            if (jsonDir == null || !Files.isDirectory(jsonDir)) {
+                return;
+            }
+            int[] count = {0};
+            try (var stream = Files.list(jsonDir)) {
+                stream.filter(Files::isRegularFile)
+                    .filter(p -> isRailJson(p.getFileName().toString().toLowerCase(Locale.ROOT)))
+                    .forEach(p -> {
+                        try {
+                            parseRailJson(Files.readAllBytes(p), RealTrainModUnofficial.MODID);
+                            count[0]++;
+                        } catch (Exception e) {
+                            RealTrainModUnofficial.LOGGER.warn("Failed to load bundled rail {}", p.getFileName(), e);
+                        }
+                    });
+            }
+            RealTrainModUnofficial.LOGGER.info("Loaded {} bundled rail (ModelRail_) definition(s)", count[0]);
+        } catch (Exception e) {
+            RealTrainModUnofficial.LOGGER.warn("Could not load bundled rail definitions", e);
         }
     }
 
@@ -106,9 +143,12 @@ public class RailPackLoader {
         if (!fileName.endsWith(".zip") && !fileName.endsWith(".jar")) {
             return false;
         }
+        //自分自身の jar を「パック」として読み直すと、jar 同梱の本家レール定義が
+        //二重登録される。ファイル名だけだとリネームされた jar をすり抜けるので実体でも見る。
         return !fileName.contains("realtrainmodunofficial")
             && !fileName.contains("rtm-official-assets")
-            && !fileName.contains("kaizpatchx");
+            && !fileName.contains("kaizpatchx")
+            && !BundledPackStore.isOwnModJar(path);
     }
 
     public static synchronized void reload() {
