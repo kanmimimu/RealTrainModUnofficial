@@ -147,11 +147,14 @@ def buildE257DefaultPack = tasks.register('buildE257DefaultPack', Zip) {
 tasks.named('jar', Jar).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     dependsOn buildE257DefaultPack
-    // 利用規約を jar のルートに入れる (本家 RTM も LICENSE.txt を同梱している)。
-    // 入れておかないと、jar だけ手に入れた人が規約を読めない。
+    // LGPL-3.0 §4(b): 頒布物には GNU GPL と本ライセンス文書のコピーを添付すること。
+    // LGPL-3.0 は GPL-3.0 の条項を取り込むライセンスなので、2 つで 1 セット。
     // ※ META-INF/LICENSE は依存ライブラリ (GraalVM 等) のもので別物。
     from('LICENSE') {
-        rename { 'LICENSE_RTMU.txt' }
+        rename { 'LICENSE_LGPL-3.0.txt' }
+    }
+    from('COPYING') {
+        rename { 'LICENSE_GPL-3.0.txt' }
     }
     from(buildE257DefaultPack.flatMap { it.archiveFile }) {
         into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
