@@ -2,6 +2,7 @@ package com.portofino.realtrainmodunofficial.client.sound;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
+import net.minecraft.world.entity.Entity;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import net.minecraft.client.Minecraft;
@@ -28,11 +29,58 @@ public final class LegacyScriptSoundManager {
     private LegacyScriptSoundManager() {
     }
 
-    public static void play(TrainEntity train, String namespace, String soundName, float volume, float pitch) {
+    // ---- 列車エンティティの両対応 ----
+    //
+    // RTMU には列車エンティティが 2 系統ある:
+    //   ・com.portofino...entity.TrainEntity          (旧, レガシー)
+    //   ・jp.ngt.rtm.entity.train.EntityTrainBase     (本家忠実移植。列車アイテムが出すのはこちら)
+    // サウンド一式は旧 TrainEntity 決め打ちで書かれていたため、実際に出る本家側の列車では
+    // <b>音が一切鳴らなかった</b>。どちらでも鳴るように、必要な値だけを型に依存せず取り出す。
+
+    /** その Entity が列車か。 */
+    public static boolean isTrain(Entity e) {
+        return e instanceof TrainEntity || e instanceof jp.ngt.rtm.entity.train.EntityTrainBase;
+    }
+
+    /** 車両定義 ID (パックの ModelTrain_*.json の name)。 */
+    private static String vehicleIdOf(Entity e) {
+        if (e instanceof TrainEntity t) {
+            return t.getVehicleId();
+        }
+        if (e instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
+            //本家側は getModelName() が定義 ID にあたる
+            return t.getModelName();
+        }
+        return "";
+    }
+
+    /** ノッチ (負=ブレーキ, 正=力行)。 */
+    private static int notchOf(Entity e) {
+        if (e instanceof TrainEntity t) {
+            return t.getNotch();
+        }
+        if (e instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
+            return t.getNotch();
+        }
+        return 0;
+    }
+
+    /** 速度。 */
+    private static float speedOf(Entity e) {
+        if (e instanceof TrainEntity t) {
+            return t.getSpeed();
+        }
+        if (e instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
+            return t.getSpeed();
+        }
+        return 0.0F;
+    }
+
+    public static void play(Entity train, String namespace, String soundName, float volume, float pitch) {
         play(train, namespace, soundName, volume, pitch, true);
     }
 
-    public static void playLegacyId(TrainEntity train, String legacySoundId, float volume, float pitch, boolean looping) {
+    public static void playLegacyId(Entity train, String legacySoundId, float volume, float pitch, boolean looping) {
         if (legacySoundId == null || legacySoundId.isBlank()) {
             return;
         }
@@ -46,7 +94,7 @@ public final class LegacyScriptSoundManager {
         play(train, namespace, soundName, volume, pitch, looping);
     }
 
-    public static void play(TrainEntity train, String namespace, String soundName, float volume, float pitch, boolean looping) {
+    public static void play(Entity train, String namespace, String soundName, float volume, float pitch, boolean looping) {
         if (train == null || !train.level().isClientSide()) {
             return;
         }
@@ -160,20 +208,20 @@ public final class LegacyScriptSoundManager {
         }
     }
 
-    public static void tickJsonRunningSound(TrainEntity train) {
+    public static void tickJsonRunningSound(Entity train) {
         if (train == null || !train.level().isClientSide()) {
             return;
         }
-        VehicleDefinition definition = VehicleRegistry.getById(train.getVehicleId());
+        VehicleDefinition definition = VehicleRegistry.getById(vehicleIdOf(train));
         if (definition == null || definition.hasSoundScript() || !definition.hasJsonRunningSounds()) {
             stopAutoRunningSound(train);
             return;
         }
 
         AutoRunningSoundState state = AUTO_RUNNING.computeIfAbsent(train.getUUID(), ignored -> new AutoRunningSoundState());
-        float speed = Math.abs(train.getSpeed());
+        float speed = Math.abs(speedOf(train));
         boolean moving = speed > 0.0025F;
-        boolean powering = train.getNotch() > 0;
+        boolean powering = notchOf(train) > 0;
         boolean accelerating = powering || speed > state.previousSpeed + 0.0005F;
         String sound = selectJsonRunningSound(definition, train, speed, moving, accelerating);
         state.previousSpeed = speed;
@@ -199,7 +247,7 @@ public final class LegacyScriptSoundManager {
         play(train, soundId.getNamespace(), soundId.getPath(), volume, pitch, true);
     }
 
-    private static String selectJsonRunningSound(VehicleDefinition definition, TrainEntity train,
+    private static String selectJsonRunningSound(VehicleDefinition definition, Entity train,
                                                  float speed, boolean moving, boolean accelerating) {
         if (!moving) {
             return definition.getSoundStop();
@@ -241,7 +289,7 @@ public final class LegacyScriptSoundManager {
         return "";
     }
 
-    public static void stop(TrainEntity train, String namespace, String soundName) {
+    public static void stop(Entity train, String namespace, String soundName) {
         if (train == null) {
             return;
         }
@@ -255,7 +303,7 @@ public final class LegacyScriptSoundManager {
         }
     }
 
-    private static void stop(TrainEntity train, ResourceLocation soundId) {
+    private static void stop(Entity train, ResourceLocation soundId) {
         if (train == null || soundId == null) {
             return;
         }
@@ -265,7 +313,23 @@ public final class LegacyScriptSoundManager {
         }
     }
 
-    public static void stopAutoRunningSound(TrainEntity train) {
+    /** その列車が鳴らしているループ音を全部止める (本家 SoundUpdater.stopAllSounds 相当)。 */
+    public static void stopAll(Entity train) {
+        if (train == null) {
+            return;
+        }
+        String prefix = train.getUUID() + "|";
+        ACTIVE.entrySet().removeIf(entry -> {
+            if (!entry.getKey().startsWith(prefix)) {
+                return false;
+            }
+            entry.getValue().requestStop();
+            return true;
+        });
+        stopAutoRunningSound(train);
+    }
+
+    public static void stopAutoRunningSound(Entity train) {
         if (train == null) {
             return;
         }
@@ -341,9 +405,9 @@ public final class LegacyScriptSoundManager {
     }
 
     private static final class LoopingTrainSound extends AbstractTickableSoundInstance {
-        private final TrainEntity train;
+        private final Entity train;
 
-        private LoopingTrainSound(TrainEntity train, ResourceLocation soundId) {
+        private LoopingTrainSound(Entity train, ResourceLocation soundId) {
             super(SoundEvent.createVariableRangeEvent(soundId), SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
             this.train = train;
             this.looping = true;

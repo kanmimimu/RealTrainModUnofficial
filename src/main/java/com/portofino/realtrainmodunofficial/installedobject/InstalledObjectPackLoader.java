@@ -165,8 +165,8 @@ public final class InstalledObjectPackLoader {
         try (var stream = Files.list(dir)) {
             stream.filter(InstalledObjectPackLoader::isSupportedArchive)
                 .forEach(path -> {
-                    try (InputStream input = Files.newInputStream(path)) {
-                        loadPack(input, path.getFileName().toString());
+                    try {
+                        loadPackFile(path, path.getFileName().toString());
                     } catch (Exception e) {
                         RealTrainModUnofficial.LOGGER.warn("Failed to load installed object pack {}", path.getFileName(), e);
                     }
@@ -210,14 +210,25 @@ public final class InstalledObjectPackLoader {
     }
 
     private static void loadPack(InputStream zipInput, String packName) throws IOException {
-        loadPack(zipInput, packName, 0);
+        loadPack(zipInput, packName, 0, java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    private static void loadPack(InputStream zipInput, String packName, int depth) throws IOException {
+    /**
+     * エントリ名が Shift-JIS の zip (Windows 製の日本語名パック) は UTF-8 では読めないので、
+     * その場合だけ Shift-JIS で開き直す。
+     */
+    private static void loadPackFile(Path path, String packName) throws Exception {
+        com.portofino.realtrainmodunofficial.util.PackZip.readWithFallback(
+            () -> Files.newInputStream(path), packName,
+            (in, charset) -> loadPack(in, packName, 0, charset));
+    }
+
+    private static void loadPack(InputStream zipInput, String packName, int depth,
+                                 java.nio.charset.Charset charset) throws IOException {
         List<EntryData> entries = new ArrayList<>();
         List<NestedArchive> nestedArchives = new ArrayList<>();
         List<String> rrsTextures = new ArrayList<>();
-        try (ZipInputStream zip = new ZipInputStream(zipInput)) {
+        try (ZipInputStream zip = new ZipInputStream(zipInput, charset)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 if (!entry.isDirectory()) {
@@ -242,7 +253,7 @@ public final class InstalledObjectPackLoader {
         for (NestedArchive nested : nestedArchives) {
             Path materialized = RailPackLoader.materializeNestedPack(nested.name(), nested.bytes());
             try (InputStream input = Files.newInputStream(materialized)) {
-                loadPack(input, nested.name(), depth + 1);
+                loadPack(input, nested.name(), depth + 1, charset);
             }
         }
     }

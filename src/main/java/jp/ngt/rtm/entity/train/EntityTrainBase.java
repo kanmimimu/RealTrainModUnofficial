@@ -296,6 +296,50 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
+    // ---- サウンド (クライアント側) ----
+    //
+    // 列車アイテムが出すのはこのクラス (本家系) だが、サウンド一式は旧 TrainEntity 側にしか
+    // 実装されていなかったため、リリース版では走行音が一切鳴らなくなっていた。
+    // 旧 TrainEntity.tick() のサウンド処理と同じものをここに持ってくる。
+
+    /** 車両パックのサウンドスクリプト (sound_*.js)。クライアント専用。 */
+    private javax.script.ScriptEngine soundScriptEngine;
+    /** スクリプトの読み込みを 1 度だけ試すためのフラグ (無い車両で毎 tick 探しに行かない)。 */
+    private boolean attemptedSoundScriptLoad;
+
+    @Override
+    public void tick() {
+        super.tick();
+
+        if (this.level().isClientSide()) {
+            this.tickSound();
+        }
+    }
+
+    /**
+     * 走行音を鳴らす。サウンドスクリプトがある車両はそれを回し、無ければ
+     * 車両 JSON の running sound 定義 (速度で音量/ピッチを変えるだけの簡易版) で鳴らす。
+     */
+    private void tickSound() {
+        if (!this.attemptedSoundScriptLoad) {
+            this.attemptedSoundScriptLoad = true;
+            com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
+                    com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
+            if (def != null && def.hasSoundScript()) {
+                this.soundScriptEngine =
+                        com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadSoundScriptForVehicle(def);
+            }
+        }
+
+        if (this.soundScriptEngine != null) {
+            //スクリプトが鳴らす音と JSON 定義の自動走行音が二重に鳴らないようにする
+            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAutoRunningSound(this);
+            com.portofino.realtrainmodunofficial.script.TrainScriptSystem.invokeSoundScript(this.soundScriptEngine, this);
+        } else {
+            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
+        }
+    }
+
     @Override
     protected void onVehicleUpdate() {
         this.updateSpeed();
@@ -837,12 +881,38 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return this.getByteFromDataWatcher(TrainStateType.State_Notch.id);
     }
 
+    /** 本家 rtm:sounds/train/lever.ogg (マスコン/ブレーキハンドルの操作音)。 */
+    private static final String SOUND_LEVER = "rtm:sounds/train/lever.ogg";
+
     public boolean addNotch(Entity driver, int par2) {
         if (par2 != 0) {
             int i = this.getNotch();
-            return this.setNotch(i + par2);
+            if (this.setNotch(i + par2)) {
+                //本家 EntityTrainBase.addNotch と同じ: ノッチが動いたらレバー音を鳴らす
+                com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(
+                        this, SOUND_LEVER, 1.0F, 1.0F);
+                //ブレーキ → 力行に入れた瞬間の緩解音 (ノッチ -1 からなら強い音)
+                if (i < 0 && par2 > 0 && !this.level().isClientSide()) {
+                    this.playBrakeReleaseSound(i == -1);
+                }
+                return true;
+            }
         }
         return false;
+    }
+
+    /** 本家 playBrakeReleaseSound: 車両側 JSON の sound_BrakeRelease / sound_BrakeRelease2。 */
+    protected void playBrakeReleaseSound(boolean isStrong) {
+        com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
+                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
+        if (def == null) {
+            return;
+        }
+        String sound = isStrong ? def.getSoundBrakeRelease() : def.getSoundBrakeRelease2();
+        if (sound == null || sound.isBlank()) {
+            return;
+        }
+        com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(this, sound, 1.0F, 1.0F);
     }
 
     public boolean setNotch(int par1) {

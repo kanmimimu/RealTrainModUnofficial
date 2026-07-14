@@ -33,14 +33,29 @@ public record TrainSoundPayload(int trainEntityId, String soundId, float volume,
         return TYPE;
     }
 
+    /**
+     * サーバーから、その列車を見ている全プレイヤーへ 1 回だけ音を鳴らす。
+     * legacySoundId は本家の書式 ("rtm:sounds/train/lever.ogg" 等) でよい。
+     */
+    public static void broadcast(net.minecraft.world.entity.Entity train, String legacySoundId, float volume, float pitch) {
+        if (train == null || train.level().isClientSide() || legacySoundId == null || legacySoundId.isBlank()) {
+            return;
+        }
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+            train, new TrainSoundPayload(train.getId(), legacySoundId, volume, pitch));
+    }
+
     public static void handleOnClient(TrainSoundPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             Minecraft minecraft = Minecraft.getInstance();
             if (minecraft.level == null || payload.soundId() == null || payload.soundId().isBlank()) {
                 return;
             }
-            if (minecraft.level.getEntity(payload.trainEntityId()) instanceof TrainEntity train) {
-                LegacyScriptSoundManager.playLegacyId(train, payload.soundId(), payload.volume(), payload.pitch(), false);
+            //旧 TrainEntity / 本家系 EntityTrainBase のどちらでも鳴らす
+            //(以前は TrainEntity 決め打ちで、実際に出る本家系の列車では黙って捨てていた)
+            net.minecraft.world.entity.Entity entity = minecraft.level.getEntity(payload.trainEntityId());
+            if (LegacyScriptSoundManager.isTrain(entity)) {
+                LegacyScriptSoundManager.playLegacyId(entity, payload.soundId(), payload.volume(), payload.pitch(), false);
             }
         });
     }

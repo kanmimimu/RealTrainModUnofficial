@@ -171,6 +171,14 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "mascon_neutral", 0));
             return;
         }
+        if (TrainControlKeyMappings.PLAY_ANNOUNCEMENT.matches(event.getKey(), event.getScanCode())) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "play_selected_announcement", 0));
+            return;
+        }
+        if (TrainControlKeyMappings.PLAY_HORN.matches(event.getKey(), event.getScanCode())) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "play_horn", 0));
+            return;
+        }
         boolean jumpDown = mc.options.keyJump.isDown();
         if (jumpDown && event.getKey() == GLFW.GLFW_KEY_LEFT) {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "toggle_door_left", 0));

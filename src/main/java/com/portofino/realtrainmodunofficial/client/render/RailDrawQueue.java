@@ -65,6 +65,12 @@ public final class RailDrawQueue {
         if (vbo == null || vbo.isInvalid() || renderType == null) {
             return false;
         }
+        //シェーダーパック使用中はこの経路を使わない (RailMeshCache 側で弾いているが二重に守る)。
+        //Iris がコアシェーダーを差し替えているため、VBO を直接描くと行列が噛み合わず
+        //レールが画面に貼り付いてしまう。
+        if (com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
+            return false;
+        }
         PoseStack.Pose pose = poseStack.last();
         Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(pose.pose());
         //レールの pose は「カメラ相対の平行移動」だけで回転が無いことがほとんど。

@@ -75,6 +75,10 @@ public class VehicleDefinition {
     private String soundAcceleration = "";
     private String soundDeceleration = "";
     private String soundDecelerationStop = "";
+    /** 本家 sound_BrakeRelease: ブレーキ → 力行に入れた瞬間の緩解音 (強)。 */
+    private String soundBrakeRelease = "";
+    /** 本家 sound_BrakeRelease2: 同上 (弱、ノッチ -1 以外から戻したとき)。 */
+    private String soundBrakeRelease2 = "";
     private final boolean doCulling;
     private final boolean renderLight;
     private final boolean notDisplayCab;
@@ -493,6 +497,19 @@ public class VehicleDefinition {
 
     public String getSoundDecelerationStop() {
         return soundDecelerationStop;
+    }
+
+    public String getSoundBrakeRelease() {
+        return soundBrakeRelease;
+    }
+
+    public String getSoundBrakeRelease2() {
+        return soundBrakeRelease2;
+    }
+
+    public void setBrakeReleaseSounds(String brakeRelease, String brakeRelease2) {
+        this.soundBrakeRelease = brakeRelease == null ? "" : brakeRelease;
+        this.soundBrakeRelease2 = brakeRelease2 == null ? "" : brakeRelease2;
     }
 
     public boolean hasJsonRunningSounds() {

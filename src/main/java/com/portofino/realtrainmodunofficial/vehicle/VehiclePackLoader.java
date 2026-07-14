@@ -208,10 +208,15 @@ public class VehiclePackLoader {
         }
     }
 
-    private static void loadVehicleZip(Path zipPath) throws IOException {
-        try (InputStream is = Files.newInputStream(zipPath)) {
-            loadVehiclePack(is, zipPath.getFileName().toString());
-        }
+    /**
+     * エントリ名が Shift-JIS の zip (Windows 製の日本語名パック) は UTF-8 では読めないので、
+     * その場合だけ Shift-JIS で開き直す。
+     */
+    private static void loadVehicleZip(Path zipPath) throws Exception {
+        String packName = zipPath.getFileName().toString();
+        com.portofino.realtrainmodunofficial.util.PackZip.readWithFallback(
+            () -> Files.newInputStream(zipPath), packName,
+            (in, charset) -> loadVehiclePack(in, packName, 0, charset));
     }
 
     private static boolean isSupportedArchive(Path path) {
@@ -265,14 +270,15 @@ public class VehiclePackLoader {
     }
 
     private static void loadVehiclePack(InputStream zipInput, String packName) throws IOException {
-        loadVehiclePack(zipInput, packName, 0);
+        loadVehiclePack(zipInput, packName, 0, java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    private static void loadVehiclePack(InputStream zipInput, String packName, int depth) throws IOException {
+    private static void loadVehiclePack(InputStream zipInput, String packName, int depth,
+                                        java.nio.charset.Charset charset) throws IOException {
         List<byte[]> jsonBytes = new ArrayList<>();
         List<String> jsonPaths = new ArrayList<>();
         List<NestedArchive> nestedArchives = new ArrayList<>();
-        try (ZipInputStream zip = new ZipInputStream(zipInput)) {
+        try (ZipInputStream zip = new ZipInputStream(zipInput, charset)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 if (!entry.isDirectory()) {
@@ -293,7 +299,7 @@ public class VehiclePackLoader {
         for (NestedArchive nested : nestedArchives) {
             Path materialized = RailPackLoader.materializeNestedPack(nested.name(), nested.bytes());
             try (InputStream input = Files.newInputStream(materialized)) {
-                loadVehiclePack(input, nested.name(), depth + 1);
+                loadVehiclePack(input, nested.name(), depth + 1, charset);
             }
         }
     }
@@ -464,6 +470,8 @@ public class VehiclePackLoader {
             String soundAcceleration = firstNonBlank(getString(trainModel, "sound_Acceleration"), getString(obj, "sound_Acceleration"));
             String soundDeceleration = firstNonBlank(getString(trainModel, "sound_Deceleration"), getString(obj, "sound_Deceleration"));
             String soundDecelerationStop = firstNonBlank(getString(trainModel, "sound_D_S"), getString(obj, "sound_D_S"));
+            String soundBrakeRelease = firstNonBlank(getString(trainModel, "sound_BrakeRelease"), getString(obj, "sound_BrakeRelease"));
+            String soundBrakeRelease2 = firstNonBlank(getString(trainModel, "sound_BrakeRelease2"), getString(obj, "sound_BrakeRelease2"));
             List<String> announcementSounds = parseAnnouncementSounds(obj, trainModel);
             float acceleration = parseFloat(trainModel, "acceleration",
                 parseFloat(trainModel, "accelerateion", parseFloat(obj, "acceleration", parseFloat(obj, "accelerateion", 0.00243F))));
@@ -531,6 +539,7 @@ public class VehiclePackLoader {
                 soundDeceleration,
                 soundDecelerationStop
             );
+            definition.setBrakeReleaseSounds(soundBrakeRelease, soundBrakeRelease2);
             LOADED.add(definition);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse train json {} in {}: {}", sourcePath, packName, e.getMessage());

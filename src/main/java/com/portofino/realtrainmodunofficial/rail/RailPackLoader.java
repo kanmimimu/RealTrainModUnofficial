@@ -46,9 +46,7 @@ public class RailPackLoader {
         loadBuiltinRailsFromModJar();
         try {
             for (Path path : BundledPackStore.listBundledPacks("rail")) {
-                try (InputStream is = Files.newInputStream(path)) {
-                    loadRailPack(is, path.getFileName().toString());
-                }
+                loadRailPackFile(path, path.getFileName().toString());
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not load bundled rail packs from mod jar", e);
@@ -127,9 +125,9 @@ public class RailPackLoader {
             // RTM 系 pack は zip / jar の両方で配られるので、入口は archive に寄せる。
             stream.filter(RailPackLoader::isSupportedArchive)
                 .forEach(zipPath -> {
-                    try (InputStream is = Files.newInputStream(zipPath)) {
+                    try {
                         int before = LOADED.size();
-                        loadRailPack(is, zipPath.getFileName().toString());
+                        loadRailPackFile(zipPath, zipPath.getFileName().toString());
                         int added = LOADED.size() - before;
                         if (added > 0) {
                             RealTrainModUnofficial.LOGGER.info("Loaded {} rail definition(s) from {}", added, zipPath.getFileName());
@@ -160,13 +158,24 @@ public class RailPackLoader {
     }
 
     private static void loadRailPack(InputStream zipInput, String packName) throws IOException {
-        loadRailPack(zipInput, packName, 0);
+        loadRailPack(zipInput, packName, 0, java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    private static void loadRailPack(InputStream zipInput, String packName, int depth) throws IOException {
+    /**
+     * パスから読む版。エントリ名が Shift-JIS の zip (Windows 製の日本語名パック) は
+     * UTF-8 では読めないので、その場合だけ Shift-JIS で開き直す。
+     */
+    private static void loadRailPackFile(java.nio.file.Path path, String packName) throws Exception {
+        com.portofino.realtrainmodunofficial.util.PackZip.readWithFallback(
+            () -> Files.newInputStream(path), packName,
+            (in, charset) -> loadRailPack(in, packName, 0, charset));
+    }
+
+    private static void loadRailPack(InputStream zipInput, String packName, int depth,
+                                     java.nio.charset.Charset charset) throws IOException {
         List<byte[]> jsonBytes = new ArrayList<>();
         List<NestedArchive> nestedArchives = new ArrayList<>();
-        try (ZipInputStream zip = new ZipInputStream(zipInput)) {
+        try (ZipInputStream zip = new ZipInputStream(zipInput, charset)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 if (!entry.isDirectory()) {
@@ -187,7 +196,7 @@ public class RailPackLoader {
             Path materialized = materializeNestedPack(nested.name(), nested.bytes());
             try (InputStream input = Files.newInputStream(materialized)) {
                 int before = LOADED.size();
-                loadRailPack(input, nested.name(), depth + 1);
+                loadRailPack(input, nested.name(), depth + 1, charset);
                 int added = LOADED.size() - before;
                 if (added > 0) {
                     RealTrainModUnofficial.LOGGER.info("Loaded {} rail definition(s) from nested pack {} in {}", added, nested.name(), packName);

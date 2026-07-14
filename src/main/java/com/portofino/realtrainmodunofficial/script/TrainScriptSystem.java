@@ -35,6 +35,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class TrainScriptSystem {
+
+    /** {@code var X = X;} (リマップで生じる自己代入宣言)。巻き上げでグローバルを潰すので消す。 */
+    private static final java.util.regex.Pattern SELF_ASSIGN_DECL =
+            java.util.regex.Pattern.compile("\\bvar\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*=\\s*\\1\\s*;");
+
     private static final String[] PREFERRED_ECMA_VERSIONS = {"2024", "2023", "2022"};
     private static final String SCRIPT_PATH_KEY = "__ptScriptPath";
 
@@ -634,6 +639,16 @@ public class TrainScriptSystem {
         result = result.replace("Packages.net.minecraftforge.fml.common.Loader", "LoaderCompat");
         result = result.replace("if (!stream) return null;", "if (!stream) return __ptDummyTextureData();");
         result = result.replace("Java.from(", "__ptJavaFrom(");
+        //★ 自己代入の宣言を消す。
+        //
+        //上のリマップで  var NGTLog = Packages.jp.ngt.ngtlib.io.NGTLog;
+        //            →  var NGTLog = NGTLog;
+        //になる。これが関数の中にあると JS の巻き上げでローカル NGTLog が先に宣言され、
+        //右辺はグローバルではなく<b>まだ undefined のローカル自身</b>を読む。結果
+        //NGTLog が undefined になり、NGTLog.debug(...) で TypeError → スクリプトごと停止する
+        //(E259 のサウンドスクリプトが丸ごと死んでいた原因)。
+        //宣言ごと消せば、以降の参照はプリリュードで用意したグローバルに解決される。
+        result = SELF_ASSIGN_DECL.matcher(result).replaceAll("");
         result = appendSuperRailBuilderOverrides(result);
         return result;
     }
@@ -1347,6 +1362,54 @@ public class TrainScriptSystem {
         }
     }
 
+    /**
+     * サウンドスクリプト (sound_*.js) を 1tick 分回す。
+     *
+     * <p>本家のサウンドスクリプトは {@code onUpdate(su)} 一本で、su には音用の executor が
+     * 渡る。描画用の {@code invokeScriptTick} は executor を旧 TrainEntity 限定で作るため、
+     * 本家系の列車では su が null になり音が鳴らなかった。ここでは両系統の列車で使える
+     * {@link SoundScriptExecutor} を必ず渡す。
+     */
+    public static void invokeSoundScript(ScriptEngine scriptEngine, net.minecraft.world.entity.Entity train) {
+        if (scriptEngine == null || train == null || isScriptDisabled(scriptEngine)) {
+            return;
+        }
+        SoundScriptExecutor su = new SoundScriptExecutor(train);
+        try {
+            scriptEngine.put("executer", su);
+            scriptEngine.put("executor", su);
+        } catch (Throwable ignored) {
+        }
+        if (!(scriptEngine instanceof Invocable invocable)) {
+            return;
+        }
+        try {
+            invocable.invokeFunction("onUpdate", su);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // onUpdate を持たないサウンドスクリプト → 下の形式を試す
+        } catch (ScriptException e) {
+            disableBrokenScript(scriptEngine, "onUpdate(su) [sound]", e);
+            return;
+        }
+        try {
+            invocable.invokeFunction("update", su, 1.0F);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // update も無い
+        } catch (ScriptException e) {
+            disableBrokenScript(scriptEngine, "update(su) [sound]", e);
+            return;
+        }
+        try {
+            invocable.invokeFunction("tick", su);
+        } catch (NoSuchMethodException ignored) {
+            // tick も無い → このスクリプトには回すものが無い
+        } catch (ScriptException e) {
+            disableBrokenScript(scriptEngine, "tick(su) [sound]", e);
+        }
+    }
+
     public static void invokeScriptUpdate(ScriptEngine scriptEngine, Object entity, float partialTicks) {
         if (scriptEngine == null || isScriptDisabled(scriptEngine)) return;
         if (scriptEngine instanceof Invocable invocable) {
@@ -1707,10 +1770,10 @@ public class TrainScriptSystem {
             try {
                 Class<?> managerClass = Class.forName("com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager");
                 if ("play".equals(method)) {
-                    managerClass.getMethod("play", TrainEntity.class, String.class, String.class, float.class, float.class, boolean.class)
+                    managerClass.getMethod("play", net.minecraft.world.entity.Entity.class, String.class, String.class, float.class, float.class, boolean.class)
                         .invoke(null, train, namespace, soundName, volume, pitch, looping);
                 } else {
-                    managerClass.getMethod("stop", TrainEntity.class, String.class, String.class)
+                    managerClass.getMethod("stop", net.minecraft.world.entity.Entity.class, String.class, String.class)
                         .invoke(null, train, namespace, soundName);
                 }
             } catch (Exception e) {

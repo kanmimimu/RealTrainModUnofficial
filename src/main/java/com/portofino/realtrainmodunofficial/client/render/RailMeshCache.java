@@ -95,6 +95,24 @@ public final class RailMeshCache {
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
             return false;
         }
+        //★ Iris/Oculus のシェーダーパック使用中は統合メッシュ (VBO) を使わない。
+        //
+        //この経路は焼いた VBO を RenderSystem.getShader() で直接描く (RailDrawQueue)。
+        //シェーダーパックが有効だとコアシェーダーが Iris のものに差し替わっており、
+        //頂点フォーマットも uniform (特に modelView) も噛み合わない。結果、レールが
+        //ワールド座標ではなくビュー座標で描かれ、<b>視点を動かすとレールが画面に貼り付いて
+        //ついてくる</b> (ユーザー報告のバグ)。
+        //
+        //シェーダー使用中は逐次描画にフォールバックする。MultiBufferSource 経由なら
+        //Iris が正しく捕まえてくれる。軽量化は効かなくなるが、壊れるよりはよい。
+        if (com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
+            //焼き済みの VBO は使わないので解放する (空なら何もしない)。
+            if (!CACHE.isEmpty()) {
+                clear();
+            }
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
+            return false;
+        }
         dropIfLevelChanged();
 
         RailMesh mesh = CACHE.get(pos);

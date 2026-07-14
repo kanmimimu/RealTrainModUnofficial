@@ -197,7 +197,12 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
         switch (action) {
             case "mascon_power" -> train.addNotch(player, 1);
             case "mascon_brake" -> train.addNotch(player, -1);
-            case "mascon_neutral" -> train.setNotch(0);
+            //ノッチ 0 に戻すのもマスコン操作なので、本家 addNotch と同じレバー音を鳴らす
+            case "mascon_neutral" -> {
+                if (train.setNotch(0)) {
+                    TrainSoundPayload.broadcast(train, "rtm:sounds/train/lever.ogg", 1.0F, 1.0F);
+                }
+            }
             case "dismount" -> player.stopRiding();
             case "toggle_reverse" -> {
                 if (train.getNotch() == 0) {
@@ -247,6 +252,24 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id, (byte) value);
             case "set_announcement" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Announcement.id, (byte) value);
+            //車内放送: 選択中のアナウンス (TrainState の Announcement が本家のインデックス) を鳴らす。
+            //本家 GuiVehicleControlPanel のボタン 129 と同じ。
+            case "play_selected_announcement" -> {
+                VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
+                List<String> sounds = def != null ? def.getAnnouncementSounds() : List.of();
+                if (!sounds.isEmpty()) {
+                    int index = Math.floorMod(train.getTrainStateData(
+                            jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Announcement.id),
+                            sounds.size());
+                    TrainSoundPayload.broadcast(train, sounds.get(index), 1.0F, 1.0F);
+                }
+            }
+            case "play_horn" -> {
+                VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
+                if (def != null && !def.getHornSound().isBlank()) {
+                    TrainSoundPayload.broadcast(train, def.getHornSound(), 1.0F, 1.0F);
+                }
+            }
             case "cycle_custom_button" -> {
                 int index = (value >>> 8) & 0xFF;
                 int currentValue = value & 0xFF;
