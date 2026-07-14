@@ -267,6 +267,21 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             return;
         }
 
+        //★ 本家式: パックの rendererPath (WirePartsRenderer) をそのまま実行する。
+        //架線柱パックは描画を renderWireStatic/renderWireDynamic に書いており、それを
+        //呼ばずに自前の近似 (モデルを線に沿って等間隔で並べる) で描いていたため、
+        //Baru's Pole のような作り込んだパックが本家と違う見た目になっていた。
+        //スクリプトが何も描けなかったときは false が返るので、従来描画にそのまま落ちる。
+        if (model != null && hasScript) {
+            com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.Scripted scripted =
+                com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.get(definition);
+            if (scripted != null && scripted.render(blockEntity, from, to, 1.0F, poseStack, buffer,
+                packedLight, packedOverlay, model)) {
+                return;
+            }
+        }
+
+
         // BasicWire / SimpleCatenary / モデル無しは本家の単線系スクリプトとして描く。
         if (hasScript || model == null) {
             renderBasicWireCable(from, to, packedLight, poseStack, buffer);
@@ -859,7 +874,9 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         poseStack.translate(0.0F, plateY, 0.0F);
         poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
         PoseStack.Pose pose = poseStack.last();
-        VertexConsumer solid = buffer.getBuffer(RenderType.entityCutoutNoCull(SolidTexture.white()));
+        //★ VertexConsumer は「使う直前に」取る。MultiBufferSource は別の RenderType を
+        //要求された時点で<b>前のバッファを閉じる</b>ので、先に取っておくと後で書き込んだ瞬間に
+        //IllegalStateException: Not building! で落ちる (標識を置くとクラッシュしていた原因)。
         if (texture != null) {
             VertexConsumer plate = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
             //表: テクスチャそのまま
@@ -889,6 +906,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             poseStack.translate(0.0F, -0.5F, 0.0F);
         }
         //本家 NGTRenderer.renderPole(tessellator, 0.0625F, 1.5F, false) + 色 0x404040
+        //板を描き終えてからバッファを取る (先に取ると板の描画でこのバッファが閉じられてしまう)。
+        VertexConsumer solid = buffer.getBuffer(RenderType.entityCutoutNoCull(SolidTexture.white()));
         renderPole(solid, poseStack.last(), 0.0625F, 1.5F, 0x404040, packedLight, packedOverlay);
         poseStack.popPose();
     }

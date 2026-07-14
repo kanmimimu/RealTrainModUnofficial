@@ -191,6 +191,12 @@ public final class RailScriptRenderers {
                         for (int i = 0; i < railCount; i++) {
                             this.renderer.currentRailIndex = i;
                             this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+                            //本家 RailPartsRendererBase.renderRail は static の<b>直後に dynamic も呼ぶ</b>。
+                            //こちらは分岐 (トング可動) でしか dynamic を呼んでいなかったため、
+                            //描画を全部 renderRailDynamic に書いているパック
+                            //(Baru's Roof 等、レールに沿って屋根を並べる系) が<b>何も表示されなかった</b>。
+                            //中身は動かない静的な形状なので、static と同じ記録に入れて焼いてよい。
+                            this.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
                         }
                     }
                 } catch (Throwable t) {

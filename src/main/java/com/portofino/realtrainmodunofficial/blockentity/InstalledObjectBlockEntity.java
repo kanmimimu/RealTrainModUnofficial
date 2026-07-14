@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class InstalledObjectBlockEntity extends BlockEntity {
+public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rtm.electric.TileEntityInsulator {
     private static final int TICKET_GATE_OPEN_TICKS = 60;
     private static final int TICKET_GATE_MOVE_TICKS = 12;
     private String definitionId = "";
@@ -139,6 +139,54 @@ public class InstalledObjectBlockEntity extends BlockEntity {
 
     public InstalledObjectBlockEntity(BlockPos pos, BlockState blockState) {
         super(RealTrainModUnofficialBlockEntities.INSTALLED_OBJECT.get(), pos, blockState);
+        //本家スクリプト互換 (1.7.10 の TileEntity 座標フィールド)。
+        //架線柱パックの描画スクリプトは周囲の碍子を探すのにこれを読む。
+        this.field_145851_c = pos.getX();
+        this.field_145848_d = pos.getY();
+        this.field_145849_e = pos.getZ();
+    }
+
+    // ---- 本家スクリプト互換 (SRG 名) ----
+    //
+    // 架線柱パックのスクリプトは RTMCore.VERSION が "1.7.10" を含むため 1.7.10 の
+    // API 名で書かれた分岐に入る。そこで読まれる名前だけをここで提供する。
+
+    /** 1.7.10 TileEntity.xCoord */
+    public int field_145851_c;
+    /** 1.7.10 TileEntity.yCoord */
+    public int field_145848_d;
+    /** 1.7.10 TileEntity.zCoord */
+    public int field_145849_e;
+
+    private jp.ngt.mccompat.WorldCompat worldCompat;
+
+    /** func_145831_w = getWorldObj()。スクリプトは戻り値に func_147438_o(x,y,z) を呼ぶ。 */
+    public jp.ngt.mccompat.WorldCompat func_145831_w() {
+        if (this.level == null) {
+            return null;
+        }
+        if (this.worldCompat == null || this.worldCompat.level != this.level) {
+            this.worldCompat = new jp.ngt.mccompat.WorldCompat(this.level);
+        }
+        return this.worldCompat;
+    }
+
+    /**
+     * 本家 TileEntityInsulator.wirePos (電線の取付点)。碍子 (コネクタ) 以外は null。
+     * スクリプトは {@code tile.wirePos} と書き、Nashorn がこの getter に解決する。
+     */
+    @Override
+    public jp.ngt.ngtlib.math.Vec3 getWirePos() {
+        InstalledObjectCategory cat = getCategory();
+        if (cat != InstalledObjectCategory.CONNECTOR_INPUT && cat != InstalledObjectCategory.CONNECTOR_OUTPUT) {
+            return null;
+        }
+        InstalledObjectDefinition def = InstalledObjectRegistry.getById(this.definitionId);
+        if (def == null) {
+            return null;
+        }
+        net.minecraft.world.phys.Vec3 wp = def.getWireAttachPos();
+        return wp == null ? null : new jp.ngt.ngtlib.math.Vec3(wp.x, wp.y, wp.z);
     }
 
     @Override
