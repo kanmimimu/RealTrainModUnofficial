@@ -128,8 +128,9 @@ Official URL : https://github.com/325-Sunnygo/RealTrainModUnofficial
   2. You MUST contact Sunnygo and obtain permission in advance if you wish to:
      a. Port the Mod to a Minecraft version other than 1.21.1 (incl. patches)
      b. Create a patch, add-on or modified build that changes the Mod's behaviour
-     c. Create another mod that reuses the Mod's source code or resources
-  3. Contact: GitHub Issues, or the RTMU Discord server.
+  3. Contact
+     - GitHub Issue : https://github.com/325-Sunnygo/RealTrainModUnofficial/issues
+     - The RTMU Discord server
 
 (3) REDISTRIBUTION
   1. Redistributing the Mod or the files inside it is prohibited in principle,
@@ -145,7 +146,6 @@ Official URL : https://github.com/325-Sunnygo/RealTrainModUnofficial
 (4) COMMERCIAL USE
   1. Selling the Mod or the files inside it is prohibited, whether modified or not.
   2. Monetising videos and images created with the Mod is permitted.
-  3. Any other commercial activity requires permission from Sunnygo.
 
 (5) DISCLAIMER
   1. Sunnygo is not liable for any damage arising from use of the Mod.
@@ -153,11 +153,12 @@ Official URL : https://github.com/325-Sunnygo/RealTrainModUnofficial
 (6) THIRD-PARTY WORKS
   The Mod contains works by the following authors, included with their
   permission. Rights to those parts remain with their respective authors.
-   - RealTrainMod / NGTLib     : ngt5479
-   - KaizPatchX                : (c) Kaiz_JP and other authors 2021
-                                 (retaining this notice is a condition of the grant)
-   - SignalControllerMod       : masa
-   - WebCTC compatibility      : fuyuzero
+
+   - RealTrainMod / NGTLib  --  ngt5479
+
+   - KaizPatchX  --  (c) Kaiz_JP and other authors 2021
+
+   - SignalControllerMod  --  masa
 
 (7) PREVIOUS VERSIONS
   1. Versions up to and including v1.0.3 were released under LGPL-3.0.
