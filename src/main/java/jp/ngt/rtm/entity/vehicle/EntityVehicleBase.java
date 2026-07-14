@@ -27,14 +27,20 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
      * 転換クロスシートの回転量 (-{@link #MAX_SEAT_ROTATION} 〜 {@link #MAX_SEAT_ROTATION})。
      * {@code updateAnimation} が進行方向へ毎 tick 1 ずつ動かすので、転換は滑らかに進む。
      * <p>
-     * ★ このフィールドと同名の getter ({@code getSeatRotation()}) を<b>絶対に足さないこと</b>。
+     * ★ Nashorn (Dynalink の BeansLinker) はプロパティ解決で<b>フィールドより getter を優先する</b>。
+     * つまり {@code getSeatRotation()} が存在すると、スクリプト中の {@code entity.seatRotation} は
+     * フィールドではなく getter を返す。本家 getSeatRotation() は {@code seatRotation / 45.0F} を
+     * 返すので、{@code entity.seatRotation / 45} と書いているパック (小田急 30000 形など) では
+     * 45 で二重に割られて座席が動かなくなる。
      * <p>
-     * パックの描画スクリプトは {@code entity.seatRotation / 45} でこの値を読む
-     * ({@code RTMCore.VERSION} が "1.7.10" を含むため、どのパックも legacy 経路に入る)。
-     * ところが Nashorn (Dynalink の BeansLinker) はプロパティ解決で<b>フィールドより getter を
-     * 優先する</b>ため、{@code getSeatRotation()} を定義すると {@code entity.seatRotation} が
-     * フィールドではなく getter を返すようになる。戻り値の尺度が変われば、スクリプト側の
-     * {@code / 45} が二重に効いて座席が動かなくなる (実際に小田急 30000 形で発生した)。
+     * しかし本家 RTM の標準スクリプト (Render223.js 等) は {@code entity.getSeatRotation()} を呼ぶので、
+     * getter を消すと今度はそちらが落ちる。両立させるため:
+     * <ul>
+     *   <li>{@link #getSeatRotation()} は本家どおり {@code seatRotation / 45.0F} を返す</li>
+     *   <li>{@link #getSeatRotationRaw()} が生の値を返す</li>
+     *   <li>{@code PackScriptSource} がスクリプト中の {@code .seatRotation} を
+     *       {@code .getSeatRotationRaw()} に書き換えるので、パック側は今までどおり生の値を読む</li>
+     * </ul>
      */
     public int seatRotation;
     public int doorMoveL;
@@ -220,6 +226,37 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
     public jp.ngt.rtm.modelpack.state.ResourceState getResourceState() {
         return this.resourceState;
+    }
+
+    // ---- 本家スクリプト互換 API ----
+    //
+    // RTM 標準のレンダースクリプト (Render223.js 等) が entity に対して直接呼ぶメソッド群。
+    // 1 つでも欠けると Nashorn が TypeError を投げ、その車両の描画が丸ごと止まる。
+
+    /**
+     * 本家 EntityVehicleBase.getSeatRotation: 転換クロスシートの回転量を -1.0〜1.0 に正規化して返す。
+     * <p>
+     * スクリプト側 (Render223.js) は {@code entity.getSeatRotation() * 15.0} のように使う。
+     * 生の値が要るときは {@link #getSeatRotationRaw()} (パックスクリプトはこちらに書き換えられる)。
+     */
+    public float getSeatRotation() {
+        return (float) this.seatRotation / (float) MAX_SEAT_ROTATION;
+    }
+
+    /**
+     * {@link #seatRotation} の生の値 (-45〜45)。
+     * パックの {@code entity.seatRotation} は PackScriptSource でこちらへ振り替えられる。
+     */
+    public int getSeatRotationRaw() {
+        return this.seatRotation;
+    }
+
+    /**
+     * 本家 EntityVehicleBase.getRollsignAnimation: 方向幕のスクロール量 (0.0〜1.0)。
+     * RTMU は方向幕をアニメーションさせないので常に 0 (= 表示が切り替わるだけ)。
+     */
+    public float getRollsignAnimation() {
+        return 0.0F;
     }
 
     /**

@@ -177,11 +177,24 @@ public final class VehicleScriptRenderers {
                 return false;
             }
             PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
+            //本家 ResourceState.exclusionParts: スクリプトが描画から外したパーツ (開いたドア等)。
+            //スクリプトの render() 内で add/removeExclusionParts が呼ばれた後に読む。
+            java.util.Set<String> excluded = exclusionPartsOf(entity);
             replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
-                    RenderPass.NORMAL.id);
+                    RenderPass.NORMAL.id, excluded);
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
                     bodyModel, graph);
             return true;
+        }
+
+        private static java.util.Set<String> exclusionPartsOf(Object entity) {
+            if (entity instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> vehicle) {
+                jp.ngt.rtm.modelpack.state.ResourceState state = vehicle.getResourceState();
+                if (state != null) {
+                    return state.getExclusionParts();
+                }
+            }
+            return null;
         }
 
         /**
@@ -250,6 +263,12 @@ public final class VehicleScriptRenderers {
                 this.renderer.currentPass = 0;
                 GLRecorder.deactivate();
             }
+            //スクリプトが途中で落ちた場合、記録には落ちる前のコマンド (glPushMatrix 等) だけが
+            //残る。それを「描画済み」と見なすと素のモデル描画がスキップされ、車体が丸ごと
+            //消える。落ちたら記録を捨てて null を返し、呼び出し側をフォールバックさせる。
+            if (this.renderer.consumeScriptFailure()) {
+                return null;
+            }
             return rec;
         }
     }
@@ -257,18 +276,26 @@ public final class VehicleScriptRenderers {
     static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                        int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
                        PolygonModel bodyGraph) {
-        replay(rec, poseStack, buffer, packedLight, packedOverlay, model, bodyGraph, RenderPass.NORMAL.id);
+        replay(rec, poseStack, buffer, packedLight, packedOverlay, model, bodyGraph, RenderPass.NORMAL.id, null);
+    }
+
+    static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
+                       int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
+                       PolygonModel bodyGraph, int legacyPass) {
+        replay(rec, poseStack, buffer, packedLight, packedOverlay, model, bodyGraph, legacyPass, null);
     }
 
     /**
      * @param legacyPass 本家 RenderPass の id。2 以上 (LIGHT/LIGHT_FRONT/LIGHT_BACK) のとき、
      *                   スクリプトが描いたグループを ***_light0/1/2.png に差し替えて重ねる
      *                   (本家 ModelObject.renderWithTexture と同じ)。
+     * @param excluded   本家 ResourceState.exclusionParts。スクリプトが「今は描かない」と指定した
+     *                   パーツ (ドアが開いた側の扉など)。null なら除外なし。
      */
     @SuppressWarnings("unchecked")
     static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                                int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
-                               PolygonModel bodyGraph, int legacyPass) {
+                               PolygonModel bodyGraph, int legacyPass, java.util.Set<String> excluded) {
         int light = packedLight;
         ResourceLocation overrideTex = null;
         //スクリプトの glColor4f (発光オーバーレイの強度等に使用)
@@ -317,8 +344,10 @@ public final class VehicleScriptRenderers {
                             model.renderNamedGroupsEmissive(poseStack, buffer, light, packedOverlay,
                                     (Set<String>) names, legacyPass);
                         } else if (model != null) {
-                            //translucent=false は全バッチ描画 (renderSelectedBatches のフィルタ仕様)
-                            model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
+                            //translucent=false は全バッチ描画 (renderSelectedBatches のフィルタ仕様)。
+                            //excluded はスクリプトが除外指定したパーツ (開いたドア等) を落とす。
+                            model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false,
+                                    (Set<String>) names, null, excluded);
                         }
                     }
                 }

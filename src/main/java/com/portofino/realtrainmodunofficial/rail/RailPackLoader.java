@@ -33,6 +33,9 @@ public class RailPackLoader {
         if (loaded) return;
         loaded = true;
         LOADED.clear();
+        //jar 同梱の本家レール定義。以前は loadFromModJar() がどこからも呼ばれておらず
+        //(デッドコード)、既定レールが 1 つも登録されていなかった。
+        loadFromModJar();
         loadFromExternalDirectories();
         loadFromGameDirectories();
         RailRegistry.setDefinitions(LOADED);
@@ -433,10 +436,20 @@ public class RailPackLoader {
             Path modJar = BundledPackStore.getModJarPath();
             if (modJar != null) return modJar;
         }
-        // packName が mod ID 自身 ("realtrainmodunofficial") のとき、 mods フォルダ内の
-        // RTM-Official-Assets*.zip を fallback として使う。 223系等のRTM公式 vehicle def は
-        // packName=mod ID で登録されるが、 bundled pack には含まれないため直接 modsから探す。
+        // packName が mod ID 自身 ("realtrainmodunofficial") のとき = MOD の jar に同梱した
+        // 本家定義 (assets/minecraft/models/json/*.json)。モデル本体も同じ jar の
+        // assets/minecraft/models/ に入っているので、jar そのものをパックとして返す。
+        //
+        // ★ここが null を返すと、定義は読めるのにモデルの実体が見つからず「当たり判定は
+        // あるのにモデルが透明」になる。以前は mods フォルダの RTM-Official-Assets*.zip しか
+        // 探しておらず、その zip を入れていない環境では本家の既定モデルが全て透明だった。
         if (com.portofino.realtrainmodunofficial.RealTrainModUnofficial.MODID.equalsIgnoreCase(packName)) {
+            Path modJar = BundledPackStore.getModJarPath();
+            if (modJar != null) {
+                return modJar;
+            }
+            // 開発環境 (jar でなく展開済みクラスパス) では jar パスが取れないことがある。
+            // その場合は従来どおり mods フォルダの RTM-Official-Assets*.zip を探す。
             Path officialModsDir = gameDir.resolve("mods");
             try (var stream = java.nio.file.Files.list(officialModsDir)) {
                 java.util.Optional<Path> hit = stream

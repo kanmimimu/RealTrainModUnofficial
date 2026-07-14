@@ -72,5 +72,27 @@ public enum TrainState {
             this.min = (byte) par3;
             this.max = (byte) par4;
         }
+
+        // ---- 本家スクリプト互換のエイリアス ----
+        //
+        // 本家のレンダースクリプトは TrainState.TrainStateType.Door のように「本家の定数名」で書く。
+        // RTMU は定数名に State_ を付けているため、そのままだとスクリプトからは undefined になり、
+        // 呼んだ瞬間に TypeError で落ちる (RTM 標準の Render223.js は 1 行目でこれを踏み、
+        // 223 系の車体が丸ごと透明になっていた)。
+        //
+        // ID は本家と同一なので、本家名の別名を張るだけで互換になる。
+        // ★注意: 本家 Direction は id 0 (編成の進行方向)、本家 Role は id 10 (編成内の位置)。
+        //   RTMU の State_Direction は id 10 = 本家 Role にあたる。取り違えないこと。
+        public static final TrainStateType Direction = State_TrainDir;
+        public static final TrainStateType Notch = State_Notch;
+        public static final TrainStateType Signal = State_Signal;
+        public static final TrainStateType Door = State_Door;
+        public static final TrainStateType Light = State_Light;
+        public static final TrainStateType Pantograph = State_Pantograph;
+        public static final TrainStateType ChunkLoader = State_ChunkLoader;
+        public static final TrainStateType Destination = State_Destination;
+        public static final TrainStateType Announcement = State_Announcement;
+        public static final TrainStateType Role = State_Direction;
+        public static final TrainStateType InteriorLight = State_InteriorLight;
     }
 }

@@ -32,9 +32,9 @@ public class VehiclePartsRenderer extends EntityPartsRenderer {
      */
     public void render(Object t, int pass, float partialTick) {
         this.currentPass = pass;
-        if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "render", t, pass, partialTick);
-        }
+        //スクリプトが落ちたらフラグを立てる (呼び出し側が素のモデル描画へ戻せるように)。
+        //黙って握りつぶすと「車体が丸ごと消える」ため。PartsRenderer.execRenderScript 参照。
+        this.execRenderScript(t, pass, partialTick);
     }
 
     public float getWheelRotationR(Object entity) {

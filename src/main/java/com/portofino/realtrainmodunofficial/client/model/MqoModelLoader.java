@@ -3417,6 +3417,19 @@ public final class MqoModelLoader {
         public void renderNamedGroups(PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
                                       boolean translucent, Set<String> normalizedGroupNames,
                                       TrainScriptSystem.ScriptModelRenderer scriptRenderer) {
+            renderNamedGroups(poseStack, buffer, packedLight, overlay, translucent, normalizedGroupNames,
+                scriptRenderer, null);
+        }
+
+        /**
+         * @param excludedGroups 本家 ResourceState.exclusionParts (正規化済み)。
+         *                       RTM 標準スクリプトはドアの開閉をこれで表現する
+         *                       (開いた側の扉パーツを除外リストに入れて消す)。null/空なら除外なし。
+         */
+        public void renderNamedGroups(PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
+                                      boolean translucent, Set<String> normalizedGroupNames,
+                                      TrainScriptSystem.ScriptModelRenderer scriptRenderer,
+                                      Set<String> excludedGroups) {
             if (normalizedGroupNames == null || normalizedGroupNames.isEmpty()) {
                 return;
             }
@@ -3442,7 +3455,14 @@ public final class MqoModelLoader {
             }
             Object entity = scriptRenderer != null ? scriptRenderer.getCurrentEntity() : null;
             boolean fullbright = false;
-            renderSelectedBatches(ordered, poseStack, buffer, packedLight, overlay, translucent, scriptRenderer, entity, fullbright);
+            //本家 ResourceState.exclusionParts: スクリプトが「今は描かない」と指定したパーツを落とす
+            //(RTM 標準スクリプトはドアの開閉をこれで表現する)。Batch のグループ名は正規化済み。
+            GroupPredicate exclusionFilter = (excludedGroups == null || excludedGroups.isEmpty())
+                ? null
+                : groupName -> !excludedGroups.contains(
+                    groupName == null ? "" : groupName.trim().toLowerCase(Locale.ROOT));
+            renderSelectedBatches(ordered, poseStack, buffer, packedLight, overlay, translucent,
+                exclusionFilter, null, scriptRenderer, entity, fullbright);
         }
 
         // (Set インスタンス → ソート済み Batch リスト) を IdentityHashMap でキャッシュ。

@@ -534,6 +534,10 @@ public class TrainScriptSystem {
             scriptEngine.put(SCRIPT_PATH_KEY, scriptPath == null ? "" : scriptPath);
             scriptEngine.put(SCRIPT_MODEL_KEY, modelName == null ? "" : modelName);
             script = normalizeLegacyScriptReferences(script);
+            //Nashorn はプロパティ解決で getter をフィールドより優先するので、
+            //.seatRotation を生値のゲッターへ振り替える (VehicleScriptRenderers 側の
+            //PackScriptSource.prepare と同じ扱いにしないと、経路によって値の意味が食い違う)。
+            script = PackScriptSource.remapFieldAccess(script);
             script = LEGACY_API_PREPEND + (script == null ? "" : script);
             scriptEngine.eval(script);
             prepareScriptRuntimeBeforeInit(scriptEngine);

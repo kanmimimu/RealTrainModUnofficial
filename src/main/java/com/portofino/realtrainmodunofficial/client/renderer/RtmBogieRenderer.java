@@ -49,9 +49,25 @@ public class RtmBogieRenderer extends EntityRenderer<EntityBogie> {
         }
         VehicleDefinition.BogieDefinition bogieDef = def.getBogies().get(index);
         if (bogieDef == null || bogieDef.modelFile() == null || bogieDef.modelFile().isBlank()
-                || BogieRenderer.isDummyBogieModel(bogieDef.modelFile())
-                || bogieDef.modelFile().toLowerCase(Locale.ROOT).endsWith(".class")) {
+                || BogieRenderer.isDummyBogieModel(bogieDef.modelFile())) {
             return;
+        }
+        //本家組込の ModelBogie.class は Java クラスなので RTMU では読めない。BogieRenderer が
+        //標準台車 (ModelBogie_ft1.obj) へ差し替えて描く。
+        //
+        //以前はここで .class を無条件に return していた。「車体モデル/スクリプトが自前で台車を
+        //描く前提」という想定だったが、300 系新幹線のように車体 MQO が body/yukashita/horo の
+        //3 グループしか持たず台車をまったく含まない車両では誰も台車を描かず、車体だけが宙に
+        //浮いた状態になっていた。
+        //
+        //自前の走り装置 (車輪グループ) を持つ車両 (蒸気機関車など) だけ、二重描画を避けて
+        //スキップする。
+        if (bogieDef.modelFile().toLowerCase(Locale.ROOT).endsWith(".class")) {
+            com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel body =
+                com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadModelForVehicle(def);
+            if (body != null && body.hasOwnWheelGroups()) {
+                return;
+            }
         }
 
         //本家 RenderBogie: 補完済み台車位置を引き、車体基準の bogiePos に置き直す

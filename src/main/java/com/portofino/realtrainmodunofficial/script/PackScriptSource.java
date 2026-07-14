@@ -123,9 +123,37 @@ public final class PackScriptSource {
     /**
      * include 解決 + 互換リマップ済みのソースを返す (プリリュードは含まない)。
      */
+    /**
+     * {@code .seatRotation} を {@code .getSeatRotationRaw()} に置き換えるためのパターン。
+     * {@code .getSeatRotation()} には (直前が "get" なので) マッチしない。
+     */
+    private static final Pattern SEAT_ROTATION_FIELD = Pattern.compile("\\.seatRotation\\b(?!\\s*\\()");
+
     public static String prepare(String source) {
         String out = resolveIncludes(source, new HashSet<>());
-        return remapLegacyClasses(out);
+        out = remapLegacyClasses(out);
+        return remapFieldAccess(out);
+    }
+
+    /**
+     * Nashorn の「フィールドより getter を優先する」仕様を回避するための書き換え。
+     * <p>
+     * 本家 EntityVehicleBase は {@code public int seatRotation} と
+     * {@code float getSeatRotation()} (= seatRotation / 45) の<b>両方</b>を持つ。
+     * 実際のパック (小田急 30000 形 / E259 / E257-500 等) は生の値が要るので
+     * {@code entity.seatRotation / 45} と書き、RTM 標準の Render223.js は
+     * {@code entity.getSeatRotation() * 15} と書く。
+     * <p>
+     * ところが Nashorn (Dynalink) はプロパティ解決で getter を優先するため、
+     * {@code getSeatRotation()} を定義した瞬間に {@code entity.seatRotation} まで
+     * getter を返すようになり、パック側で 45 が二重に効いて座席が動かなくなる。
+     * <p>
+     * そこでスクリプト中の {@code .seatRotation} だけを {@code .getSeatRotationRaw()} に
+     * 書き換える。これで「フィールド参照は生の値」「getSeatRotation() は本家どおり」の
+     * 両方が成立する。
+     */
+    public static String remapFieldAccess(String source) {
+        return SEAT_ROTATION_FIELD.matcher(source).replaceAll(".getSeatRotationRaw()");
     }
 
     public static String remapLegacyClasses(String source) {

@@ -31,7 +31,58 @@ public class PartsRenderer {
     public int currentMatId;
     public int currentPass;
 
+    /**
+     * 直近の render() でスクリプトが例外を投げたか。
+     * <p>
+     * ★これが無いと「モデルが透明になる」。本家 (と RTMU) はスクリプトの例外を
+     * {@code doScriptIgnoreError} で握りつぶすが、握りつぶした結果、途中まで記録された
+     * GL コマンド (glPushMatrix だけ等) が残る。呼び出し側はそれを見て「スクリプトが
+     * 描画を担当した」と判断し、素のモデル描画をスキップしてしまう。
+     * <p>
+     * 実例: RTM 標準の Render223.js は 1 行目で {@code entity.getVehicleState(...)} を呼ぶが、
+     * RTMU の車両エンティティにそのメソッドが無く即 TypeError。結果 223 系の車体だけが
+     * 丸ごと消えていた (当たり判定は残るので「透明な列車」に見える)。
+     * <p>
+     * スクリプトが落ちたらこのフラグを立て、呼び出し側は「スクリプト描画は失敗」として
+     * 素のモデル描画にフォールバックする。アニメーションは効かないが車体は必ず見える。
+     */
+    private boolean scriptFailed;
+
     public PartsRenderer(String... par1) {
+    }
+
+    /**
+     * スクリプトを実行し、例外が出たら {@link #scriptFailed} を立てる。
+     * 例外自体は本家どおり握りつぶす (1 フレームの失敗でクラッシュさせない)。
+     */
+    protected void execRenderScript(Object entity, int pass, float partialTick) {
+        if (this.script == null) {
+            return;
+        }
+        try {
+            jp.ngt.ngtlib.io.ScriptUtil.doScriptFunction(this.script, "render", entity, pass, partialTick);
+        } catch (Throwable t) {
+            this.scriptFailed = true;
+            if (!this.warnedScriptFail) {
+                this.warnedScriptFail = true;
+                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                    "Render script failed (falling back to plain model rendering): {}",
+                    String.valueOf(t.getCause() != null ? t.getCause() : t));
+            }
+        }
+    }
+
+    private boolean warnedScriptFail;
+
+    /**
+     * 直近の render() が失敗したかを読み取ってフラグを下ろす。
+     *
+     * @return true = スクリプトが落ちた (呼び出し側は素のモデル描画へフォールバックすること)
+     */
+    public boolean consumeScriptFailure() {
+        boolean failed = this.scriptFailed;
+        this.scriptFailed = false;
+        return failed;
     }
 
     public void setScript(ScriptEngine se) {

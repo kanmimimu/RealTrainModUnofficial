@@ -898,6 +898,66 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.setByteToDataWatcher(id, data);
     }
 
+    // ---- 本家スクリプト互換 API ----
+    //
+    // RTM 標準のレンダースクリプトが entity に対して直接呼ぶメソッド群。
+    // 1 つでも欠けると Nashorn が TypeError を投げ、その車両の描画が丸ごと止まる
+    // (Render223.js は 1 行目で getVehicleState を呼ぶため、223 系の車体が透明になっていた)。
+
+    /**
+     * 本家 EntityVehicleBase.getVehicleState。RTMU の状態は id で持っているので id に落として読む。
+     */
+    public byte getVehicleState(TrainState.TrainStateType type) {
+        return type == null ? 0 : this.getTrainStateData(type.id);
+    }
+
+    /**
+     * 本家 EntityVehicleBase.setVehicleState。
+     */
+    public void setVehicleState(TrainState.TrainStateType type, byte data) {
+        if (type != null) {
+            this.setTrainStateData(type.id, data);
+        }
+    }
+
+    /**
+     * 本家 EntityVehicleBase.syncVehicleState: クライアントの操作をサーバーへ送る。
+     * <p>
+     * 本家はモデル内の運転台スイッチをクリックしたときにスクリプトから呼ばれる。RTMU は
+     * 運転操作を専用 GUI ({@code TrainControlScreen}) で行うため、ここではサーバー側でのみ
+     * 状態を書き換える (クライアントから勝手に編成の状態を変えないため)。
+     * <b>スクリプトが呼んでも落ちないこと</b>が目的。
+     */
+    public void syncVehicleState(TrainState.TrainStateType type, byte data) {
+        if (type != null && !this.level().isClientSide) {
+            this.setTrainStateData(type.id, data);
+        }
+    }
+
+    /**
+     * 本家 EntityTrainBase.syncNotch: ノッチを相対値で動かす。
+     * syncVehicleState と同じ理由でサーバー側でのみ効かせる。
+     */
+    public void syncNotch(int notchInc) {
+        if (notchInc != 0 && !this.level().isClientSide) {
+            this.addNotch(null, notchInc);
+        }
+    }
+
+    /**
+     * 本家 EntityTrainBase.getCouplerYaw: 連結器が隣の車両を向く角度 (度)。
+     * 連結相手がいなければ 0。
+     */
+    public float getCouplerYaw(int dir) {
+        EntityTrainBase conTrain = this.getConnectedTrain(dir);
+        if (conTrain == null) {
+            return 0.0F;
+        }
+        float dif = NGTMath.getAngleD(this.getZ(), this.getX(), conTrain.getZ(), conTrain.getX());
+        float angle = NGTMath.wrapAngle(dif - (this.getYRot() + (dir == 0 ? 0.0F : 180.0F)));
+        return angle + (Math.abs(angle) > 90.0F ? 180.0F : 0.0F);
+    }
+
     /**
      * サーバー同期後にクライアントで speed を反映
      */

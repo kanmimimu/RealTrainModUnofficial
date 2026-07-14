@@ -18,9 +18,9 @@ public abstract class TileEntityPartsRenderer extends PartsRenderer {
      */
     public void render(Object t, int pass, float partialTick) {
         this.currentPass = pass;
-        if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "render", t, pass, partialTick);
-        }
+        //スクリプトが落ちたらフラグを立てる (呼び出し側が素のモデル描画へ戻せるように)。
+        //PartsRenderer.execRenderScript 参照。
+        this.execRenderScript(t, pass, partialTick);
     }
 
     /**
