@@ -166,5 +166,11 @@
   "key.realtrainmodunofficial.camera_cycle_grid": "Cycle grid",
   "key.realtrainmodunofficial.camera_cycle_aspect": "Cycle aspect guide",
   "key.realtrainmodunofficial.camera_toggle_level": "Toggle level",
-  "key.realtrainmodunofficial.camera_shoot": "Shoot"
+  "key.realtrainmodunofficial.camera_shoot": "Shoot",
+  "item.realtrainmodunofficial.item_large_rail": "Copied Rail",
+  "message.realtrainmodunofficial.rail_model_changed": "Rail model changed: %s",
+  "message.realtrainmodunofficial.rail_model_same": "That rail already uses this model",
+  "message.realtrainmodunofficial.rail_model_none": "No rail model selected (right-click in air to choose)",
+  "message.realtrainmodunofficial.rail_subrail_added": "Sub-rail added: %s",
+  "message.realtrainmodunofficial.rail_subrail_removed": "Sub-rail removed: %s"
 }

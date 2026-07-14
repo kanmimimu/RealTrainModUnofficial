@@ -61,10 +61,13 @@ public class ItemRail extends Item {
                 if (core != null) {
                     RailProperty property = ItemRail.getProperty(itemStack);
                     if (property != null) {
+                        //本家はシフトで差し替え / 素で重ねレールだったが、通常のレールアイテム
+                        //(モデル選択式) を「右クリックでモデル差し替え」にしたので、こちらも
+                        //操作を揃える。両方のレールアイテムで挙動が逆だと混乱するため。
                         if (player.isShiftKeyDown()) {
-                            core.replaceRail(property);
-                        } else {
                             core.addSubRail(property);
+                        } else {
+                            core.replaceRail(property);
                         }
                     }
                 }

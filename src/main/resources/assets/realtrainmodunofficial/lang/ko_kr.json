@@ -166,5 +166,11 @@
   "key.realtrainmodunofficial.camera_cycle_grid": "그리드 전환",
   "key.realtrainmodunofficial.camera_cycle_aspect": "화면비 가이드 전환",
   "key.realtrainmodunofficial.camera_toggle_level": "수평계 표시",
-  "key.realtrainmodunofficial.camera_shoot": "촬영"
+  "key.realtrainmodunofficial.camera_shoot": "촬영",
+  "item.realtrainmodunofficial.item_large_rail": "복사한 레일",
+  "message.realtrainmodunofficial.rail_model_changed": "레일 모델 변경: %s",
+  "message.realtrainmodunofficial.rail_model_same": "그 레일은 이미 이 모델입니다",
+  "message.realtrainmodunofficial.rail_model_none": "레일 모델이 선택되지 않음 (허공에 우클릭하여 선택)",
+  "message.realtrainmodunofficial.rail_subrail_added": "겹침 레일 추가: %s",
+  "message.realtrainmodunofficial.rail_subrail_removed": "겹침 레일 제거: %s"
 }

@@ -166,5 +166,11 @@
   "key.realtrainmodunofficial.camera_cycle_grid": "切換網格",
   "key.realtrainmodunofficial.camera_cycle_aspect": "切換畫幅參考線",
   "key.realtrainmodunofficial.camera_toggle_level": "水平儀顯示",
-  "key.realtrainmodunofficial.camera_shoot": "拍攝"
+  "key.realtrainmodunofficial.camera_shoot": "拍攝",
+  "item.realtrainmodunofficial.item_large_rail": "複製的鐵軌",
+  "message.realtrainmodunofficial.rail_model_changed": "已更改鐵軌模型: %s",
+  "message.realtrainmodunofficial.rail_model_same": "該鐵軌已是此模型",
+  "message.realtrainmodunofficial.rail_model_none": "未選擇鐵軌模型 (對空右鍵選擇)",
+  "message.realtrainmodunofficial.rail_subrail_added": "已新增疊加鐵軌: %s",
+  "message.realtrainmodunofficial.rail_subrail_removed": "已移除疊加鐵軌: %s"
 }

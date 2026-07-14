@@ -166,5 +166,11 @@
   "key.realtrainmodunofficial.camera_cycle_grid": "切换网格",
   "key.realtrainmodunofficial.camera_cycle_aspect": "切换画幅参考线",
   "key.realtrainmodunofficial.camera_toggle_level": "水平仪显示",
-  "key.realtrainmodunofficial.camera_shoot": "拍摄"
+  "key.realtrainmodunofficial.camera_shoot": "拍摄",
+  "item.realtrainmodunofficial.item_large_rail": "复制的铁轨",
+  "message.realtrainmodunofficial.rail_model_changed": "已更改铁轨模型: %s",
+  "message.realtrainmodunofficial.rail_model_same": "该铁轨已是此模型",
+  "message.realtrainmodunofficial.rail_model_none": "未选择铁轨模型 (对空右键选择)",
+  "message.realtrainmodunofficial.rail_subrail_added": "已添加叠加铁轨: %s",
+  "message.realtrainmodunofficial.rail_subrail_removed": "已移除叠加铁轨: %s"
 }

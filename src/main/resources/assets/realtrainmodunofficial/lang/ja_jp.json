@@ -166,5 +166,11 @@
   "key.realtrainmodunofficial.camera_cycle_grid": "グリッド切替",
   "key.realtrainmodunofficial.camera_cycle_aspect": "アスペクトガイド切替",
   "key.realtrainmodunofficial.camera_toggle_level": "水平器の表示",
-  "key.realtrainmodunofficial.camera_shoot": "撮影"
+  "key.realtrainmodunofficial.camera_shoot": "撮影",
+  "item.realtrainmodunofficial.item_large_rail": "コピーしたレール",
+  "message.realtrainmodunofficial.rail_model_changed": "レールのモデルを変更: %s",
+  "message.realtrainmodunofficial.rail_model_same": "そのレールは既にこのモデルです",
+  "message.realtrainmodunofficial.rail_model_none": "レールのモデルが未選択です (何もない所を右クリックで選択)",
+  "message.realtrainmodunofficial.rail_subrail_added": "重ねレールを追加: %s",
+  "message.realtrainmodunofficial.rail_subrail_removed": "重ねレールを削除: %s"
 }

@@ -5,6 +5,9 @@ import com.portofino.realtrainmodunofficial.ClientHooks;
 import com.portofino.realtrainmodunofficial.block.MarkerBlock;
 import com.portofino.realtrainmodunofficial.rail.RailDefinition;
 import com.portofino.realtrainmodunofficial.rail.RailRegistry;
+import jp.ngt.rtm.rail.TileEntityLargeRailBase;
+import jp.ngt.rtm.rail.TileEntityLargeRailCore;
+import jp.ngt.rtm.rail.util.RailProperty;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -42,13 +45,25 @@ public class RailItem extends Item {
     @Override
     public InteractionResult useOn(UseOnContext context) {
         ItemStack stack = context.getItemInHand();
-        if (stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get()) == null) {
-            return InteractionResult.PASS;
-        }
-
         Level level = context.getLevel();
         Player player = context.getPlayer();
         if (player == null) {
+            return InteractionResult.PASS;
+        }
+
+        //敷設済みのレールを右クリック → そのレールのモデルを、今このアイテムで選んでいる
+        //モデルに差し替える。引き直さずに見た目だけ変えられるようにするため。
+        if (level.getBlockEntity(context.getClickedPos()) instanceof TileEntityLargeRailBase railBase) {
+            TileEntityLargeRailCore core = railBase.getRailCore();
+            if (core != null) {
+                if (!level.isClientSide) {
+                    changeRailModel(core, stack, player);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            }
+        }
+
+        if (stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get()) == null) {
             return InteractionResult.PASS;
         }
 
@@ -65,6 +80,57 @@ public class RailItem extends Item {
             return created ? InteractionResult.SUCCESS : InteractionResult.FAIL;
         }
         return InteractionResult.SUCCESS;
+    }
+
+    /**
+     * 敷設済みレールのモデル差し替え。
+     *
+     * <p>本家 ItemRail もレールを右クリックするとモデルをいじれる (シフトで差し替え、
+     * 素で重ねレールの追加) が、そちらは「コピーしたレール」アイテム側の話で、
+     * モデル選択式の通常レールアイテムからは何もできなかった。
+     * 引き直さずに見た目だけ変えたい、という要望に応えて右クリックで差し替える。
+     *
+     * <p>シフト右クリックは本家どおり<b>重ねレール</b> (同じ線形に別モデルを重ねる。
+     * 三線軌条やガードレールを足すのに使う) の追加/削除にしてある。
+     *
+     * <p>差し替えると {@code markBlockForUpdate} が飛び、クライアント側の
+     * {@code loadAdditional} が {@code shouldRerenderRail} を立てるので、
+     * 統合メッシュ (VBO) も焼き直される。
+     */
+    private static void changeRailModel(TileEntityLargeRailCore core, ItemStack stack, Player player) {
+        String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge
+            .getSelectedModelId(stack);
+        if (selectedId == null || selectedId.isBlank()) {
+            player.displayClientMessage(
+                Component.translatable("message.realtrainmodunofficial.rail_model_none"), true);
+            return;
+        }
+        RailDefinition def = RailRegistry.getById(selectedId);
+        String name = def != null ? def.getDisplayName() : selectedId;
+
+        RailProperty old = core.getProperty();
+        //道床のブロックと高さは今のレールのものを引き継ぐ (変えるのはモデルだけ)
+        RailProperty next = new RailProperty(selectedId, old.block, old.blockMetadata, old.blockHeight);
+
+        if (player.isShiftKeyDown()) {
+            //本家 ItemRail: 同じ線形に別モデルを重ねる (もう一度で解除)
+            boolean had = core.subRails.stream()
+                .anyMatch(p -> p.railModel.equals(selectedId));
+            core.addSubRail(next);
+            player.displayClientMessage(Component.translatable(
+                had ? "message.realtrainmodunofficial.rail_subrail_removed"
+                    : "message.realtrainmodunofficial.rail_subrail_added", name), true);
+            return;
+        }
+
+        if (selectedId.equals(old.railModel)) {
+            player.displayClientMessage(
+                Component.translatable("message.realtrainmodunofficial.rail_model_same"), true);
+            return;
+        }
+        core.replaceRail(next);
+        player.displayClientMessage(
+            Component.translatable("message.realtrainmodunofficial.rail_model_changed", name), true);
     }
 
     @Override
