@@ -46,7 +46,11 @@ public final class RailMeshCache {
     private RailMeshCache() {
     }
 
-    private record RailMesh(List<MeshCapture.Section> sections, MqoModelLoader.MqoModel model, int light) {
+    /**
+     * @param variant 同じレールでも見た目が変わる要因 (分岐の開通方向など)。変われば焼き直す。
+     */
+    private record RailMesh(List<MeshCapture.Section> sections, MqoModelLoader.MqoModel model,
+                            int light, long variant) {
         void close() {
             for (MeshCapture.Section section : sections) {
                 section.close();
@@ -63,20 +67,50 @@ public final class RailMeshCache {
     public static boolean draw(BlockPos pos, GLRecorder rec, MqoModelLoader.MqoModel model,
                                PoseStack poseStack, int packedLight, int packedOverlay, boolean rebuilt) {
         if (rec == null || model == null || rec.isEmpty()) {
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
+            return false;
+        }
+        dropIfLevelChanged();
+
+        return drawBaked(pos, 0L, model, poseStack, packedLight, packedOverlay, rebuilt,
+            (ps, buffer) -> RailScriptRenderers.replayForCapture(rec, ps, buffer, packedLight, packedOverlay, model));
+    }
+
+    /**
+     * 描画コードを渡して統合メッシュに焼き、以後は VBO を描くだけにする汎用版。
+     * <p>
+     * GLRecorder を持たない経路 (分岐の旧パイプライン) からも使えるようにしたもの。
+     * {@code baker} は<b>単位行列の PoseStack</b> で呼ばれるので、頂点はレール原点
+     * (ブロック隅) 基準になる。毎フレームの描画時に本物の pose を掛けるため、結果は
+     * 逐次描画と数学的に同じ。
+     *
+     * @param variant      見た目が変わる要因 (分岐の開通方向など)。変われば焼き直す
+     * @param forceRebuild true = 強制的に焼き直す
+     * @return true = 描画を予約した (呼び出し元は逐次描画をスキップする)
+     */
+    public static boolean drawBaked(BlockPos pos, long variant, MqoModelLoader.MqoModel model,
+                                    PoseStack poseStack, int packedLight, int packedOverlay,
+                                    boolean forceRebuild, Baker baker) {
+        if (model == null || baker == null) {
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
             return false;
         }
         dropIfLevelChanged();
 
         RailMesh mesh = CACHE.get(pos);
-        //モデルが差し替わった (パック再読込 / キャッシュ追い出し) 場合と、
-        //ライト値が変わった (頂点にライトを焼いているため) 場合も焼き直す。
-        if (rebuilt || mesh == null || mesh.model() != model || mesh.light() != packedLight) {
+        //モデルが差し替わった (パック再読込 / キャッシュ追い出し) 場合、ライト値が変わった
+        //(頂点にライトを焼いているため) 場合、見た目の要因が変わった場合も焼き直す。
+        if (forceRebuild || mesh == null || mesh.model() != model
+                || mesh.light() != packedLight || mesh.variant() != variant) {
             RailMesh old = CACHE.remove(pos);
             if (old != null) {
                 old.close();
             }
-            mesh = bake(rec, model, packedLight, packedOverlay);
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailBake();
+            mesh = bake(baker, model, packedLight, variant);
             if (mesh == null) {
+                //頂点数が上限超え等で焼けなかった → 毎フレーム逐次描画に落ちる (重い)
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
                 return false;
             }
             CACHE.put(pos, mesh);
@@ -84,13 +118,17 @@ public final class RailMeshCache {
         }
 
         for (MeshCapture.Section section : mesh.sections()) {
-            if (!MqoModelLoader.MqoModel.drawMergedVbo(section.vbo(), section.renderType(), poseStack)) {
-                //描けなかった (VBO 無効等) → このレールは統合メッシュを諦めて逐次描画に戻す
+            //即時描画はしない。RenderType ごとにまとめて描くためキューへ積む
+            //(GL のステート設定/破棄をレール 1 本ごとに走らせるのが重さの正体だった)。
+            if (!RailDrawQueue.enqueue(section.vbo(), section.renderType(), poseStack)) {
+                //VBO が無効になった → このレールは統合メッシュを諦めて逐次描画に戻す
                 CACHE.remove(pos);
                 mesh.close();
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
                 return false;
             }
         }
+        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailMerged();
         return true;
     }
 
@@ -99,12 +137,17 @@ public final class RailMeshCache {
      * 単位行列の PoseStack で再生するので、頂点はレール原点 (ブロック隅) 基準になる。
      * 毎フレームの描画時に本物の pose を掛けるため、結果は逐次描画と数学的に同じ。
      */
-    private static RailMesh bake(GLRecorder rec, MqoModelLoader.MqoModel model, int packedLight, int packedOverlay) {
+    /** 統合メッシュに焼く描画コード。単位行列の PoseStack と捕獲用バッファが渡される。 */
+    public interface Baker {
+        void render(PoseStack poseStack, net.minecraft.client.renderer.MultiBufferSource buffer);
+    }
+
+    private static RailMesh bake(Baker baker, MqoModelLoader.MqoModel model, int packedLight, long variant) {
         MeshCapture.Source source = new MeshCapture.Source();
         boolean prevCapture = MqoModelLoader.captureMode;
         MqoModelLoader.captureMode = true;
         try {
-            RailScriptRenderers.replayForCapture(rec, new PoseStack(), source, packedLight, packedOverlay, model);
+            baker.render(new PoseStack(), source);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Rail mesh bake failed", t);
             return null;
@@ -121,7 +164,7 @@ public final class RailMeshCache {
             if (sections.isEmpty()) {
                 return null;
             }
-            return new RailMesh(sections, model, packedLight);
+            return new RailMesh(sections, model, packedLight, variant);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Rail mesh upload failed", t);
             return null;

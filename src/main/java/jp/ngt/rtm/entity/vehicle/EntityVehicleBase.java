@@ -104,6 +104,9 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
         this.applyPhysicalEffect();
 
+        //視点追従 (本家 KaizPatchX EntityTrainBase.updateRiderPosition)
+        this.rotateRiders();
+
         //パックスクリプト互換 SRG フィールドの更新
         if (this.field_70170_p == null || this.field_70170_p.level != this.level()) {
             this.field_70170_p = new jp.ngt.mccompat.WorldCompat(this.level());
@@ -112,6 +115,48 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         this.field_70177_z = this.getYRot();
         this.field_70125_A = this.getXRot();
         this.field_70153_n = this.getPassengers().isEmpty() ? null : this.getPassengers().get(0);
+    }
+
+    /**
+     * 車体が向きを変えたぶんだけ、乗客の視点も一緒に回す (カーブでの視点追従)。
+     * <p>
+     * 本家 KaizPatchX {@code EntityTrainBase.updateRiderPosition}:
+     * <pre>
+     *   //運転手のYaw調整, PlayerのYawは他のEntityとは逆向き
+     *   riddenByEntity.rotationYaw   -= wrapAngleTo180(rotationYaw   - prevRotationYaw);
+     *   riddenByEntity.rotationPitch -= wrapAngleTo180(rotationPitch - prevRotationPitch);
+     * </pre>
+     * <p>
+     * 符号が引き算なのは、<b>車体の yaw (RTM 系: 90° = +X) と Minecraft のプレイヤー yaw
+     * (90° = −X) で X の符号が逆</b>だから。車体が RTM 系で +θ 回れば、同じ向きを向くために
+     * プレイヤーの yaw は −θ 動かす必要がある。
+     * <p>
+     * クライアントだけで行う。プレイヤーの視点はクライアントが持ち主で、毎tickサーバーへ
+     * 送られるため、サーバー側で回しても上書きされて意味がない (他プレイヤーの視点は
+     * そのプレイヤー自身のクライアントが回す)。
+     */
+    private void rotateRiders() {
+        if (!this.level().isClientSide || this.getPassengers().isEmpty()) {
+            return;
+        }
+        float dYaw = net.minecraft.util.Mth.wrapDegrees(this.getYRot() - this.prevRotationYawVehicle);
+        float dPitch = net.minecraft.util.Mth.wrapDegrees(this.getXRot() - this.prevRotationPitchVehicle);
+        if (dYaw == 0.0F && dPitch == 0.0F) {
+            return;
+        }
+        for (Entity rider : this.getPassengers()) {
+            //yRotO / xRotO も一緒に動かす。動かさないと補間が 1 tick ぶん引っ張られて
+            //カーブのたびに視点がガクつく。
+            rider.setYRot(rider.getYRot() - dYaw);
+            rider.yRotO -= dYaw;
+            rider.setYHeadRot(rider.getYHeadRot() - dYaw);
+            rider.setXRot(rider.getXRot() - dPitch);
+            rider.xRotO -= dPitch;
+            if (rider instanceof net.minecraft.world.entity.LivingEntity living) {
+                living.yBodyRot -= dYaw;
+                living.yBodyRotO -= dYaw;
+            }
+        }
     }
 
     /**

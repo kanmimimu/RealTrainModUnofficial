@@ -20,6 +20,7 @@ import java.util.List;
  * の GUISignalController 1.21.1 移植。ボタン配置は 1.7.10 原作と同じ:
  *   SignalType [切替ボタン]
  *   Option     [x]last [ ]repeat [ ]Reduced Speed
+ *   ("above" は未使用かつ画面からはみ出すため非表示。値は保持したまま送り返す)
  *                x      y      z
  *   nextSignal0 [___] [___] [___] [+]
  *   displayPos0 [___] [___] [___] [+]
@@ -40,7 +41,6 @@ public class SignalControllerScreen extends Screen {
     private Checkbox lastBox;
     private Checkbox repeatBox;
     private Checkbox reducedBox;
-    private Checkbox aboveBox;
 
     public SignalControllerScreen(TileEntitySignalController controller) {
         super(Component.literal("SignalController"));
@@ -86,9 +86,8 @@ public class SignalControllerScreen extends Screen {
         this.reducedBox = addRenderableWidget(Checkbox.builder(Component.literal("Reduced Speed"), this.font)
                 .pos(cx + 85, cy - 55).selected(this.reducedSpeed)
                 .onValueChange((box, value) -> this.reducedSpeed = value).build());
-        this.aboveBox = addRenderableWidget(Checkbox.builder(Component.literal("above"), this.font)
-                .pos(cx + 205, cy - 55).selected(this.above)
-                .onValueChange((box, value) -> this.above = value).build());
+        //"above" は使われていないうえ、画面外にはみ出して見切れていたので出さない。
+        //値そのものは読み込んだままサーバーへ送り返すので、既存の設定は壊れない。
 
         //座標行 (x/y/z の EditBox ×3 + 最終行の "+" 追加ボタン)
         this.nextBoxes.clear();

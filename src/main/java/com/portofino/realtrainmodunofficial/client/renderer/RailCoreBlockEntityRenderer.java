@@ -113,7 +113,101 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     be, maps, poseStack, buffer, packedLight, packedOverlay, model)) {
                 return;
             }
-            //ここから下は旧パイプライン (スクリプト/プレーン経路が描いた場合は到達しない)。
+            //ここから下は旧パイプライン。トング (可動レール) を持つ分岐コアだけがここに来る。
+            //
+            //かつてはここで毎フレーム「0.5m 刻みの位置ごとにモデルを描画呼び出し」していて、
+            //実測 12.4ms/本。視界に 1 本あるだけでレール描画時間のほぼ全部を食っていた。
+            //
+            //そこでこの経路も統合メッシュに焼く。トングは動くが、動くのは転てつを切り替えた
+            //一瞬だけなので、アニメ中だけ従来どおり逐次描画し、落ち着いたら焼いて使い回す。
+            //焼いたメッシュは「開通方向」をキーにしているので、転てつすれば自動で焼き直る。
+            long legacyStart = ClientRenderProfiler.begin();
+            try {
+                //★ 焼き直しのキーは「トングの位置」で決める。
+                //  以前は開通方向 (activeIndex) をキーにしていたが、トングの位置は
+                //  renderSwitchPoint が Point.getMovement() から読んでいるため、
+                //  開通方向だけ見ても転てつを検知できず、焼いたメッシュが固まったままだった。
+                boolean animating = isSwitchAnimating(be, partialTick, maps.length);
+                if (!animating) {
+                    long variant = switchVariantKey(be);
+                    RailDefinition bakedDef = def;
+                    //packedLight はこのメソッド内で再代入しているのでラムダに直接は渡せない
+                    final int bakedLight = packedLight;
+                    boolean forceRebuild = be.shouldRerenderRail;
+                    boolean drew = com.portofino.realtrainmodunofficial.client.render.RailMeshCache.drawBaked(
+                        be.getBlockPos(), variant, model, poseStack, bakedLight, packedOverlay, forceRebuild,
+                        (ps, buf) -> renderLegacy(be, bakedDef, model, maps, 1.0F, ps, buf,
+                            bakedLight, packedOverlay));
+                    if (drew) {
+                        be.shouldRerenderRail = false;
+                        return;
+                    }
+                }
+                renderLegacy(be, def, model, maps, partialTick, poseStack, buffer, packedLight, packedOverlay);
+            } finally {
+                ClientRenderProfiler.endRailOld(legacyStart);
+            }
+        } catch (Throwable t) {
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn("Skipping rail render at {} after renderer failure", be.getBlockPos(), t);
+        } finally {
+            ClientRenderProfiler.endRail(profilerStart);
+        }
+    }
+
+    /**
+     * 焼いたメッシュの「見た目の要因」。トングの位置が変われば別物として焼き直す。
+     * <p>
+     * {@code Point.getMovement()} は {@code moveCount / MAX_COUNT} で、レッドストーン入力に
+     * 応じて 0 〜 1 を毎 tick 1 段ずつ動く。ここを見ないと転てつしてもメッシュが更新されない。
+     */
+    private static long switchVariantKey(TileEntityLargeRailCore be) {
+        long key = 1L;
+        jp.ngt.rtm.rail.util.Point[] points = be.getSwitchPoints();
+        if (points != null) {
+            for (jp.ngt.rtm.rail.util.Point p : points) {
+                key = key * 31L + (p == null ? 0 : Float.floatToIntBits(p.getMovement()));
+            }
+        }
+        //Point を持たない分岐 (フォールバック描画) 用に開通方向も混ぜる
+        key = key * 31L + be.getActiveSegmentIndex();
+        key = key * 31L + be.getPreviousSegmentIndex();
+        return key;
+    }
+
+    /**
+     * 転てつのアニメーション中か。動いている間は毎フレーム形が変わるので焼かず、
+     * 従来どおり逐次描画する (焼くと毎フレーム焼き直しになってかえって重い)。
+     */
+    private static boolean isSwitchAnimating(TileEntityLargeRailCore be, float partialTick, int mapCount) {
+        jp.ngt.rtm.rail.util.Point[] points = be.getSwitchPoints();
+        if (points != null) {
+            for (jp.ngt.rtm.rail.util.Point p : points) {
+                if (p == null) {
+                    continue;
+                }
+                float movement = p.getMovement();
+                if (movement > 0.0F && movement < 1.0F) {
+                    return true;
+                }
+            }
+        }
+        if (mapCount > 1) {
+            float progress = be.getSwitchProgress(partialTick);
+            if (progress > 0.0F && progress < 1.0F) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 旧パイプライン本体 (トング付き分岐)。統合メッシュへの焼き込みからも、逐次描画からも
+     * 同じコードが呼ばれる。渡された poseStack がレール原点基準であることが前提。
+     */
+    private void renderLegacy(TileEntityLargeRailCore be, RailDefinition def,
+                              MqoModelLoader.MqoModel model, RailMap[] maps, float partialTick,
+                              PoseStack poseStack, MultiBufferSource buffer,
+                              int packedLight, int packedOverlay) {
             //compatibilityHeavy はこのパスでしか使わないので、早期 return の後で求める。
             boolean compatibilityHeavy = shouldUseCompatibilityRendering(def, model);
             net.minecraft.world.phys.Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
@@ -173,11 +267,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 renderRailMap(be, activeMap, activeIndex, RenderSwitchLayout.NONE, activeIndex, activeIndex, 1.0F,
                     poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, cameraDistanceSq, compatibilityHeavy, null);
             }
-        } catch (Throwable t) {
-            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn("Skipping rail render at {} after renderer failure", be.getBlockPos(), t);
-        } finally {
-            ClientRenderProfiler.endRail(profilerStart);
-        }
     }
 
     private void renderRailMap(
