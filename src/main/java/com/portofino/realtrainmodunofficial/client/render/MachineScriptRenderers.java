@@ -97,9 +97,15 @@ public final class MachineScriptRenderers {
             }
             mo.model = modelBytes != null ? ModelLoader.parse(modelBytes, def.getModelFile()) : new PolygonModel();
 
-            //getModelName() は config 名 (CrossingGate01R 等) を返す必要がある
+            //getModelName() は本家 config.getName() 相当、つまり <b>素のモデル名</b>
+            //("CrossingGate01R" / "Point01A") を返さなければならない。
+            //以前は def.getId() ("crossing:pack名:CrossingGate01R") を入れていたため、
+            //  RenderCrossingGate01.js : getModelName().equals("CrossingGate01R")
+            //  RenderPoint01.js        : getModelName().equals("Point01A")
+            //がどちらも常に false になり、右用の踏切が左用と同じ向きに描かれ、
+            //自動転轍機がモーターでなくレバーで描かれていた。
             jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = new jp.ngt.rtm.modelpack.cfg.TrainConfig();
-            cfg.trainName = def.getId();
+            cfg.trainName = def.getDisplayName();
             cfg.init();
             renderer.init(new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(cfg), mo);
 

@@ -134,5 +134,22 @@
   "realtrainmodunofficial.configuration.magicNumber": "매직 넘버",
   "screen.realtrainmodunofficial.marker_offset": "마커 위치 조정",
   "screen.realtrainmodunofficial.marker_offset.reset": "기본값으로",
-  "screen.realtrainmodunofficial.marker_offset.hint": "마커 기본 위치로부터의 오프셋. 단위는 1/16 블록."
+  "screen.realtrainmodunofficial.marker_offset.hint": "마커 기본 위치로부터의 오프셋. 단위는 1/16 블록.",
+  "item.realtrainmodunofficial.fluorescent": "유리 형광등",
+  "item.realtrainmodunofficial.railroad_sign": "철도 표지",
+  "item.realtrainmodunofficial.bumping_post": "차막이",
+  "item.realtrainmodunofficial.point_machine": "전철기",
+  "item.realtrainmodunofficial.ticket_vendor": "발매기",
+  "item.realtrainmodunofficial.ticket": "승차권",
+  "item.realtrainmodunofficial.ticket_book": "회수권",
+  "screen.realtrainmodunofficial.select_fluorescent": "형광등 선택",
+  "screen.realtrainmodunofficial.select_railroad_sign": "표지 텍스처 선택",
+  "screen.realtrainmodunofficial.select_bumping_post": "차막이 선택",
+  "screen.realtrainmodunofficial.select_point_machine": "전철기 선택",
+  "screen.realtrainmodunofficial.select_ticket_vendor": "발매기 선택",
+  "screen.realtrainmodunofficial.ticket_vendor": "발매기",
+  "screen.realtrainmodunofficial.ticket_vendor.ticket": "승차권",
+  "screen.realtrainmodunofficial.ticket_vendor.ticket_book": "회수권",
+  "tooltip.realtrainmodunofficial.ticket.remaining": "남은 횟수: %s",
+  "tooltip.realtrainmodunofficial.ticket.entered": "입장함"
 }

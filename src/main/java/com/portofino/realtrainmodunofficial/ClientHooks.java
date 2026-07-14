@@ -97,6 +97,16 @@ public final class ClientHooks {
         invokeClient("openDetectorConfigScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
+    /** 券売機: 素手で右クリック (本家 GuiTicketVendor) */
+    public static void openTicketVendorScreen(BlockPos pos) {
+        invokeClient("openTicketVendorScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 標識のテクスチャ変更: 素手で右クリック (本家 guiIdSelectTileEntityTexture) */
+    public static void openRailroadSignScreen(BlockPos pos) {
+        invokeClient("openRailroadSignScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
     public static void stopCrossingGateSound(Level level, BlockPos pos) {
         invokeClient("stopCrossingGateSound", new Class<?>[]{Level.class, BlockPos.class}, level, pos);
     }

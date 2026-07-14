@@ -39,5 +39,9 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(SaveSignboardPayload.TYPE, SaveSignboardPayload.STREAM_CODEC, SaveSignboardPayload::handleOnServer);
         //本家 列車検知器 (出力先の座標と 置く/消す)
         registrar.playToServer(ConfigureDetectorPayload.TYPE, ConfigureDetectorPayload.STREAM_CODEC, ConfigureDetectorPayload::handleOnServer);
+        //本家 GuiTicketVendor (券売機で切符/回数券を買う)
+        registrar.playToServer(BuyTicketPayload.TYPE, BuyTicketPayload.STREAM_CODEC, BuyTicketPayload::handleOnServer);
+        //本家 guiIdSelectTileEntityTexture (標識のテクスチャ変更)
+        registrar.playToServer(SetObjectModelPayload.TYPE, SetObjectModelPayload.STREAM_CODEC, SetObjectModelPayload::handleOnServer);
     }
 }

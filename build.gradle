@@ -194,22 +194,73 @@ tasks.named('build').configure {
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.
 // When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
 // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
+// 設置物 6 種 (ガラスの蛍光灯 / 架線柱 / 車止め / 転轍機 / 券売機 / 標識) だけは
+// 本家モデルをそのまま同梱する。パックを入れていない状態でも使えるようにするため。
+// それ以外の RTM 内蔵モデルパックは従来どおり同梱しない (下の exclude 群)。
+def bundledObjectModels = [
+    'Model_Fluorescent.mqo', 'Model_FluorescentCovered.mqo',
+    'Model_LinePole.mqo', 'Model_LinePole2.mqo', 'Model_LinePoleFrame.mqo', 'Model_SignalPole.mqo',
+    'ModelBumpingPost_Type2.mqo', 'machine_point01.mqo', 'TicketVendor.mqo',
+]
+def bundledObjectJson = [
+    'ModelOrnament_Fluorescent01.json', 'ModelOrnament_Fluorescent01Broken.json',
+    'ModelOrnament_FluorescentCovered01.json',
+    'ModelOrnament_LinePole01.json', 'ModelOrnament_LinePole02.json',
+    'ModelOrnament_LinePoleFrame01.json', 'ModelOrnament_SignalPole01.json',
+    'ModelMachine_BumpingPost_Type2.json',
+    'ModelMachine_Point01M.json', 'ModelMachine_Point01A.json',
+    'ModelMachine_Vendor01.json', 'ModelMachine_Vendor02.json',
+]
+def bundledOrnamentTextures = [
+    'fluorescent.png', 'fluorescent_light0.png', 'fluorescent_light1.png', 'fluorescent_light2.png',
+    'linepole.png',
+    'button_Fluorescent01.png', 'button_Fluorescent01Broken.png', 'button_FluorescentCovered01.png',
+    'button_LinePole01.png', 'button_LinePole02.png', 'button_LinePoleFrame01.png', 'button_SignalPole01.png',
+]
+def bundledMachineTextures = [
+    'bumpingPost.png', 'point.png', 'vendor01.png', 'vendor02.png',
+    'button_BumpingPost_Type2.png', 'button_Point01M.png', 'button_Point01A.png',
+    'button_Vendor01.png', 'button_Vendor02.png',
+]
+
 tasks.withType(ProcessResources).configureEach {
     // Do not ship RTM's built-in model packs. Runtime should show only user-added
     // external packs while keeping this mod's item/block textures and item models.
-    exclude 'assets/minecraft/models/**'
+    // 例外は上で定義した設置物 6 種ぶんだけ。
+    exclude { details ->
+        // ディレクトリを除外すると中身ごと消える。特に models/json は models/ の枝に
+        // 引っかかるので、判定はファイルだけに限る。
+        if (details.isDirectory()) {
+            return false
+        }
+        def path = details.relativePath.pathString.replace('\\', '/')
+        if (!path.startsWith('assets/minecraft/')) {
+            return false
+        }
+        if (path.startsWith('assets/minecraft/models/json/')) {
+            return !bundledObjectJson.contains(details.name)
+        }
+        if (path.startsWith('assets/minecraft/models/')) {
+            return !bundledObjectModels.contains(details.name)
+        }
+        if (path.startsWith('assets/minecraft/textures/ornament/')) {
+            return !bundledOrnamentTextures.contains(details.name)
+        }
+        if (path.startsWith('assets/minecraft/textures/machine/')) {
+            return !bundledMachineTextures.contains(details.name)
+        }
+        return false
+    }
+    // 標識 (RRS) はモデルを持たず textures/rrs/*.png がそのまま選択肢になるので全部同梱する。
     exclude 'assets/minecraft/textures/connector/**'
     exclude 'assets/minecraft/textures/container/**'
     exclude 'assets/minecraft/textures/decoration/**'
     exclude 'assets/minecraft/textures/ebb/**'
     exclude 'assets/minecraft/textures/firearm/**'
     exclude 'assets/minecraft/textures/flag/**'
-    exclude 'assets/minecraft/textures/machine/**'
     exclude 'assets/minecraft/textures/mechanism/**'
     exclude 'assets/minecraft/textures/npc/**'
-    exclude 'assets/minecraft/textures/ornament/**'
     exclude 'assets/minecraft/textures/rail/**'
-    exclude 'assets/minecraft/textures/rrs/**'
     exclude 'assets/minecraft/textures/signal/**'
     exclude 'assets/minecraft/textures/signboard/**'
     exclude 'assets/minecraft/textures/train/**'

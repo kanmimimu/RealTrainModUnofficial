@@ -110,7 +110,18 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     boolean veryFar = cameraDistanceSq > veryFarThreshold * veryFarThreshold;
                     poseStack.pushPose();
                     pushed = true;
-                    if (blockEntity.getMountFace() >= 0) {
+                    if (blockEntity.getCategory() == InstalledObjectCategory.FLUORESCENT) {
+                        //本家 RenderOrnament: 蛍光灯はブロック中心を原点にするだけ。
+                        //取付方向 (0..7) に応じた ±0.4375 の寄せと Y90度回転は
+                        //RenderFluorescent.js が entity.getDir() を見て自分で行う。
+                        //ここで面回転や yaw を掛けると二重に回って壁にめり込む。
+                        poseStack.translate(0.5D, 0.5D, 0.5D);
+                        Vec3 renderOffset = blockEntity.getRenderOffset();
+                        poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
+                        applyAdjustments(poseStack, blockEntity);
+                        poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
+                        poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
+                    } else if (blockEntity.getMountFace() >= 0) {
                         //本家 RenderElectricalWiring (碍子/コネクタ) 準拠:
                         //ブロック中心 (+0.5,+0.5,+0.5) を基準に、クリック面 (meta 0-5) で回転。
                         //持ち上げ/横倒しハックは使わない。
@@ -141,9 +152,16 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     }
                     //踏切/改札: 本家式スクリプト描画 (MachinePartsRenderer + Nashorn)。成功時は旧近似パスをスキップ。
                     //改札は本家 RenderTurnstile01.js が getMovingCount(entity)>0 で扉を回す (開閉アニメ)。
+                    //蛍光灯 (RenderFluorescent.js / OrnamentPartsRenderer): pass2 で発光管を描く。
+                    //架線柱 (RenderConnectablePole.js): 隣の柱とつながる腕を出す。
+                    //転轍機 (RenderPoint01.js): getMovingCount でレバーを ±30 度回す。
+                    //どれも本家スクリプトが向き・部品の出し分けを全部やるので、この経路に載せる必要がある。
                     if ((blockEntity.getCategory() == InstalledObjectCategory.CROSSING
                             || blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE
-                            || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL)
+                            || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
+                            || blockEntity.getCategory() == InstalledObjectCategory.FLUORESCENT
+                            || blockEntity.getCategory() == InstalledObjectCategory.OVERHEAD_LINE_POLE
+                            || blockEntity.getCategory() == InstalledObjectCategory.POINT)
                             && definition.getScriptPath() != null && !definition.getScriptPath().isBlank()) {
                         com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.Scripted machineScripted =
                             com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(definition);
@@ -202,6 +220,11 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                 ClientRenderProfiler.endInstalledObject(profilerStart);
                 return;
             }
+        }
+        if (blockEntity.getCategory() == InstalledObjectCategory.RAILROAD_SIGN) {
+            renderRailroadSign(blockEntity, definition, poseStack, buffer, packedLight, packedOverlay);
+            ClientRenderProfiler.endInstalledObject(profilerStart);
+            return;
         }
         if (blockEntity.getCategory() == InstalledObjectCategory.SIGNBOARD) {
             renderSignboard(blockEntity, definition, poseStack, buffer, packedLight, packedOverlay);
@@ -798,6 +821,89 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
      * </ul>
      * 側面 4 面は color から 0x101010 引いた色で塗る (本家準拠の「縁」)。
      */
+    /**
+     * 本家 RenderRailroadSign の移植。標識は 6 種のうち唯一 MQO モデルを持たず、
+     * ポール (直径 1/8・高さ 1.5 の円柱) の上に、選んだテクスチャを貼った板を立てるだけ。
+     * <p>
+     * 本家と同じく、真上にブロックがあるときは板を下げてポールを下へ伸ばし、
+     * 天井から吊り下げた形にする。
+     */
+    private void renderRailroadSign(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
+                                    PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
+        String signTexture = definition.getSignTexture();
+        ResourceLocation texture = signTexture == null || signTexture.isBlank()
+            ? null
+            : MqoModelLoader.resolvePackTexture(definition.getPackName(), signTexture);
+
+        //本家 RenderRailroadSign.flipVertical: 真上が空でなければ吊り下げ。
+        boolean hanging = blockEntity.getLevel() != null
+            && !blockEntity.getLevel().isEmptyBlock(blockEntity.getBlockPos().above());
+        //本家: f0 = 1.25 (立てる) / -0.25 (吊る)
+        float plateY = hanging ? -0.25F : 1.25F;
+        final float w = 0.25F;      //板の半径 (本家 w)
+        final float d = 0.0675F;    //板の Z 方向オフセット (本家 d)
+
+        poseStack.pushPose();
+        poseStack.translate(0.5D, 0.0D, 0.5D);
+        Vec3 renderOffset = blockEntity.getRenderOffset();
+        poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
+        applyAdjustments(poseStack, blockEntity);
+
+        // ---- 板 ----
+        poseStack.pushPose();
+        poseStack.translate(0.0F, plateY, 0.0F);
+        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
+        PoseStack.Pose pose = poseStack.last();
+        if (texture != null) {
+            VertexConsumer plate = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
+            signVertex(plate, pose, w, -w, d, 1.0F, 1.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
+            signVertex(plate, pose, w, w, d, 1.0F, 0.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
+            signVertex(plate, pose, -w, w, d, 0.0F, 0.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
+            signVertex(plate, pose, -w, -w, d, 0.0F, 1.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
+        }
+        //本家: 裏面は同じ四角形を色 0 (黒) で塗るだけ。
+        VertexConsumer solid = buffer.getBuffer(RenderType.entityCutoutNoCull(SolidTexture.white()));
+        signVertex(solid, pose, -w, -w, d, 0.0F, 1.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
+        signVertex(solid, pose, -w, w, d, 0.0F, 0.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
+        signVertex(solid, pose, w, w, d, 1.0F, 0.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
+        signVertex(solid, pose, w, -w, d, 1.0F, 1.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
+        poseStack.popPose();
+
+        // ---- ポール ----
+        //本家: 吊り下げのときはポールの根元を 0.5 下げる (板から天井まで届かせる)。
+        if (hanging) {
+            poseStack.translate(0.0F, -0.5F, 0.0F);
+        }
+        //本家 NGTRenderer.renderPole(tessellator, 0.0625F, 1.5F, false) + 色 0x404040
+        renderPole(solid, poseStack.last(), 0.0625F, 1.5F, 0x404040, packedLight, packedOverlay);
+        poseStack.popPose();
+    }
+
+    /**
+     * 本家 NGTRenderer.renderPole 相当の 16 角柱。テクスチャは使わず単色で塗る。
+     * (本家は球モデルの赤道リングを流用していたが、やっていることは単位円なので三角関数で出す)
+     */
+    private static void renderPole(VertexConsumer consumer, PoseStack.Pose pose,
+                                   float radius, float length, int color,
+                                   int packedLight, int packedOverlay) {
+        final int sides = 16;
+        for (int i = 0; i < sides; i++) {
+            double a0 = (Math.PI * 2.0D / sides) * i;
+            double a1 = (Math.PI * 2.0D / sides) * (i + 1);
+            float x0 = (float) (Math.cos(a0) * radius);
+            float z0 = (float) (Math.sin(a0) * radius);
+            float x1 = (float) (Math.cos(a1) * radius);
+            float z1 = (float) (Math.sin(a1) * radius);
+            //法線は面の中央方向 (外向き)
+            float nx = (float) Math.cos((a0 + a1) * 0.5D);
+            float nz = (float) Math.sin((a0 + a1) * 0.5D);
+            signVertex(consumer, pose, x0, 0.0F, z0, 0.0F, 1.0F, packedLight, packedOverlay, color, nx, 0.0F, nz);
+            signVertex(consumer, pose, x0, length, z0, 0.0F, 0.0F, packedLight, packedOverlay, color, nx, 0.0F, nz);
+            signVertex(consumer, pose, x1, length, z1, 1.0F, 0.0F, packedLight, packedOverlay, color, nx, 0.0F, nz);
+            signVertex(consumer, pose, x1, 0.0F, z1, 1.0F, 1.0F, packedLight, packedOverlay, color, nx, 0.0F, nz);
+        }
+    }
+
     private void renderSignboard(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
                                  PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
         String signTexture = definition.getSignTexture();

@@ -50,7 +50,9 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.INSULATOR_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TRAIN_DETECTOR_ITEM.get());
-                //架線柱 はユーザー要望で削除 (NGTO Builder 等で代替。登録は既存ワールド互換のため残置)
+                //架線柱: 本家モデル (LinePole01/02/Frame01/SignalPole01) を同梱したので再追加。
+                //以前は選択できるモデルが1つも無かったためタブから外していた。
+                output.accept(RealTrainModUnofficialItems.OVERHEAD_LINE_POLE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_GATE_ITEM.get());
                 //入力コネクタ/出力コネクタ/信号変換器 はユーザー要望で削除
                 //(信号機とワイヤーのみ残す。登録は既存ワールド互換のため残置)
@@ -62,6 +64,14 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_1.get());
                 //スピーカー: 本家仕様化 (スピーカーごとの音登録+可聴範囲) に伴い再追加
                 output.accept(RealTrainModUnofficialItems.SPEAKER_ITEM.get());
+                //本家 ItemInstalledObject から移植した設置物
+                output.accept(RealTrainModUnofficialItems.FLUORESCENT_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.RAILROAD_SIGN_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.BUMPING_POST_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.POINT_MACHINE_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.TICKET_VENDOR_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.TICKET_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.TICKET_BOOK_ITEM.get());
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {

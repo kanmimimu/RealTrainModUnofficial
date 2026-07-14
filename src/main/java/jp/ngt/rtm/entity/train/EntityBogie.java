@@ -429,7 +429,50 @@ public class EntityBogie extends Entity {
         List<Entity> list = this.level().getEntities(this,
                 new AABB(this.getX() - dis, this.getY() - EntityTrainBase.TRAIN_HEIGHT, this.getZ() - dis,
                         this.getX() + dis, this.getY() + EntityTrainBase.TRAIN_HEIGHT, this.getZ() + dis));
+        this.collideWithBumpingPost();
         return this.collideWithEntities(list);
+    }
+
+    /**
+     * 本家 EntityBogie.collideWithBumpingPost の移植。
+     * 進行方向の先頭台車が車止めの 1.75 ブロック以内に入ったら列車を非常停止させる。
+     * <p>
+     * 本家の車止めはエンティティ (EntityBumpingPost) だったが、RTMU では他の設置物と同じ
+     * ブロックなので、エンティティ一覧ではなく周囲のブロックエンティティを見る。
+     */
+    private void collideWithBumpingPost() {
+        EntityTrainBase train = this.getTrain();
+        //本家: 先頭台車のときだけ判定する。動いていない列車は調べる必要が無い。
+        if (train == null || train.getTrainDirection() != this.getBogieId() || train.getSpeed() == 0.0F) {
+            return;
+        }
+        final double range = 1.75D;
+        final double rangeSq = range * range;
+        final int r = Mth.ceil(range);
+        net.minecraft.core.BlockPos center = this.blockPosition();
+        for (int dx = -r; dx <= r; ++dx) {
+            for (int dy = -1; dy <= 2; ++dy) {
+                for (int dz = -r; dz <= r; ++dz) {
+                    net.minecraft.core.BlockPos pos = center.offset(dx, dy, dz);
+                    if (!(this.level().getBlockEntity(pos)
+                            instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be)
+                            || be.getCategory()
+                                != com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.BUMPING_POST) {
+                        continue;
+                    }
+                    //車止めはレールに吸着して置かれる。実際の位置はブロックの
+                    //(x+0.5, y, z+0.5) にレール曲線への寄せ (renderOffset) を足したもの。
+                    net.minecraft.world.phys.Vec3 offset = be.getRenderOffset();
+                    double px = pos.getX() + 0.5D + offset.x;
+                    double py = pos.getY() + offset.y;
+                    double pz = pos.getZ() + 0.5D + offset.z;
+                    if (this.distanceToSqr(px, py, pz) <= rangeSq) {
+                        train.stopTrain(true);
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     private boolean collideWithEntities(List<Entity> list) {

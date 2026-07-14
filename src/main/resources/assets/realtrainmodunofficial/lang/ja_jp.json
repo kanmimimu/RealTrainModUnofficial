@@ -134,5 +134,22 @@
   "realtrainmodunofficial.configuration.magicNumber": "マジックナンバー",
   "screen.realtrainmodunofficial.marker_offset": "マーカー位置調整",
   "screen.realtrainmodunofficial.marker_offset.reset": "既定に戻す",
-  "screen.realtrainmodunofficial.marker_offset.hint": "マーカーの既定位置からのずれ。単位は 1/16 ブロック。"
+  "screen.realtrainmodunofficial.marker_offset.hint": "マーカーの既定位置からのずれ。単位は 1/16 ブロック。",
+  "item.realtrainmodunofficial.fluorescent": "ガラスの蛍光灯",
+  "item.realtrainmodunofficial.railroad_sign": "標識",
+  "item.realtrainmodunofficial.bumping_post": "車止め",
+  "item.realtrainmodunofficial.point_machine": "転轍機",
+  "item.realtrainmodunofficial.ticket_vendor": "券売機",
+  "item.realtrainmodunofficial.ticket": "切符",
+  "item.realtrainmodunofficial.ticket_book": "回数券",
+  "screen.realtrainmodunofficial.select_fluorescent": "蛍光灯を選択",
+  "screen.realtrainmodunofficial.select_railroad_sign": "標識のテクスチャを選択",
+  "screen.realtrainmodunofficial.select_bumping_post": "車止めを選択",
+  "screen.realtrainmodunofficial.select_point_machine": "転轍機を選択",
+  "screen.realtrainmodunofficial.select_ticket_vendor": "券売機を選択",
+  "screen.realtrainmodunofficial.ticket_vendor": "券売機",
+  "screen.realtrainmodunofficial.ticket_vendor.ticket": "切符",
+  "screen.realtrainmodunofficial.ticket_vendor.ticket_book": "回数券",
+  "tooltip.realtrainmodunofficial.ticket.remaining": "残り: %s",
+  "tooltip.realtrainmodunofficial.ticket.entered": "入場済み"
 }

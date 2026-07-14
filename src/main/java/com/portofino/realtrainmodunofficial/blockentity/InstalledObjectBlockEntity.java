@@ -66,6 +66,23 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     private int speakerRange = 32;
     private final Map<String, String> scriptData = new HashMap<>();
 
+    // ---- 蛍光灯 (本家 TileEntityFluorescent) ----
+    // 本家 dirF: 設置面とプレイヤーの向きから決まる 0..7 の取付方向。
+    // RenderFluorescent.js が entity.getDir() で読み、平行移動と Y90度回転を自分で行う。
+    //   0=天井(Z向き) 1=北壁 2=床(Z向き) 3=南壁 4=天井(X向き) 5=西壁 6=床(X向き) 7=東壁
+    private byte fluorescentDir;
+    // 本家 BlockFluorescent.getLightValue: meta==2 (壊れた蛍光灯) はランダムに明滅する。
+    private int fluorescentFlickerTick;
+    private int fluorescentLight = 15;
+
+    // ---- 転轍機 (本家 TileEntityPoint) ----
+    // activated: レッドストーン出力 (ON=15)。右クリックで切り替わる。
+    private boolean pointActivated;
+    // move: 本家既定 24.0。符号がレバー/本体の向き(左右どちら側に付くか)を決める。
+    // MachinePartsRenderer.getLodState が move>0 ? 1 : -1 を返し、RenderPoint01.js が
+    // state<0 のとき本体を +2.75 ずらす。バールの右クリックで符号を反転する。
+    private float pointMove = 24.0F;
+
     // ---- 看板 (本家 TileEntitySignBoard / ResourceStateSignboard) ----
     /**
      * 板に貼り付けた文字。看板エディタ (SignboardScreen) で編集する。
@@ -158,6 +175,10 @@ public class InstalledObjectBlockEntity extends BlockEntity {
         tag.putInt("SignalChannel", signalChannel);
         tag.putInt("SignalAspect", signalAspect);
         tag.putInt("SpeakerRange", speakerRange);
+        //蛍光灯 / 転轍機 (本家 TileEntityFluorescent.dir, TileEntityPoint.Activated/Move)
+        tag.putByte("FluorescentDir", fluorescentDir);
+        tag.putBoolean("PointActivated", pointActivated);
+        tag.putFloat("PointMove", pointMove);
         if (!scriptData.isEmpty()) {
             CompoundTag scriptDataTag = new CompoundTag();
             scriptData.forEach(scriptDataTag::putString);
@@ -214,6 +235,11 @@ public class InstalledObjectBlockEntity extends BlockEntity {
             electricity = SignalAspect.byId(signalAspect).getLegacyValue();
         }
         speakerRange = tag.contains("SpeakerRange") ? tag.getInt("SpeakerRange") : 32;
+        fluorescentDir = tag.getByte("FluorescentDir");
+        pointActivated = tag.getBoolean("PointActivated");
+        //本家 TileEntityPoint の既定は 24.0。0 だと転轍機の本体が反対側にずれてしまうので、
+        //キーが無い旧データは既定値に戻す。
+        pointMove = tag.contains("PointMove") ? tag.getFloat("PointMove") : 24.0F;
         scriptData.clear();
         if (tag.contains("ScriptData")) {
             CompoundTag scriptDataTag = tag.getCompound("ScriptData");
@@ -753,10 +779,93 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     public int getY() { return worldPosition.getY(); }
     public int getZ() { return worldPosition.getZ(); }
 
-    /** 0–3 facing direction derived from yaw (0=south,1=west,2=north,3=east). */
+    /**
+     * 0–3 facing direction derived from yaw (0=south,1=west,2=north,3=east).
+     * <p>
+     * ただし蛍光灯だけは本家 TileEntityFluorescent.getDir() と同じく
+     * <b>取付方向 0..7</b> を返す (RenderFluorescent.js がこれで平行移動と回転を決める)。
+     */
     public int getDir() {
-        int d = Math.floorMod(Math.round(yaw / 90.0F), 4);
-        return d;
+        if (getCategory() == InstalledObjectCategory.FLUORESCENT) {
+            return fluorescentDir;
+        }
+        return Math.floorMod(Math.round(yaw / 90.0F), 4);
+    }
+
+    // ---- 蛍光灯 (本家 TileEntityFluorescent) ----
+
+    public void setFluorescentDir(byte dir) {
+        this.fluorescentDir = dir;
+        setChanged();
+    }
+
+    /** 壊れた蛍光灯 (本家 meta==2 / モデル名 *Broken) か。 */
+    public boolean isBrokenFluorescent() {
+        return getCategory() == InstalledObjectCategory.FLUORESCENT
+            && getModelName().toLowerCase(java.util.Locale.ROOT).contains("broken");
+    }
+
+    /**
+     * 本家 BlockFluorescent.getLightValue: 壊れた蛍光灯は 0/4/8/12 をランダムに返して明滅する。
+     * 通常の蛍光灯は常に 15。
+     * <p>
+     * 本家は getLightValue が呼ばれるたびに乱数を振っていたが、getLightEmission は
+     * 光源伝播中に何度も呼ばれるので値がぶれる。ここでは 3tick ごと (本家
+     * TileEntityFluorescent.update の count==3 と同じ間隔) に振り直した値を保持して返す。
+     */
+    public int getFluorescentLightValue() {
+        return isBrokenFluorescent() ? fluorescentLight : 15;
+    }
+
+    /** 壊れた蛍光灯の明滅。3tick ごとに明るさを振り直して再ライティングを要求する。 */
+    private static void tickFluorescentFlicker(Level level, BlockPos pos, InstalledObjectBlockEntity be) {
+        if (!be.isBrokenFluorescent()) {
+            return;
+        }
+        if (++be.fluorescentFlickerTick < 3) {
+            return;
+        }
+        be.fluorescentFlickerTick = 0;
+        int next = switch (level.random.nextInt(4)) {
+            case 0 -> 0;
+            case 1 -> 4;
+            case 2 -> 8;
+            default -> 12;
+        };
+        if (next != be.fluorescentLight) {
+            be.fluorescentLight = next;
+            //本家 world.checkLight(pos) 相当。これを呼ばないと明るさが変わっても再描画されない。
+            level.getLightEngine().checkBlock(pos);
+        }
+    }
+
+    // ---- 転轍機 (本家 TileEntityPoint) ----
+
+    public boolean isPointActivated() {
+        return pointActivated;
+    }
+
+    public void setPointActivated(boolean activated) {
+        this.pointActivated = activated;
+        setChanged();
+        sync();
+    }
+
+    public float getPointMove() {
+        return pointMove;
+    }
+
+    /** バールでの右クリックで符号が反転し、転轍機の本体が線路の反対側に移る (本家 BlockPoint)。 */
+    public void setPointMove(float move) {
+        this.pointMove = move;
+        setChanged();
+        sync();
+    }
+
+    private void sync() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
     }
 
     /** Whether this block is connected to a neighbor on the given RTM side (0–5). Always false stub. */
@@ -795,6 +904,12 @@ public class InstalledObjectBlockEntity extends BlockEntity {
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, InstalledObjectBlockEntity be) {
+        //蛍光灯は明滅以外にやることが無い。明るさはクライアント/サーバー両方で使うので
+        //サイド分岐より前に処理する (壊れていない蛍光灯なら何もせず抜ける)。
+        if (be.getCategory() == InstalledObjectCategory.FLUORESCENT) {
+            tickFluorescentFlicker(level, pos, be);
+            return;
+        }
         if (level.isClientSide) {
             //看板: 本家 TileEntitySignBoard.update — フレームアニメを進める。
             if (be.getCategory() == InstalledObjectCategory.SIGNBOARD) {

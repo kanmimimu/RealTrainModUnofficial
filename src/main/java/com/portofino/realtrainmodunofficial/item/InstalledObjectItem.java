@@ -198,16 +198,29 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         //汎用の壁挿し(90°横倒し)ロジックに乗せてはいけない。
         boolean honkeFaceMount = category == InstalledObjectCategory.INSULATOR
                 || category == InstalledObjectCategory.SIGNBOARD;
-        //列車検知器: 本家 ItemInstalledObject.setEntityOnRail 準拠で、クリックしたレールの
+        //本家で常に直立している設置物 (転轍機/券売機/標識)。壁挿し・逆さ設置はさせず、
+        //本家 setRotation(player, 15.0F, ...) と同じく向きを 15 度刻みに丸めるだけ。
+        boolean uprightOnly = category == InstalledObjectCategory.POINT
+                || category == InstalledObjectCategory.TICKET_VENDOR
+                || category == InstalledObjectCategory.RAILROAD_SIGN;
+        //蛍光灯: 本家 ItemInstalledObject は取付方向 (0..7) だけを持たせ、平行移動と回転は
+        //レンダースクリプト側でやる。汎用の壁挿し/逆さ設置には乗せない。
+        boolean fluorescent = category == InstalledObjectCategory.FLUORESCENT;
+        //列車検知器と車止め: 本家 ItemInstalledObject.setEntityOnRail 準拠で、クリックしたレールの
         //曲線上に載せる (位置・向き・勾配・カント)。汎用の壁挿し/逆さ設置には乗せない。
-        RailSnap railSnap = category == InstalledObjectCategory.TRAIN_DETECTOR
+        boolean railMounted = category == InstalledObjectCategory.TRAIN_DETECTOR
+                || category == InstalledObjectCategory.BUMPING_POST;
+        RailSnap railSnap = railMounted
                 ? computeRailSnap(level, context.getClickedPos(), placePos, player)
                 : null;
         if (railSnap != null) {
             placeYaw = railSnap.yaw();
             placeMountPitch = railSnap.pitch();
-        } else if (!honkeFaceMount
-                && category != InstalledObjectCategory.TRAIN_DETECTOR
+        } else if (uprightOnly) {
+            placeYaw = Math.round(player.getYRot() / 15.0F) * 15.0F;
+        } else if (fluorescent) {
+            placeYaw = 0.0F;
+        } else if (!honkeFaceMount && !railMounted
                 && category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL) {
             if (clickedFace == net.minecraft.core.Direction.DOWN) {
                 upsideDown = true;
@@ -227,6 +240,11 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
                     //レール曲線上の点にモデルを載せる (レンダラの原点は placePos + (0.5, 0, 0.5))
                     blockEntity.setRenderOffset(railSnap.offX(), railSnap.offY(), railSnap.offZ());
                     blockEntity.setMountRoll(railSnap.roll());
+                } else if (fluorescent) {
+                    //本家 ItemInstalledObject の蛍光灯: 取付方向 (0..7) だけを持たせる。
+                    //RenderFluorescent.js が getDir() を読んで自分で寄せて回す。
+                    blockEntity.setFluorescentDir(fluorescentDir(clickedFace, player.getYRot()));
+                    blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
                 } else if (honkeFaceMount) {
                     //本家 meta = クリック面 (1.7.10 side と 1.21 Direction.ordinal は同一)
                     blockEntity.setMountFace(clickedFace.ordinal());
@@ -265,6 +283,30 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
             }
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    /**
+     * 本家 ItemInstalledObject の蛍光灯の取付方向 (TileEntityFluorescent.dirF, 0..7)。
+     * <p>
+     * クリックした面で「どこに貼るか」が決まり、天井/床のときだけプレイヤーの向きで
+     * 蛍光灯を走らせる軸 (Z か X か) が決まる。RenderFluorescent.js の switch と対になっている:
+     * <pre>
+     *   0=天井(Z向き) 1=北面 2=床(Z向き) 3=南面 4=天井(X向き) 5=西面 6=床(X向き) 7=東面
+     * </pre>
+     */
+    private static byte fluorescentDir(net.minecraft.core.Direction clickedFace, float playerYaw) {
+        //本家: floor(yaw * 4 / 360 + 0.5) & 3 — プレイヤーの向きを4方位に丸める。
+        //偶数 (南/北) なら Z 軸、奇数 (西/東) なら X 軸に蛍光灯を寝かせる。
+        int quadrant = net.minecraft.util.Mth.floor(playerYaw * 4.0F / 360.0F + 0.5F) & 3;
+        boolean alongZ = quadrant == 0 || quadrant == 2;
+        return switch (clickedFace) {
+            case DOWN -> (byte) (alongZ ? 0 : 4);   //天井から吊る
+            case UP -> (byte) (alongZ ? 2 : 6);     //床に置く
+            case NORTH -> (byte) 1;
+            case SOUTH -> (byte) 3;
+            case WEST -> (byte) 5;
+            case EAST -> (byte) 7;
+        };
     }
 
     @Override

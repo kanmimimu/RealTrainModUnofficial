@@ -22,5 +22,31 @@ public enum InstalledObjectCategory {
     /**
      * 本家: 出力コネクタ (配線網→レッドストーン)
      */
-    CONNECTOR_OUTPUT
+    CONNECTOR_OUTPUT,
+    /**
+     * 本家: ガラスの蛍光灯 (BlockFluorescent / ModelOrnament ornamentType="Lamp")。
+     * 天井/壁/床のどこにでも貼れ、向き(0..7)を持つ。光源レベル 15。
+     */
+    FLUORESCENT,
+    /**
+     * 本家: 鉄道標識 (BlockRailroadSign / ResourceType RRS)。
+     * 唯一モデルを持たず、textures/rrs/*.png から選んだテクスチャを板に貼って
+     * ポールの上に立てるだけ。よってモデル選択でなくテクスチャ選択になる。
+     */
+    RAILROAD_SIGN,
+    /**
+     * 本家: 車止め (EntityBumpingPost / machineType="BumpingPost")。
+     * レールに吸着して置き、先頭台車が近づくと列車を非常停止させる。
+     */
+    BUMPING_POST,
+    /**
+     * 本家: 転轍機 (BlockPoint / machineType="Point")。
+     * 右クリックで切り替わるレッドストーン源 (ON=15)。分岐器を動かすのに使う。
+     */
+    POINT,
+    /**
+     * 本家: 券売機 (BlockTicketVendor / machineType="Vendor")。
+     * 右クリックで切符/回数券を購入できる。
+     */
+    TICKET_VENDOR
 }

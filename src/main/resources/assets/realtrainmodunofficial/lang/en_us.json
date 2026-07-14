@@ -134,5 +134,22 @@
   "realtrainmodunofficial.configuration.magicNumber": "Magic Number",
   "screen.realtrainmodunofficial.marker_offset": "Marker Position",
   "screen.realtrainmodunofficial.marker_offset.reset": "Reset",
-  "screen.realtrainmodunofficial.marker_offset.hint": "Offset from the marker's default position, in 1/16 block."
+  "screen.realtrainmodunofficial.marker_offset.hint": "Offset from the marker's default position, in 1/16 block.",
+  "item.realtrainmodunofficial.fluorescent": "Fluorescent Light",
+  "item.realtrainmodunofficial.railroad_sign": "Railroad Sign",
+  "item.realtrainmodunofficial.bumping_post": "Bumping Post",
+  "item.realtrainmodunofficial.point_machine": "Point Machine",
+  "item.realtrainmodunofficial.ticket_vendor": "Ticket Vendor",
+  "item.realtrainmodunofficial.ticket": "Ticket",
+  "item.realtrainmodunofficial.ticket_book": "Ticket Book",
+  "screen.realtrainmodunofficial.select_fluorescent": "Select Fluorescent Light",
+  "screen.realtrainmodunofficial.select_railroad_sign": "Select Sign Texture",
+  "screen.realtrainmodunofficial.select_bumping_post": "Select Bumping Post",
+  "screen.realtrainmodunofficial.select_point_machine": "Select Point Machine",
+  "screen.realtrainmodunofficial.select_ticket_vendor": "Select Ticket Vendor",
+  "screen.realtrainmodunofficial.ticket_vendor": "Ticket Vendor",
+  "screen.realtrainmodunofficial.ticket_vendor.ticket": "Ticket",
+  "screen.realtrainmodunofficial.ticket_vendor.ticket_book": "Ticket Book",
+  "tooltip.realtrainmodunofficial.ticket.remaining": "Remaining: %s",
+  "tooltip.realtrainmodunofficial.ticket.entered": "Entered"
 }

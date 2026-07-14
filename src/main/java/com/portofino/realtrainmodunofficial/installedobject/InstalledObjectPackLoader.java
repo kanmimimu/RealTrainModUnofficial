@@ -122,6 +122,15 @@ public final class InstalledObjectPackLoader {
                         }
                     });
             }
+            //標識 (RRS) は JSON を持たず textures/rrs/*.png 自体が選択肢になる。
+            Path rrsDir = modFile.findResource("assets", "minecraft", "textures", "rrs");
+            if (rrsDir != null && Files.isDirectory(rrsDir)) {
+                try (var stream = Files.list(rrsDir)) {
+                    stream.filter(Files::isRegularFile)
+                        .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".png"))
+                        .forEach(path -> registerRailroadSign("textures/rrs/" + path.getFileName(), packName));
+                }
+            }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not load built-in installed object definitions from mod JAR", e);
         }
@@ -187,6 +196,7 @@ public final class InstalledObjectPackLoader {
                         || name.startsWith("modelconnector_")
                         || name.startsWith("modelwire_")
                         || name.startsWith("modelcrossing_")
+                        || name.startsWith("modelornament_")
                         || name.startsWith("signboard_")
                 ));
         } catch (IOException e) {
@@ -201,6 +211,7 @@ public final class InstalledObjectPackLoader {
     private static void loadPack(InputStream zipInput, String packName, int depth) throws IOException {
         List<EntryData> entries = new ArrayList<>();
         List<NestedArchive> nestedArchives = new ArrayList<>();
+        List<String> rrsTextures = new ArrayList<>();
         try (ZipInputStream zip = new ZipInputStream(zipInput)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
@@ -208,6 +219,8 @@ public final class InstalledObjectPackLoader {
                     String normalized = normalize(entry.getName());
                     if (isSupportedJson(normalized)) {
                         entries.add(new EntryData(normalized, zip.readAllBytes()));
+                    } else if (isRrsTexture(normalized)) {
+                        rrsTextures.add(normalized);
                     } else if (depth < 2 && isArchiveName(normalized)) {
                         nestedArchives.add(new NestedArchive(normalized, zip.readAllBytes()));
                     }
@@ -217,6 +230,9 @@ public final class InstalledObjectPackLoader {
         }
         for (EntryData entry : entries) {
             parse(entry.path(), entry.bytes(), packName);
+        }
+        for (String rrs : rrsTextures) {
+            registerRailroadSign(rrs, packName);
         }
         for (NestedArchive nested : nestedArchives) {
             Path materialized = RailPackLoader.materializeNestedPack(nested.name(), nested.bytes());
@@ -229,15 +245,52 @@ public final class InstalledObjectPackLoader {
     private static void loadPackDirectory(Path packDir, String packName) throws IOException {
         try (var stream = Files.walk(packDir)) {
             stream.filter(Files::isRegularFile)
-                .filter(path -> isSupportedJson(normalize(packDir.relativize(path).toString())))
                 .forEach(path -> {
+                    String relative = normalize(packDir.relativize(path).toString());
                     try {
-                        parse(normalize(packDir.relativize(path).toString()), Files.readAllBytes(path), packName);
+                        if (isSupportedJson(relative)) {
+                            parse(relative, Files.readAllBytes(path), packName);
+                        } else if (isRrsTexture(relative)) {
+                            registerRailroadSign(relative, packName);
+                        }
                     } catch (Exception e) {
                         RealTrainModUnofficial.LOGGER.warn("Failed to parse installed object json {} in {}", path, packName, e);
                     }
                 });
         }
+    }
+
+    // ---- 標識 (本家 RRS) ----
+    //
+    //本家の標識だけは他の設置物と違って JSON を持たない。ResourceType RRS は
+    //setCustomLoading(true) で textures/rrs/ 以下の png を総なめして「テクスチャそのもの」を
+    //選択肢にする。ここでも同じく、パック/JAR に入っている textures/rrs/*.png を1枚1定義として登録する。
+
+    private static boolean isRrsTexture(String path) {
+        String lower = normalize(path).toLowerCase(Locale.ROOT);
+        return lower.endsWith(".png") && lower.contains("textures/rrs/");
+    }
+
+    /**
+     * @param path 例: "assets/minecraft/textures/rrs/rrs_01.png"
+     */
+    private static void registerRailroadSign(String path, String packName) {
+        String normalized = normalize(path);
+        int index = normalized.toLowerCase(Locale.ROOT).indexOf("textures/rrs/");
+        if (index < 0) {
+            return;
+        }
+        //パックテクスチャの解決は "textures/..." からの相対パスで行う (MqoModelLoader.resolvePackTexture)。
+        String texture = normalized.substring(index);
+        String name = leaf(texture).replace(".png", "");
+        String id = InstalledObjectCategory.RAILROAD_SIGN.name().toLowerCase(Locale.ROOT) + ":" + packName + ":" + name;
+        LOADED.add(new InstalledObjectDefinition(
+            id, name, packName, InstalledObjectCategory.RAILROAD_SIGN,
+            //モデルは無い。板とポールは BER が直接描く (本家 RenderRailroadSign と同じ)。
+            "", "", texture, Map.of(),
+            Vec3.ZERO, 1.0F, false,
+            1.0F, 1.0F, 0.125F, texture, "", "",
+            Map.of(), List.of(), Vec3.ZERO, 1, 0));
     }
 
     /**
@@ -283,6 +336,9 @@ public final class InstalledObjectPackLoader {
             || file.startsWith("modelconnector_")
             || file.startsWith("modelwire_")
             || file.startsWith("modelcrossing_")
+            //本家 ModelOrnament_ (蛍光灯/架線柱)。ornamentType が Lamp/Pole 以外のもの
+            //(足場/階段/パイプ/植物) は categoryFor が null を返して捨てる。
+            || file.startsWith("modelornament_")
             || file.startsWith("signboard_")
         );
     }
@@ -307,6 +363,10 @@ public final class InstalledObjectPackLoader {
             }
 
             InstalledObjectCategory category = categoryFor(obj, lower);
+            if (category == null) {
+                //未対応の飾り(足場/階段/パイプ/植物)。登録しない。
+                return;
+            }
             JsonObject model = getObject(obj, "model");
             JsonObject modelPartsBody = getObject(obj, "modelPartsBody");
             String modelFile = firstNonBlank(model == null ? null : getString(model, "modelFile"), getString(obj, "signalModel"));
@@ -435,8 +495,14 @@ public final class InstalledObjectPackLoader {
         return "textures/signboard/" + normalized + ".png";
     }
 
+    /**
+     * JSON から設置物カテゴリを決める。
+     *
+     * @return null = 対応していない種類 (足場/階段/パイプ/植物など)。呼び出し側は登録せず捨てる。
+     */
     private static InstalledObjectCategory categoryFor(JsonObject obj, String lowerFile) {
         String machineType = firstNonBlank(getString(obj, "machineType"), getString(obj, "MachineType")).toLowerCase(Locale.ROOT);
+        String ornamentType = firstNonBlank(getString(obj, "ornamentType"), getString(obj, "OrnamentType")).toLowerCase(Locale.ROOT);
         String name = firstNonBlank(getString(obj, "name"), getString(obj, "signalName")).toLowerCase(Locale.ROOT);
         String runningSound = firstNonBlank(
             getString(obj, "sound_Running"),
@@ -489,6 +555,18 @@ public final class InstalledObjectPackLoader {
         if (lowerFile.startsWith("modelwire_")) {
             return InstalledObjectCategory.WIRE;
         }
+        //本家 ModelOrnament_*.json は ornamentType (Lamp/Pole/Stair/Scaffold/Pipe/Plant) で種類が決まる。
+        //移植済みは Lamp(蛍光灯) と Pole(架線柱) だけなので、それ以外は null で捨てる。
+        //捨てないと汎用フォールバックの INSULATOR に落ちて、碍子の選択欄が植物や足場で埋まる。
+        if (lowerFile.startsWith("modelornament_")) {
+            if (ornamentType.equals("lamp") || containsAny(lowerFile, "fluorescent", "蛍光灯")) {
+                return InstalledObjectCategory.FLUORESCENT;
+            }
+            if (ornamentType.equals("pole") || containsAny(lowerFile, "pole", "架線柱")) {
+                return InstalledObjectCategory.OVERHEAD_LINE_POLE;
+            }
+            return null;
+        }
         // 踏切は改札より先に判定する(CrossingGate を "gate" で改札に誤分類しないため)。
         if (lowerFile.startsWith("modelcrossing_") || looksLikeCrossing
                 || containsAny(hay, "crossing", "fumikiri", "踏切", "toryanse")) {
@@ -501,6 +579,19 @@ public final class InstalledObjectPackLoader {
         }
         if (looksLikeSpeaker || containsAny(hay, "speaker", "スピーカ")) {
             return InstalledObjectCategory.SPEAKER;
+        }
+        //本家 ModelMachine_BumpingPost_Type2.json: machineType="BumpingPost" (車止め)
+        if (machineType.equals("bumpingpost") || containsAny(hay, "bumpingpost", "bumping_post", "車止め")) {
+            return InstalledObjectCategory.BUMPING_POST;
+        }
+        //本家 ModelMachine_Point01M/A.json: machineType="Point" (転轍機)。
+        //"point" は一般語すぎるので machineType の完全一致かファイル名プレフィックスでしか拾わない。
+        if (machineType.equals("point") || lowerFile.startsWith("modelmachine_point") || hay.contains("転轍")) {
+            return InstalledObjectCategory.POINT;
+        }
+        //本家 ModelMachine_Vendor01/02.json: machineType="Vendor" (券売機)
+        if (machineType.equals("vendor") || containsAny(hay, "ticketvendor", "ticket_vendor", "券売")) {
+            return InstalledObjectCategory.TICKET_VENDOR;
         }
         if (containsAny(hay, "linepole", "line_pole", "catenarypole", "catenary_pole",
                 "poleglay", "架線柱", "架線")) {

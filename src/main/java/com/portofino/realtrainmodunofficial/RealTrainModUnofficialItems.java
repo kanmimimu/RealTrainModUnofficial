@@ -114,6 +114,35 @@ public class RealTrainModUnofficialItems {
         "signal_converter", () -> new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.SIGNAL_CONVERTER.get(), new net.minecraft.world.item.Item.Properties())
     );
 
+    // ---- 本家 ItemInstalledObject のうち未移植だった設置物 ----
+    //本家 installed_object meta 0: ガラスの蛍光灯 (BlockFluorescent)。置くだけで光源 15。
+    public static final DeferredItem<InstalledObjectItem> FLUORESCENT_ITEM = ITEMS.register(
+        "fluorescent", () -> new InstalledObjectItem(InstalledObjectCategory.FLUORESCENT)
+    );
+    //本家 installed_object meta 6: 標識 (BlockRailroadSign)。モデルでなくテクスチャを選ぶ。
+    public static final DeferredItem<InstalledObjectItem> RAILROAD_SIGN_ITEM = ITEMS.register(
+        "railroad_sign", () -> new InstalledObjectItem(InstalledObjectCategory.RAILROAD_SIGN)
+    );
+    //本家 installed_object meta 13: 車止め (EntityBumpingPost)。レールに吸着し列車を止める。
+    public static final DeferredItem<InstalledObjectItem> BUMPING_POST_ITEM = ITEMS.register(
+        "bumping_post", () -> new InstalledObjectItem(InstalledObjectCategory.BUMPING_POST)
+    );
+    //本家 installed_object meta 16: 転轍機 (BlockPoint)。右クリックで切り替わるレッドストーン源。
+    public static final DeferredItem<InstalledObjectItem> POINT_MACHINE_ITEM = ITEMS.register(
+        "point_machine", () -> new InstalledObjectItem(InstalledObjectCategory.POINT)
+    );
+    //本家 installed_object meta 18: 券売機 (BlockTicketVendor)。切符/回数券を発券する。
+    public static final DeferredItem<InstalledObjectItem> TICKET_VENDOR_ITEM = ITEMS.register(
+        "ticket_vendor", () -> new InstalledObjectItem(InstalledObjectCategory.TICKET_VENDOR)
+    );
+    //本家 ItemTicket: 券売機が発券し改札が消費する。切符=1回, 回数券=11回。
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.TicketItem> TICKET_ITEM = ITEMS.register(
+        "ticket", () -> new com.portofino.realtrainmodunofficial.item.TicketItem(1)
+    );
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.TicketItem> TICKET_BOOK_ITEM = ITEMS.register(
+        "ticket_book", () -> new com.portofino.realtrainmodunofficial.item.TicketItem(11)
+    );
+
     //SignalControllerMod (masa300) 移植: 信号制御器 + 位置設定ツール×2
     public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_CONTROLLER_ITEM = ITEMS.register(
         "signal_controller", () -> new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.SIGNAL_CONTROLLER.get(), new net.minecraft.world.item.Item.Properties())

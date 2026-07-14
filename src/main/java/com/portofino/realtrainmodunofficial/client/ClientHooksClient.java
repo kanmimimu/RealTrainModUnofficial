@@ -120,6 +120,20 @@ public final class ClientHooksClient {
         }
     }
 
+    /** 券売機 (本家 GuiTicketVendor): 切符 / 回数券 の2ボタン */
+    public static void openTicketVendorScreen(BlockPos pos) {
+        Minecraft.getInstance().setScreen(
+            new com.portofino.realtrainmodunofficial.client.screen.TicketVendorScreen(pos));
+    }
+
+    /** 標識のテクスチャ変更 (本家 guiIdSelectTileEntityTexture) */
+    public static void openRailroadSignScreen(BlockPos pos) {
+        if (Minecraft.getInstance().level != null
+            && Minecraft.getInstance().level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
+            ClientItemHelper.openRailroadSignScreen(be);
+        }
+    }
+
     public static void openScriptBlockScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(new ScriptBlockScreen(pos));
     }

@@ -134,5 +134,22 @@
   "realtrainmodunofficial.configuration.magicNumber": "幻数",
   "screen.realtrainmodunofficial.marker_offset": "标记位置微调",
   "screen.realtrainmodunofficial.marker_offset.reset": "恢复默认",
-  "screen.realtrainmodunofficial.marker_offset.hint": "相对标记默认位置的偏移，单位为 1/16 格。"
+  "screen.realtrainmodunofficial.marker_offset.hint": "相对标记默认位置的偏移，单位为 1/16 格。",
+  "item.realtrainmodunofficial.fluorescent": "玻璃荧光灯",
+  "item.realtrainmodunofficial.railroad_sign": "铁路标志",
+  "item.realtrainmodunofficial.bumping_post": "车挡",
+  "item.realtrainmodunofficial.point_machine": "转辙机",
+  "item.realtrainmodunofficial.ticket_vendor": "售票机",
+  "item.realtrainmodunofficial.ticket": "车票",
+  "item.realtrainmodunofficial.ticket_book": "回数票",
+  "screen.realtrainmodunofficial.select_fluorescent": "选择荧光灯",
+  "screen.realtrainmodunofficial.select_railroad_sign": "选择标志贴图",
+  "screen.realtrainmodunofficial.select_bumping_post": "选择车挡",
+  "screen.realtrainmodunofficial.select_point_machine": "选择转辙机",
+  "screen.realtrainmodunofficial.select_ticket_vendor": "选择售票机",
+  "screen.realtrainmodunofficial.ticket_vendor": "售票机",
+  "screen.realtrainmodunofficial.ticket_vendor.ticket": "车票",
+  "screen.realtrainmodunofficial.ticket_vendor.ticket_book": "回数票",
+  "tooltip.realtrainmodunofficial.ticket.remaining": "剩余: %s",
+  "tooltip.realtrainmodunofficial.ticket.entered": "已进站"
 }

@@ -26,6 +26,12 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
                 //MQO のデフォルトポーズが「開」で、state>0 の回転で「閉」になる。
                 return be.isTicketGateOpen() ? 0.0F : 1.0F;
             }
+            //本家 MachinePartsRenderer: 転轍機は isActivated() ? 1 : 0。
+            //RenderPoint01.js が (count * 60 - 30) 度だけレバーを X 軸回転させるので、
+            //OFF で -30 度、ON で +30 度に倒れる。
+            if (be.getCategory() == InstalledObjectCategory.POINT) {
+                return be.isPointActivated() ? 1.0F : 0.0F;
+            }
         }
         return 0.0F;
     }
@@ -45,7 +51,17 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
         return -1;
     }
 
+    /**
+     * 本家 MachinePartsRenderer.getLodState: 転轍機だけ move の符号を返す (move &gt; 0 ? 1 : -1)。
+     * <p>
+     * RenderPoint01.js は state &lt; 0 のとき本体 (body3) を +2.75 ずらす。つまりこれは LOD ではなく
+     * 「転轍機が線路のどちら側に付くか」の切り替えで、バールの右クリックで符号が反転する。
+     */
     public int getLodState(Object tile) {
+        if (tile instanceof InstalledObjectBlockEntity be
+                && be.getCategory() == InstalledObjectCategory.POINT) {
+            return be.getPointMove() > 0.0F ? 1 : -1;
+        }
         return 0;
     }
 

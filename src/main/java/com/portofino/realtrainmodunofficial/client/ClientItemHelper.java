@@ -160,6 +160,29 @@ public final class ClientItemHelper {
         ));
     }
 
+    /**
+     * 本家 guiIdSelectTileEntityTexture: 設置済みの標識を素手で右クリックしてテクスチャを変える。
+     * <p>
+     * 標識は 1 テクスチャ = 1 定義なので、モデル選択画面をそのまま使える
+     * (ボタン画像に標識のテクスチャ自体が入っている)。
+     */
+    public static void openRailroadSignScreen(
+            com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity blockEntity) {
+        List<ModelSelectScreen.ModelInfo> infos =
+            InstalledObjectRegistry.getByCategory(InstalledObjectCategory.RAILROAD_SIGN).stream()
+                .map(d -> new ModelSelectScreen.ModelInfo(d.getId(), d.getDisplayName(), d.getPackName(), d.getButtonTexture()))
+                .toList();
+        net.minecraft.core.BlockPos pos = blockEntity.getBlockPos();
+        Minecraft.getInstance().setScreen(new ModelSelectScreen(
+            Component.translatable(getInstalledObjectTitleKey(InstalledObjectCategory.RAILROAD_SIGN)),
+            infos,
+            selection -> PacketDistributor.sendToServer(
+                new com.portofino.realtrainmodunofficial.network.SetObjectModelPayload(pos, selection.modelId())),
+            blockEntity.getDefinitionId(),
+            ""
+        ));
+    }
+
     private static String getInstalledObjectTitleKey(InstalledObjectCategory category) {
         return switch (category) {
             case LIGHT -> "screen.realtrainmodunofficial.select_light";
@@ -173,6 +196,11 @@ public final class ClientItemHelper {
             case SPEAKER -> "screen.realtrainmodunofficial.select_speaker";
             case TRAIN_DETECTOR -> "screen.realtrainmodunofficial.select_train_detector";
             case CONNECTOR_INPUT, CONNECTOR_OUTPUT -> "screen.realtrainmodunofficial.select_connector";
+            case FLUORESCENT -> "screen.realtrainmodunofficial.select_fluorescent";
+            case RAILROAD_SIGN -> "screen.realtrainmodunofficial.select_railroad_sign";
+            case BUMPING_POST -> "screen.realtrainmodunofficial.select_bumping_post";
+            case POINT -> "screen.realtrainmodunofficial.select_point_machine";
+            case TICKET_VENDOR -> "screen.realtrainmodunofficial.select_ticket_vendor";
         };
     }
 }
