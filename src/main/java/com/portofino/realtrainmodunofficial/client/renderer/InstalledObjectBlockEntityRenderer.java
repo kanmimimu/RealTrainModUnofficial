@@ -859,19 +859,28 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         poseStack.translate(0.0F, plateY, 0.0F);
         poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
         PoseStack.Pose pose = poseStack.last();
+        VertexConsumer solid = buffer.getBuffer(RenderType.entityCutoutNoCull(SolidTexture.white()));
         if (texture != null) {
             VertexConsumer plate = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
+            //表: テクスチャそのまま
             signVertex(plate, pose, w, -w, d, 1.0F, 1.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
             signVertex(plate, pose, w, w, d, 1.0F, 0.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
             signVertex(plate, pose, -w, w, d, 0.0F, 0.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
             signVertex(plate, pose, -w, -w, d, 0.0F, 1.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
+
+            //裏: 本家は<b>同じテクスチャを貼ったまま</b>色 0 (黒) で塗る。テクスチャ付きなので
+            //透明部分はそのまま抜ける。ここを白ベタ (SolidTexture) にしていたため、三角や丸の
+            //標識の背景に<b>黒い四角</b>が残っていた。
+            //
+            //さらに本家は面カリングが効いていて表裏のどちらか片方しか描かれないが、こちらは
+            //NoCull で両面描くため、表と裏が<b>まったく同じ Z</b> にあると Z ファイティングを
+            //起こして<b>チラつく</b>。裏面をわずかに後ろへ下げて重なりを解消する。
+            final float backD = d - 0.002F;
+            signVertex(plate, pose, -w, -w, backD, 0.0F, 1.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
+            signVertex(plate, pose, -w, w, backD, 0.0F, 0.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
+            signVertex(plate, pose, w, w, backD, 1.0F, 0.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
+            signVertex(plate, pose, w, -w, backD, 1.0F, 1.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
         }
-        //本家: 裏面は同じ四角形を色 0 (黒) で塗るだけ。
-        VertexConsumer solid = buffer.getBuffer(RenderType.entityCutoutNoCull(SolidTexture.white()));
-        signVertex(solid, pose, -w, -w, d, 0.0F, 1.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
-        signVertex(solid, pose, -w, w, d, 0.0F, 0.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
-        signVertex(solid, pose, w, w, d, 1.0F, 0.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
-        signVertex(solid, pose, w, -w, d, 1.0F, 1.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
         poseStack.popPose();
 
         // ---- ポール ----

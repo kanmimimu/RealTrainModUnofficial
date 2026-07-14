@@ -63,6 +63,18 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      */
     private static final EntityDataAccessor<String> DATA_SEATS =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.STRING);
+    /**
+     * 編成 (Formation) のクライアント同期。本家 PacketFormation 相当。
+     * <p>
+     * 本家 Formation.sendPacket() は編成をクライアントへ送るが、移植では no-op のままで、
+     * <b>クライアント側の getFormation() が常に null</b> だった。パックの描画スクリプトは
+     * これを使って号車番号を出す (E259 等) ため、号車が 0 のままになり、方向幕のコマ番号が
+     * 負になってテクスチャが巻き戻り、まったく別の行先 (「普通」等) が表示されていた。
+     * <p>
+     * 形式: "id|entryPos|entryDir|size" (編成なしは空文字)。
+     */
+    private static final EntityDataAccessor<String> DATA_FORMATION =
+            SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.STRING);
 
     public static final short MAX_AIR_COUNT = 2880;
     public static final short MIN_AIR_COUNT = 2480;
@@ -218,6 +230,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         builder.define(DATA_YAW, 0.0F);
         builder.define(DATA_PITCH, 0.0F);
         builder.define(DATA_SEATS, "");
+        builder.define(DATA_FORMATION, "");
     }
 
     @Override
@@ -313,7 +326,72 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
         if (this.level().isClientSide()) {
             this.tickSound();
+        } else {
+            this.syncFormationData();
         }
+    }
+
+    /** サーバー: 編成の位置情報をクライアントへ流す (値が変わった時だけ同期が走る)。 */
+    private void syncFormationData() {
+        String data = "";
+        if (this.formation != null) {
+            FormationEntry entry = this.formation.getEntry(this);
+            if (entry != null) {
+                data = this.formation.id + "|" + entry.entryId + "|" + entry.dir + "|" + this.formation.size();
+            }
+        }
+        if (!data.equals(this.entityData.get(DATA_FORMATION))) {
+            this.entityData.set(DATA_FORMATION, data);
+        }
+    }
+
+    /** クライアント: 受け取った編成データから Formation を組み立て直す。 */
+    private void applyClientFormationData(String data) {
+        if (data == null || data.isEmpty()) {
+            this.formation = null;
+            return;
+        }
+        String[] parts = data.split("\\|");
+        if (parts.length != 4) {
+            return;
+        }
+        long id;
+        byte pos;
+        byte dir;
+        int size;
+        try {
+            id = Long.parseLong(parts[0]);
+            pos = Byte.parseByte(parts[1]);
+            dir = Byte.parseByte(parts[2]);
+            size = Integer.parseInt(parts[3]);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (size <= 0 || pos < 0 || pos >= size) {
+            return;
+        }
+        FormationManager fm = FormationManager.getInstance(true);
+        Formation f = fm.getFormation(id);
+        if (f == null) {
+            //この編成の 1 両目がクライアントに届いた
+            this.formation = fm.createNewFormation(this, id, pos, dir, size);
+            return;
+        }
+        //両数が変わった (連結/解放) → 配列を作り直して既存の車両を引き継ぐ
+        if (f.size() != size) {
+            FormationEntry[] resized = new FormationEntry[size];
+            System.arraycopy(f.entries, 0, resized, 0, Math.min(f.entries.length, size));
+            f.entries = resized;
+        }
+        //自分が別の位置に居座っていたら消してから登録し直す (二重登録の防止)
+        for (int i = 0; i < f.entries.length; ++i) {
+            FormationEntry e = f.entries[i];
+            if (e != null && this.equals(e.train) && i != pos) {
+                f.entries[i] = null;
+            }
+        }
+        f.setTrain(this, pos, dir);
+        this.formation = f;
     }
 
     /**
@@ -1051,6 +1129,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
         if (DATA_SEATS.equals(key) && this.level().isClientSide) {
             this.readSeats(this.entityData.get(DATA_SEATS));
+        }
+        if (DATA_FORMATION.equals(key) && this.level().isClientSide) {
+            this.applyClientFormationData(this.entityData.get(DATA_FORMATION));
         }
     }
 }
