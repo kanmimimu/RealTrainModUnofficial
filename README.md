@@ -16,6 +16,7 @@
 
 ## Special thanks
 
-ngt5479様  
-masa様  
-fuyuzero様
+- RealTrainMod / NGTLib — ngt5479
+- KaizPatchX — (c) Kaiz_JP and other authors 2021
+- SignalControllerMod — masa
+- E257系パック — fuyuzero
