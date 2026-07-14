@@ -245,6 +245,52 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return this;
     }
 
+    /**
+     * 本家 TileEntityLargeRailBase.getRailFromCoordinates (KaizPatchX の 4 引数版) の移植。
+     *
+     * <p>指定座標から<b>真下へ降りながらレールを探し</b>、見つかったレールのコアを返す。
+     *
+     * <p>架線柱のスクリプトはこれで足元の線路を掴み、
+     * {@code railMap.getRailRotation(...)} でレールの向きを取って<b>自分の向き (yaw) を線路に合わせる</b>。
+     * 無いと yaw が決まらないままスクリプトが TypeError で死に、柱が線路と無関係な向き・
+     * フォールバック描画になっていた。
+     *
+     * <p>スクリプトからは {@code tileEntity.func_145831_w()} の戻り値 (WorldCompat) が渡るので
+     * Object で受けて実 Level を取り出す。
+     */
+    public static LargeRailCoreBlockEntity getRailFromCoordinates(Object world, double px, double py, double pz) {
+        return getRailFromCoordinates(world, px, py, pz, Integer.MIN_VALUE);
+    }
+
+    /** 本家 2.4.24 の 5 引数版 (minY で打ち切り)。 */
+    public static LargeRailCoreBlockEntity getRailFromCoordinates(Object world, double px, double py, double pz, int minY) {
+        Level level = unwrapLevel(world);
+        if (level == null) {
+            return null;
+        }
+        int x = Mth.floor(px);
+        int z = Mth.floor(pz);
+        int bottom = Math.max(minY, level.getMinBuildHeight());
+        for (int y = Mth.floor(py); y > bottom; y--) {
+            LargeRailCoreBlockEntity core = com.portofino.realtrainmodunofficial.entity.BogieTracker
+                .findCoreDirect(level, new BlockPos(x, y, z));
+            if (core != null) {
+                return core;
+            }
+        }
+        return null;
+    }
+
+    private static Level unwrapLevel(Object world) {
+        if (world instanceof Level level) {
+            return level;
+        }
+        if (world instanceof jp.ngt.mccompat.WorldCompat compat) {
+            return compat.getLevel();
+        }
+        return null;
+    }
+
     /** 本家RTM準拠の分岐レンダリング用: 分岐の Point 配列(分岐でなければ null)。 */
     public jp.ngt.rtm.rail.util.Point[] getSwitchPoints() {
         return switchType != null ? switchType.getPoints() : null;

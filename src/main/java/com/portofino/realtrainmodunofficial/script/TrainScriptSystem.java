@@ -267,6 +267,12 @@ public class TrainScriptSystem {
         // これで `tile instanceof TileEntityLargeRailBase` が実レールBEで true になり、レール接続検出が効く。
         "try { TileEntityLargeRailBase = Java.type('com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity'); } catch(e) { if (typeof TileEntityLargeRailBase === 'undefined') TileEntityLargeRailBase = function(){}; }\n" +
         "if (typeof TileEntitySign === 'undefined') TileEntitySign = function(){};\n" +
+        // 架線柱パックは周囲のブロックを走査して `tile instanceof TileEntityInsulator` で碍子を探し、
+        // その wirePos と向きから腕金(ブラケット)を組み立てる。importPackage を no-op にしているので
+        // ここで実クラスを束縛しないと undefined になり、instanceof が TypeError で落ちる。
+        "try { if (typeof TileEntityInsulator === 'undefined') TileEntityInsulator = Java.type('jp.ngt.rtm.electric.TileEntityInsulator'); } catch(e) {}\n" +
+        // Parts (renderer.registerParts(new Parts(\"obj1\", ...))) も同様に実クラスを使う。
+        "try { if (typeof Parts === 'undefined') Parts = Java.type('jp.ngt.rtm.render.Parts'); } catch(e) {}\n" +
         // RailPosition は __SRB__ ブリッジ経由で RTMU の実 RailPosition を生成(new で返り値オブジェクトが採用される)。\n
         "if (typeof RailPosition === 'undefined') RailPosition = function(x,y,z,dir,type){ try{ return __SRB__.createRailPosition(x|0,y|0,z|0,dir|0,(type!=null?__srbNum(type):0),-1,0,0,0,0,0); }catch(e){ return { blockX:x,blockY:y,blockZ:z,direction:dir,switchType:type,anchorYaw:0,anchorPitch:0,anchorLengthHorizontal:-1,anchorLengthVertical:-1,cantCenter:0,cantEdge:0,height:0,setHeight:function(h){this.height=h;},init:function(){} }; } };\n" +
         // RailPosition.REVISION: 8方向の[dx,dz]オフセット(RTMU RailPosition.REVISION と同値)。render の getNearestEdgePos 等が参照。
@@ -276,7 +282,23 @@ public class TrainScriptSystem {
     private static TrainScriptSystem instance;
     private ScriptEngine engine;
     private final Map<UUID, EntityScriptContext> entityContexts = new HashMap<>();
-    private static final String SCRIPT_CORE_VERSION = "2.4.24";
+    /**
+     * スクリプトに見せる RTMCore.VERSION。
+     *
+     * <p>パックはこれを見て 1.7.10 系 / 1.12 系の API を出し分ける:
+     * <pre>var isOldVer = RTMCore.VERSION.indexOf("1.7.10") !== -1;</pre>
+     *
+     * <p>RTMU が用意している互換 API は<b>1.7.10 の形</b> (TileEntity.field_145851_c,
+     * World.func_147438_o(x,y,z), EntityTrainBase.getTrainStateData(int) …) であって、
+     * 1.12 の形 (func_174877_v() → BlockPos, func_175625_s(BlockPos) …) ではない。
+     *
+     * <p>ここは以前 "2.4.24" (= RTM 1.12.2 のバージョン) を返しており、実クラス
+     * {@link jp.ngt.rtm.RTMCore#VERSION} ("1.7.10.41 KaizPatchX/…") と食い違っていた。
+     * そのためこのエンジンで動くパックだけが 1.12 側の分岐に入り、存在しない
+     * {@code tileEntity.func_174877_v()} を呼んで毎フレーム TypeError で死んでいた
+     * (架線柱がフォールバック描画の変な塔になっていた原因)。実クラスを唯一の出所にする。
+     */
+    private static final String SCRIPT_CORE_VERSION = jp.ngt.rtm.RTMCore.VERSION;
     private static final Set<Integer> DISABLED_SCRIPT_ENGINES = ConcurrentHashMap.newKeySet();
     private static final Set<String> REPORTED_SCRIPT_ERRORS = ConcurrentHashMap.newKeySet();
 
@@ -877,7 +899,11 @@ public class TrainScriptSystem {
                 // --- SuperRailBuilder3 等の 1.12.2 RTM スクリプト互換グローバル ---
                 // 本家 RTM の Java クラスは 1.21.1 に存在しないため、スクリプトが eval 時に
                 // 参照するトップレベルのグローバルを最小限スタブする。
-                "if (typeof RTMCore === 'undefined') RTMCore = { VERSION: 'RTMU-1.21.1', MODID: 'rtm' };\n" +
+                //
+                //RTMCore は injectScriptCompatibility が必ず代入するのでここは保険。
+                //VERSION は SCRIPT_CORE_VERSION (= 実クラスの値) を唯一の出所にする
+                //(別の文字列を書くとパックの 1.7.10/1.12 分岐が食い違って壊れる)。
+                "if (typeof RTMCore === 'undefined') RTMCore = { VERSION: " + quoteJs(SCRIPT_CORE_VERSION) + ", MODID: 'rtm' };\n" +
                 "if (typeof Blocks === 'undefined') Blocks = {};\n" +
                 "if (Blocks.field_150325_L === undefined) Blocks.field_150325_L = { __rtmuBlock: 'minecraft:white_wool' };\n" +
                 "if (typeof LoaderCompat === 'undefined') LoaderCompat = { isModLoaded: function(n) { return false; } };\n" +

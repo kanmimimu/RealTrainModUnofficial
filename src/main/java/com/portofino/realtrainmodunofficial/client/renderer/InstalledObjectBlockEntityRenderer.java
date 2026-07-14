@@ -262,6 +262,9 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                 definition.getTextureOverrides(), definition.getScriptPath(), definition.isSmoothing())
             : null;
 
+        //どの経路で描いているかを定義ごとに 1 回だけ出す (架線柱が本家と違う見た目になる問題の切り分け用)
+        logWireRouteOnce(definition, hasScript, wireScript, model);
+
         if (model != null && renderKnownScriptWireModel(blockEntity, definition, model, from, to,
             normalizedScript, poseStack, buffer, packedLight, packedOverlay)) {
             return;
@@ -275,8 +278,10 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         if (model != null && hasScript) {
             com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.Scripted scripted =
                 com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.get(definition);
-            if (scripted != null && scripted.render(blockEntity, from, to, 1.0F, poseStack, buffer,
-                packedLight, packedOverlay, model)) {
+            boolean drawn = scripted != null && scripted.render(blockEntity, from, to, 1.0F, poseStack, buffer,
+                packedLight, packedOverlay, model);
+            logWireScriptResultOnce(definition, scripted != null, drawn);
+            if (drawn) {
                 return;
             }
         }
@@ -325,6 +330,40 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         }
     }
 
+    /** 架線 1 本ごとに「どの描画経路に入ったか」を定義単位で 1 回だけ記録する。 */
+    private static final java.util.Set<String> WIRE_ROUTE_LOGGED =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * 架線柱パックが本家と違う見た目になる問題の切り分け用。
+     *
+     * <p>本家式スクリプト描画 ({@link com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers})
+     * が動いていれば "Wire script renderer initialized" が出るはずだが、ログに一度も現れない。
+     * scriptPath が空なのか、モデルが読めていないのか、条件で弾かれているのかを確定させる。
+     */
+    private static void logWireRouteOnce(InstalledObjectDefinition definition, boolean hasScript,
+                                         String wireScript, MqoModelLoader.MqoModel model) {
+        if (definition == null || !WIRE_ROUTE_LOGGED.add(definition.getId())) {
+            return;
+        }
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+            "[wire-route] id={} pack={} modelFile={} scriptPath={} hasScript={} modelLoaded={}",
+            definition.getId(), definition.getPackName(), definition.getModelFile(),
+            wireScript == null ? "(null)" : wireScript, hasScript, model != null);
+    }
+
+    private static final java.util.Set<String> WIRE_SCRIPT_LOGGED =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** 本家式スクリプト描画を「呼べたか」「実際に描けたか」を定義単位で 1 回だけ記録する。 */
+    private static void logWireScriptResultOnce(InstalledObjectDefinition definition, boolean hasRenderer, boolean drawn) {
+        if (definition == null || !WIRE_SCRIPT_LOGGED.add(definition.getId())) {
+            return;
+        }
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+            "[wire-route] id={} rendererReady={} scriptDrew={}", definition.getId(), hasRenderer, drawn);
+    }
+
     private static boolean hasRenderableWireModel(InstalledObjectDefinition definition) {
         if (definition == null) {
             return false;
@@ -341,20 +380,31 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         if (level != null && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity endpoint) {
             InstalledObjectDefinition endpointDef = InstalledObjectRegistry.getById(endpoint.getDefinitionId());
             if (endpointDef != null) {
-                // 本家 TileEntityConnectorBase.getWirePos: 接続点は<b>設定の wirePos そのもの</b>
-                // (ブロック底面中央からの相対座標)。
-                //
-                // ここは以前「碍子モデルの実描画上端」で Y を上書きしていた。だが本家はモデルの形など
-                // 一切見ておらず、wirePos をそのまま使う。腕が伸びている碍子ではモデル上端が
-                // wirePos よりずっと高いため、<b>電線が碍子から浮いて宙に張られる</b>
-                // (Baru's Pole で顕著)。本家どおり wirePos を使う。
                 Vec3 wp = endpointDef.getWireAttachPos();
-                Vec3 local = new Vec3(wp.x, wp.y, wp.z);
-                // 描画と同じ順序で回転(まず mountPitch を X、次に yaw を Y)。壁挿し碍子の
-                // 取付点もモデルと同じ位置に来るようにする。
-                Vec3 tilted = rotateX(local, endpoint.getMountPitch());
+
+                //★ 面に取り付けた碍子 (通常の架線柱はこれ)。
+                //
+                //本家 TileEntityConnectorBase.updateWirePos + RenderElectricalWiring.renderAllWire:
+                //  接続点 = ブロック中心 (+0.5,+0.5,+0.5) + 「取付面で回した wirePos」
+                //碍子モデル本体も renderConnector が同じ中心・同じ面回転で描く。つまり
+                //<b>モデルと接続点は必ず同じ座標系</b>になる。
+                //
+                //RTMU はここが食い違っていた: モデルは中心 (0.5,0.5,0.5) + 面回転で描くのに、
+                //接続点だけ<b>底面 (0.5,0.0,0.5)</b> を基準にして、しかも面回転ではなく
+                //180-yaw で回していた。そのため電線が碍子から 0.5 ブロックずれ、向きも合わず、
+                //宙に浮いたり明後日の方向へ張られたりしていた (Baru's Pole)。
+                if (endpoint.getMountFace() >= 0) {
+                    jp.ngt.ngtlib.math.Vec3 rotated = rotateWirePosByMountFace(
+                        new jp.ngt.ngtlib.math.Vec3(wp.x, wp.y, wp.z), endpoint.getMountFace());
+                    return Vec3.atLowerCornerOf(pos)
+                        .add(0.5D, 0.5D, 0.5D)
+                        .add(endpoint.getRenderOffset())
+                        .add(rotated.getX(), rotated.getY(), rotated.getZ());
+                }
+
+                //地面置き (取付面なし)。モデルは底面中央 + (180-yaw) で描かれるので接続点も同じに。
+                Vec3 tilted = rotateX(new Vec3(wp.x, wp.y, wp.z), endpoint.getMountPitch());
                 Vec3 rotated = rotateY(tilted, 180.0D - endpoint.getYaw());
-                // 碍子モデルは translate(0.5, 0.0, 0.5)(底面中央)で描画されるので、接続点も同じ基準。
                 return Vec3.atLowerCornerOf(pos)
                     .add(0.5D, 0.0D, 0.5D)
                     .add(endpoint.getRenderOffset())
@@ -362,6 +412,32 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             }
         }
         return Vec3.atCenterOf(pos);
+    }
+
+    /**
+     * 本家 TileEntityConnectorBase.updateWirePos の忠実移植。
+     *
+     * <p>取付面 (0=下 1=上 2=北 3=南 4=西 5=東) に応じて wirePos を回す。
+     * {@link #applyHonkeMountFaceRotation} が碍子モデルに掛ける GL 回転と対になっており、
+     * X の符号が逆なのは NGTLib の Vec3.rotateAroundX が glRotatef と逆手系のため
+     * (本家自身がこの組で書いている)。
+     */
+    private static jp.ngt.ngtlib.math.Vec3 rotateWirePosByMountFace(jp.ngt.ngtlib.math.Vec3 vec, int face) {
+        switch (face) {
+            case 0:
+                return vec.rotateAroundZ(180.0F);
+            case 2:
+                return vec.rotateAroundX(-90.0F).rotateAroundY(180.0F);
+            case 3:
+                return vec.rotateAroundX(-90.0F);
+            case 4:
+                return vec.rotateAroundX(-90.0F).rotateAroundY(-90.0F);
+            case 5:
+                return vec.rotateAroundX(-90.0F).rotateAroundY(90.0F);
+            case 1:
+            default:
+                return vec;
+        }
     }
 
     private static Vec3 rotateY(Vec3 vec, double degrees) {
