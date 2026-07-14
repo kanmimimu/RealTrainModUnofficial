@@ -173,7 +173,10 @@ public final class VehicleScriptRenderers {
                               MqoModelLoader.MqoModel bodyModel) {
             //本家 RenderVehicleBase.doRender: 通常描画 (RenderPass.NORMAL) → 発光描画 (renderBodyLight)
             GLRecorder normal = record(entity, RenderPass.NORMAL.id, partialTick);
-            if (normal == null || normal.isEmpty()) {
+            //★ isEmpty ではなく hasGeometry で判定する。スクリプトが何も描かずに落ちると
+            //  glPushMatrix だけが残り isEmpty()==false になるため、「描画済み」と誤判定して
+            //  素のモデル描画がスキップされ、車体が透明になる (223 系で発生)。
+            if (normal == null || !normal.hasGeometry()) {
                 return false;
             }
             PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
@@ -238,7 +241,8 @@ public final class VehicleScriptRenderers {
                 }
                 int pass = RenderPass.LIGHT.id + i;
                 GLRecorder rec = record(entity, pass, partialTick);
-                if (rec == null || rec.isEmpty()) {
+                //スクリプトが発光パスの途中で落ちても、そこまでに描いたライトは活かす。
+                if (rec == null || !rec.hasGeometry()) {
                     continue;
                 }
                 replay(rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, pass);
@@ -263,12 +267,10 @@ public final class VehicleScriptRenderers {
                 this.renderer.currentPass = 0;
                 GLRecorder.deactivate();
             }
-            //スクリプトが途中で落ちた場合、記録には落ちる前のコマンド (glPushMatrix 等) だけが
-            //残る。それを「描画済み」と見なすと素のモデル描画がスキップされ、車体が丸ごと
-            //消える。落ちたら記録を捨てて null を返し、呼び出し側をフォールバックさせる。
-            if (this.renderer.consumeScriptFailure()) {
-                return null;
-            }
+            //スクリプトが落ちても記録は捨てない。途中まで描いていればそれは活かす
+            //(発光パスの途中で落ちる車両が多く、記録ごと捨てるとライトが消える)。
+            //「何も描かずに落ちた」かどうかは呼び出し側が rec.hasGeometry() で判断する。
+            this.renderer.consumeScriptFailure();
             return rec;
         }
     }

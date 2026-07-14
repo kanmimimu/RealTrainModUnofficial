@@ -134,7 +134,6 @@ public final class MachineScriptRenderers {
                               MqoModelLoader.MqoModel model) {
             GLRecorder rec = new GLRecorder();
             GLRecorder.activate(rec);
-            boolean scriptFailed;
             try {
                 this.renderer.currentMatId = 0;
                 //本家: pass 0 (通常) → pass 2 (発光)。発光はフルブライトで描く。
@@ -143,11 +142,12 @@ public final class MachineScriptRenderers {
                 this.renderer.render(be, 2, partialTick);
             } finally {
                 GLRecorder.deactivate();
-                scriptFailed = this.renderer.consumeScriptFailure();
+                this.renderer.consumeScriptFailure();
             }
-            //スクリプトが落ちたら記録を捨てる。中途半端な記録を「描画済み」と見なすと
-            //素のモデル描画がスキップされ、設置物が透明になる (VehicleScriptRenderers と同じ)。
-            if (scriptFailed || rec.isEmpty()) {
+            //★ isEmpty ではなく hasGeometry。スクリプトが何も描かずに落ちると行列操作だけが
+            //  残って isEmpty()==false になり、「描画済み」と誤判定して素のモデル描画が
+            //  スキップされ、設置物が透明になる。
+            if (!rec.hasGeometry()) {
                 return false;
             }
             VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model,

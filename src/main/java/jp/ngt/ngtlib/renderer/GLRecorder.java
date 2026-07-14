@@ -87,6 +87,30 @@ public final class GLRecorder {
         return this.cmds.isEmpty();
     }
 
+    /**
+     * 実際にジオメトリを 1 つでも描いたか。
+     * <p>
+     * 行列操作 (PUSH/TRANSLATE/…) だけの記録は「何も描いていない」。スクリプトが 1 行目で
+     * 落ちると glPushMatrix だけが残るが、{@link #isEmpty()} は false になるため、呼び出し側が
+     * 「スクリプトが描画を担当した」と誤判定して素のモデル描画をスキップし、車体が透明になる。
+     * <p>
+     * 逆に、スクリプトが<b>途中まで描いてから</b>落ちた場合は、そこまでの描画は活かしたい
+     * (発光パスの途中で落ちる車両が多く、記録ごと捨てるとライトが消える)。
+     * そのため「失敗したか」ではなく「何か描いたか」で判定する。
+     */
+    public boolean hasGeometry() {
+        for (Cmd cmd : this.cmds) {
+            switch (cmd.op) {
+                case RENDER_PARTS, RENDER_GROUPS, DRAW_TESS, DRAW_MODEL_GROUP -> {
+                    return true;
+                }
+                default -> {
+                }
+            }
+        }
+        return false;
+    }
+
     public void push() {
         this.cmds.add(new Cmd(Op.PUSH, 0, 0, 0, 0, null));
     }
