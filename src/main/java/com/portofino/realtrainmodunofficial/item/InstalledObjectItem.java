@@ -206,6 +206,11 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         //蛍光灯: 本家 ItemInstalledObject は取付方向 (0..7) だけを持たせ、平行移動と回転は
         //レンダースクリプト側でやる。汎用の壁挿し/逆さ設置には乗せない。
         boolean fluorescent = category == InstalledObjectCategory.FLUORESCENT;
+        //架線柱: 本家 ItemInstalledObject は LINEPOLE に setRotation を一切呼ばず、
+        //ブロックと同じくグリッドに揃えて置くだけ。RenderConnectablePole.js が隣の柱を見て
+        //partXP / partXN / partZP / partZN を<b>ワールド軸で</b>出し分けるため、少しでも回すと
+        //腕の向きが実際の接続方向とずれる。よって斜め置きも壁挿しもさせない。
+        boolean gridAligned = category == InstalledObjectCategory.OVERHEAD_LINE_POLE;
         //列車検知器と車止め: 本家 ItemInstalledObject.setEntityOnRail 準拠で、クリックしたレールの
         //曲線上に載せる (位置・向き・勾配・カント)。汎用の壁挿し/逆さ設置には乗せない。
         boolean railMounted = category == InstalledObjectCategory.TRAIN_DETECTOR
@@ -218,7 +223,7 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
             placeMountPitch = railSnap.pitch();
         } else if (uprightOnly) {
             placeYaw = Math.round(player.getYRot() / 15.0F) * 15.0F;
-        } else if (fluorescent) {
+        } else if (fluorescent || gridAligned) {
             placeYaw = 0.0F;
         } else if (!honkeFaceMount && !railMounted
                 && category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL) {

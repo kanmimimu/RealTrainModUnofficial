@@ -1,6 +1,0 @@
-{
-	"name": "MannequinSteve",
-	"texture": "textures/entity/steve.png",
-	"buttonTexture": "textures/npc/button_mannequin_steve.png",
-	"role": "mannequin"
-}

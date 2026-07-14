@@ -110,11 +110,16 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     boolean veryFar = cameraDistanceSq > veryFarThreshold * veryFarThreshold;
                     poseStack.pushPose();
                     pushed = true;
-                    if (blockEntity.getCategory() == InstalledObjectCategory.FLUORESCENT) {
-                        //本家 RenderOrnament: 蛍光灯はブロック中心を原点にするだけ。
-                        //取付方向 (0..7) に応じた ±0.4375 の寄せと Y90度回転は
-                        //RenderFluorescent.js が entity.getDir() を見て自分で行う。
-                        //ここで面回転や yaw を掛けると二重に回って壁にめり込む。
+                    if (blockEntity.getCategory() == InstalledObjectCategory.FLUORESCENT
+                            || blockEntity.getCategory() == InstalledObjectCategory.OVERHEAD_LINE_POLE) {
+                        //本家 RenderOrnament: 飾り物はブロック中心を原点にするだけで回転しない。
+                        //
+                        //蛍光灯: 取付方向 (0..7) に応じた ±0.4375 の寄せと Y90度回転は
+                        //  RenderFluorescent.js が entity.getDir() を見て自分で行う。
+                        //  ここで面回転や yaw を掛けると二重に回って壁にめり込む。
+                        //架線柱: RenderConnectablePole.js が隣の柱を見て partXP / partXN / partZP /
+                        //  partZN を<b>ワールド軸で</b>出し分ける。ここで回すと (yaw=0 でも
+                        //  180-yaw で 180度回ってしまう) 腕が実際の接続方向と逆を向く。
                         poseStack.translate(0.5D, 0.5D, 0.5D);
                         Vec3 renderOffset = blockEntity.getRenderOffset();
                         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
