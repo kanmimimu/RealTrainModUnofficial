@@ -92,6 +92,14 @@ public final class RealTrainModUnofficialClientModEvents {
     @SubscribeEvent
     public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         TrainControlKeyMappings.register(event);
+        com.portofino.realtrainmodunofficial.client.camera.CameraKeyMappings.register(event);
+    }
+
+    /** カメラの被写界深度 / 流し撮り用コアシェーダー */
+    @SubscribeEvent
+    public static void registerShaders(net.neoforged.neoforge.client.event.RegisterShadersEvent event)
+            throws java.io.IOException {
+        com.portofino.realtrainmodunofficial.client.camera.CameraPostProcessor.registerShaders(event);
     }
 
     @SubscribeEvent

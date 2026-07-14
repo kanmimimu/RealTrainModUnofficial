@@ -107,6 +107,11 @@ public final class ClientHooks {
         invokeClient("openRailroadSignScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
+    /** カメラ: 右クリックでファインダーモードを開閉 (本家 GuiCamera 相当) */
+    public static void toggleCamera() {
+        invokeClient("toggleCamera", new Class<?>[]{});
+    }
+
     public static void stopCrossingGateSound(Level level, BlockPos pos) {
         invokeClient("stopCrossingGateSound", new Class<?>[]{Level.class, BlockPos.class}, level, pos);
     }

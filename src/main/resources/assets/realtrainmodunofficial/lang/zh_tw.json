@@ -151,5 +151,20 @@
   "screen.realtrainmodunofficial.ticket_vendor.ticket": "車票",
   "screen.realtrainmodunofficial.ticket_vendor.ticket_book": "回數票",
   "tooltip.realtrainmodunofficial.ticket.remaining": "剩餘: %s",
-  "tooltip.realtrainmodunofficial.ticket.entered": "已進站"
+  "tooltip.realtrainmodunofficial.ticket.entered": "已進站",
+  "item.realtrainmodunofficial.camera": "相機",
+  "key.categories.realtrainmodunofficial.camera": "RTMU - 相機",
+  "key.realtrainmodunofficial.camera_zoom_in": "放大 (長焦)",
+  "key.realtrainmodunofficial.camera_zoom_out": "縮小 (廣角)",
+  "key.realtrainmodunofficial.camera_aperture_open": "開大光圈 (降低F值)",
+  "key.realtrainmodunofficial.camera_aperture_close": "收小光圈 (提高F值)",
+  "key.realtrainmodunofficial.camera_shutter_faster": "提高快門速度",
+  "key.realtrainmodunofficial.camera_shutter_slower": "降低快門速度 (追隨攝影)",
+  "key.realtrainmodunofficial.camera_focus_near": "對焦拉近 (MF)",
+  "key.realtrainmodunofficial.camera_focus_far": "對焦拉遠 (MF)",
+  "key.realtrainmodunofficial.camera_focus_mode": "對焦模式 (AF-S/AF-C/MF)",
+  "key.realtrainmodunofficial.camera_cycle_grid": "切換網格",
+  "key.realtrainmodunofficial.camera_cycle_aspect": "切換畫幅參考線",
+  "key.realtrainmodunofficial.camera_toggle_level": "水平儀顯示",
+  "key.realtrainmodunofficial.camera_shoot": "拍攝"
 }

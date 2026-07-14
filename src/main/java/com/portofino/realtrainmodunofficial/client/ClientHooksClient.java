@@ -120,6 +120,11 @@ public final class ClientHooksClient {
         }
     }
 
+    /** カメラ: 右クリックでファインダーモードを開閉 */
+    public static void toggleCamera() {
+        com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.toggle();
+    }
+
     /** 券売機 (本家 GuiTicketVendor): 切符 / 回数券 の2ボタン */
     public static void openTicketVendorScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(

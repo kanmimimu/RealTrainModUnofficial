@@ -135,6 +135,10 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> TICKET_VENDOR_ITEM = ITEMS.register(
         "ticket_vendor", () -> new InstalledObjectItem(InstalledObjectCategory.TICKET_VENDOR)
     );
+    //本家 ItemCamera: 撮り鉄用カメラ (望遠 / 被写界深度 / 流し撮り / 列車追尾AF)
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.CameraItem> CAMERA_ITEM = ITEMS.register(
+        "camera", com.portofino.realtrainmodunofficial.item.CameraItem::new
+    );
     //本家 ItemTicket: 券売機が発券し改札が消費する。切符=1回, 回数券=11回。
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.TicketItem> TICKET_ITEM = ITEMS.register(
         "ticket", () -> new com.portofino.realtrainmodunofficial.item.TicketItem(1)

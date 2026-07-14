@@ -72,6 +72,7 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.TICKET_VENDOR_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_BOOK_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.CAMERA_ITEM.get());
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
