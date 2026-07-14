@@ -431,6 +431,86 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     }
 
     /**
+     * 本家 TileEntityLargeRailCore.getResourceState()。
+     *
+     * <p>レールのスクリプトは {@code shouldRenderObject} の中でこれを呼び、
+     * レールの名前 (ResourceName) や設定を見て「このオブジェクトを描くか」を決める。
+     * 未実装だったため<b>スクリプトが毎フレーム落ちて</b> shouldRenderObject が使えず、
+     * 端のトリミングや枕木の間引きが効かなくなっていた (ログに 1224 件の失敗)。
+     */
+    public ResourceStateCompat getResourceState() {
+        return new ResourceStateCompat(this);
+    }
+
+    /** func_174877_v = getPos() (1.12 の SRG 名)。パックのスクリプトが呼ぶ。 */
+    public net.minecraft.core.BlockPos func_174877_v() {
+        return this.getBlockPos();
+    }
+
+    /** 本家 ResourceStateRail 相当 (スクリプトが触る範囲だけ)。 */
+    public static final class ResourceStateCompat {
+        private final TileEntityLargeRailCore rail;
+
+        public ResourceStateCompat(TileEntityLargeRailCore rail) {
+            this.rail = rail;
+        }
+
+        /** レールのモデル名 ("1067mm_PC" 等)。 */
+        public String getResourceName() {
+            return this.rail == null ? "" : this.rail.getRailDefinitionId();
+        }
+
+        public ModelSetRailCompat getResourceSet() {
+            return new ModelSetRailCompat(this.rail);
+        }
+
+        public jp.ngt.rtm.modelpack.modelset.DataMapCompat getDataMap() {
+            return new jp.ngt.rtm.modelpack.modelset.DataMapCompat();
+        }
+    }
+
+    /** 本家 ModelSetRail 相当。スクリプトは getConfig() から幅や名前を読む。 */
+    public static final class ModelSetRailCompat {
+        private final TileEntityLargeRailCore rail;
+
+        public ModelSetRailCompat(TileEntityLargeRailCore rail) {
+            this.rail = rail;
+        }
+
+        public RailConfigCompat getConfig() {
+            return new RailConfigCompat(this.rail);
+        }
+
+        public boolean isDummy() {
+            return this.rail == null;
+        }
+    }
+
+    /** 本家 RailConfig 相当。 */
+    public static final class RailConfigCompat {
+        private final TileEntityLargeRailCore rail;
+
+        public RailConfigCompat(TileEntityLargeRailCore rail) {
+            this.rail = rail;
+            this.railName = rail == null ? "" : rail.getRailDefinitionId();
+        }
+
+        /** 本家 RailConfig.railName (スクリプトはフィールド参照もする)。 */
+        public final String railName;
+
+        public String getName() {
+            return this.railName;
+        }
+
+        /** 道床の幅。 */
+        public int getBallastWidth() {
+            com.portofino.realtrainmodunofficial.rail.RailDefinition def =
+                    com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(this.railName);
+            return def == null ? 3 : Math.max(1, def.getBallastWidth());
+        }
+    }
+
+    /**
      * @deprecated Remaster 独自。
      */
     @Deprecated

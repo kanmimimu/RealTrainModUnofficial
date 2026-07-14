@@ -58,6 +58,8 @@ public final class WireScriptRenderers {
         try {
             byte[] bytes = NGTFileLoader.findAsset(def.getScriptPath());
             if (bytes == null) {
+                RealTrainModUnofficial.LOGGER.warn("[wire] スクリプトが見つかりません: {} ({})",
+                        def.getId(), def.getScriptPath());
                 return INVALID;
             }
             String source = new String(bytes, StandardCharsets.UTF_8);
@@ -71,6 +73,7 @@ public final class WireScriptRenderers {
                     + source);
             Object rcName = se.get("renderClass");
             if (rcName == null) {
+                RealTrainModUnofficial.LOGGER.warn("[wire] renderClass がありません: {}", def.getId());
                 return INVALID;
             }
             Class<?> rc = Class.forName(rcName.toString(), true, ScriptUtil.class.getClassLoader());
@@ -82,6 +85,8 @@ public final class WireScriptRenderers {
             }
             if (!(instance instanceof WirePartsRenderer renderer)) {
                 //架線以外の renderClass (BasicWire 等が別クラスを指す場合) は従来描画に任せる
+                RealTrainModUnofficial.LOGGER.info("[wire] renderClass {} は WirePartsRenderer ではありません ({}) → 従来描画",
+                        rcName, def.getId());
                 return INVALID;
             }
             renderer.setScript(se);
@@ -118,6 +123,8 @@ public final class WireScriptRenderers {
             return INVALID;
         }
     }
+
+    private static final java.util.Set<String> WARNED_EMPTY = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public static final class Scripted {
         private final WirePartsRenderer renderer;
@@ -158,6 +165,10 @@ public final class WireScriptRenderers {
             }
             //スクリプトが未対応 API で落ちて何も描けなかった場合は従来描画に戻す
             if (!rec.hasGeometry()) {
+                if (!WARNED_EMPTY.contains(this.renderer.getClass().getName())) {
+                    WARNED_EMPTY.add(this.renderer.getClass().getName());
+                    RealTrainModUnofficial.LOGGER.warn("[wire] スクリプトが何も描きませんでした → 従来描画にフォールバック");
+                }
                 return false;
             }
             VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model,

@@ -158,6 +158,20 @@ public class TrainScriptSystem {
         "NGTLog = { debug: function() {}, info: function() {}, warn: function() {}, error: function() {}, sendChatMessage: function(player, msg){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) __SRB__.chat(player, ''+msg); }catch(e){} }, sendChatMessageToAll: function(msg){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) __SRB__.chat((typeof __RTMU_MC__!=='undefined'&&__RTMU_MC__)?__RTMU_MC__.getPlayer():null, ''+msg); }catch(e){} } };\n" +
         "NGTUtil = { getCurrentTime: function() { return java.lang.System.currentTimeMillis(); }, getUniqueId: function() { return java.lang.System.nanoTime(); }, isClient: function() { return true; }, getCurrentWorld: function() { return null; }, getCurrentPlayer: function() { return null; }, getMCVersion: function() { return '1.21.1'; }, isLanguage: function() { return false; } };\n" +
         "NGTMath = { toRadians: function(d) { return d * Math.PI / 180.0; }, toDegrees: function(r) { return r * 180.0 / Math.PI; }, sin: Math.sin, cos: Math.cos, tan: Math.tan, atan2: Math.atan2, sqrt: Math.sqrt, floor: Math.floor, ceil: Math.ceil, clamp: function(v,a,b) { return Math.max(a, Math.min(b, v)); }, normalizeAngle: function(a) { while(a>=180)a-=360; while(a<-180)a+=360; return a; } };\n" +
+        // ★ ここまでの JS シムは「Java 実装が無いときのフォールバック」。
+        // Java 側 (NGTUtilCompat 等) を put してあるなら、そちらを使う。
+        // シムで無条件に上書きしていたため、Java に実装した getMethod / getField 等が
+        // <b>スクリプトから見えなくなっていた</b> (西武 2000 系の運転台が丸ごと死んでいた原因)。
+        "if (typeof __RTMU_NGTUtil__ !== 'undefined' && __RTMU_NGTUtil__) NGTUtil = __RTMU_NGTUtil__;\n" +
+        "if (typeof __RTMU_NGTLog__  !== 'undefined' && __RTMU_NGTLog__)  NGTLog  = __RTMU_NGTLog__;\n" +
+        "if (typeof __RTMU_NGTMath__ !== 'undefined' && __RTMU_NGTMath__) NGTMath = __RTMU_NGTMath__;\n" +
+        "if (typeof __RTMU_NGTText__ !== 'undefined' && __RTMU_NGTText__) NGTText = __RTMU_NGTText__;\n" +
+        // importPackage を no-op にしているため、パックが importPackage(Packages.jp.ngt.ngtlib.renderer) で
+        // 取り込んでいたクラスが<b>未定義</b>になる (ReferenceError: NGTTessellator is not defined)。
+        // 実クラスがあるものは Java.type で束縛しておく。
+        "try { if (typeof NGTTessellator === 'undefined') NGTTessellator = Java.type('jp.ngt.ngtlib.renderer.NGTTessellator'); } catch (e) {}\n" +
+        "try { if (typeof NGTRenderer === 'undefined') NGTRenderer = Java.type('jp.ngt.ngtlib.renderer.NGTRenderer'); } catch (e) {}\n" +
+        "try { if (typeof GLHelper === 'undefined') GLHelper = Java.type('jp.ngt.ngtlib.renderer.GLHelper'); } catch (e) {}\n" +
         // ModelPackManager: スクリプトの sound lib include で頻出するので空 stub
         "if (typeof ModelPackManager === 'undefined') ModelPackManager = { INSTANCE: { getResource: function() { return null; }, getModel: function() { return null; } } };\n" +
         // MCTE (ミニチュア) — NGTO Builder 系がロード時に参照する。レガシー環境 (モデル
@@ -730,6 +744,7 @@ public class TrainScriptSystem {
             scriptEngine.put("__RTMU_NGTLog__", ngtLog);
             scriptEngine.put("__RTMU_NGTUtil__", ngtUtil);
             scriptEngine.put("__RTMU_NGTMath__", ngtMath);
+            scriptEngine.put("__RTMU_NGTText__", ngtText);
             // 直接名前でも put (importPackage を no-op 化済みなので衝突なし)
             scriptEngine.put("NGTText", ngtText);
             scriptEngine.put("NGTLog", ngtLog);
@@ -5193,6 +5208,29 @@ public class TrainScriptSystem {
     /** RTM 原作の jp.ngt.ngtlib.io.NGTLog スタブ。debug/info/warn/error を Java の logger に橋渡し。 */
     public static final class NGTLogCompat {
         public void debug(Object... args) { /* silent */ }
+
+        /** 本家 NGTLog.sendChatMessage(player, message, ...)。 */
+        public void sendChatMessage(Object... args) {
+            if (args == null || args.length < 2) {
+                return;
+            }
+            try {
+                net.minecraft.world.entity.player.Player player =
+                        jp.ngt.mccompat.PlayerCompat.unwrap(args[0]);
+                if (player != null) {
+                    player.displayClientMessage(
+                            net.minecraft.network.chat.Component.literal(String.valueOf(args[1])), false);
+                }
+            } catch (Throwable ignored) {
+                //チャットに出せないだけなので無視
+            }
+        }
+
+        public void sendChatMessageToAll(Object... args) {
+            if (args != null && args.length > 0) {
+                RealTrainModUnofficial.LOGGER.info("[NGTLog] {}", args[0]);
+            }
+        }
         public void info(Object... args) {
             if (args != null && args.length > 0) {
                 RealTrainModUnofficial.LOGGER.info("[NGTLog] {}", args[0]);
@@ -5229,6 +5267,100 @@ public class TrainScriptSystem {
                     net.minecraft.client.Minecraft.getInstance().getLanguageManager().getSelected()
                 );
             } catch (Throwable t) { return false; }
+        }
+
+        /**
+         * 本家 NGTUtil.getMethod: リフレクションでメソッドを呼び、戻り値を返す。
+         *
+         * <p>パックはこれで <b>private なメソッド</b> (Formation.getControlCar 等) を叩く。
+         * 未実装だったため、西武 2000 系のような運転台スクリプトが
+         * {@code TypeError: NGTUtil.getMethod is not a function} で落ち、スクリプトごと無効化されて
+         * <b>素のモデル (全ノッチぶんのマスコン) がまとめて描かれていた</b>。
+         *
+         * <p>引数の並びは NGTLib のバージョンで違う:
+         * <pre>
+         *   (clazz, instance, names[], types[], args...)        1.7.10 / KaizPatchX
+         *   (clazz, instance, ???, names[], types[], args...)   RTM 2.x
+         * </pre>
+         * どちらでも通るよう、2 番目を対象インスタンスとし、残りからメソッド名を拾う。
+         */
+        public Object getMethod(Object... params) {
+            if (params == null || params.length < 2 || params[1] == null) {
+                return null;
+            }
+            Object instance = params[1];
+            java.util.List<String> names = new java.util.ArrayList<>();
+            for (int i = 2; i < params.length; i++) {
+                collectStrings(params[i], names);
+            }
+            for (String name : names) {
+                java.lang.reflect.Method method = findMethod(instance.getClass(), name);
+                if (method != null) {
+                    try {
+                        method.setAccessible(true);
+                        return method.invoke(instance);
+                    } catch (ReflectiveOperationException e) {
+                        return null;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /** 本家 NGTUtil.getField: リフレクションでフィールドを読む。 */
+        public Object getField(Object... params) {
+            if (params == null || params.length < 2 || params[1] == null) {
+                return null;
+            }
+            Object instance = params[1];
+            java.util.List<String> names = new java.util.ArrayList<>();
+            for (int i = 2; i < params.length; i++) {
+                collectStrings(params[i], names);
+            }
+            for (String name : names) {
+                for (Class<?> c = instance.getClass(); c != null; c = c.getSuperclass()) {
+                    try {
+                        java.lang.reflect.Field field = c.getDeclaredField(name);
+                        field.setAccessible(true);
+                        return field.get(instance);
+                    } catch (ReflectiveOperationException ignored) {
+                        //次の親クラスへ
+                    }
+                }
+            }
+            return null;
+        }
+
+        /** 引数が文字列 / 文字列配列 / JS 配列のどれでもメソッド名を拾えるようにする。 */
+        private static void collectStrings(Object obj, java.util.List<String> out) {
+            if (obj instanceof String s) {
+                out.add(s);
+            } else if (obj instanceof Object[] array) {
+                for (Object o : array) {
+                    collectStrings(o, out);
+                }
+            } else if (obj instanceof java.util.Collection<?> collection) {
+                for (Object o : collection) {
+                    collectStrings(o, out);
+                }
+            } else if (obj instanceof java.util.Map<?, ?> map) {
+                //Nashorn の JS 配列は Map ("0" -> 値) として渡ってくる
+                for (Object o : map.values()) {
+                    collectStrings(o, out);
+                }
+            }
+        }
+
+        /** 引数なしのメソッドを、private も含めて親クラスまで探す。 */
+        private static java.lang.reflect.Method findMethod(Class<?> clazz, String name) {
+            for (Class<?> c = clazz; c != null; c = c.getSuperclass()) {
+                try {
+                    return c.getDeclaredMethod(name);
+                } catch (NoSuchMethodException ignored) {
+                    //次の親クラスへ
+                }
+            }
+            return null;
         }
     }
 

@@ -147,6 +147,14 @@ public class PartsRenderer {
     /**
      * 本家: modelSet.getConfig().getName() — スクリプトが車種判定に使う
      */
+    /**
+     * 本家 RailPartsRendererBase 限定の API だが、パックによっては車両/設置物の
+     * レンダラーからも呼ばれる。落とさないよう空実装を用意する
+     * (レール用は RailPartsRenderer が override する)。
+     */
+    public void renderStaticParts(Object tile, double x, double y, double z) {
+    }
+
     public String getModelName() {
         if (this.modelSet instanceof jp.ngt.rtm.modelpack.modelset.ModelSetCompat msc) {
             return msc.getConfig().getName();

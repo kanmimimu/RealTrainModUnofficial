@@ -73,6 +73,28 @@ public class WorldCompat {
     }
 
     /**
+     * func_82737_E = getTotalWorldTime。
+     * <p>E259 の ATS プラグイン (lib_ATS_*.js) が毎 tick これを読む。無いと
+     * 全 ATS スクリプトが TypeError で死ぬ。
+     */
+    public long func_82737_E() {
+        return this.level.getGameTime();
+    }
+
+    /**
+     * func_72839_b = getEntitiesWithinAABBExcludingEntity(entity, aabb)。
+     * <p>列車検知器のサーバースクリプトが、自分の当たり判定に触れている列車を探すのに使う。
+     * スクリプトは戻り値に .forEach(function(e){...}) を呼ぶ (Java の List で通る)。
+     */
+    public java.util.List<net.minecraft.world.entity.Entity> func_72839_b(Object exclude, Object aabb) {
+        net.minecraft.world.phys.AABB box = AxisAlignedBB.unwrap(aabb);
+        if (box == null) {
+            return java.util.List.of();
+        }
+        return this.level.getEntities(EntityCompatUtil.unwrapEntity(exclude), box);
+    }
+
+    /**
      * getEntityByID。プレイヤーは PlayerCompat ラッパーで返す
      * (SRB3 等が MCWrapperClient.getPlayer() の戻り値と === 比較するため)。
      */
@@ -113,7 +135,38 @@ public class WorldCompat {
             return false;
         }
         BlockPos pos = new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z));
-        return this.level.setBlock(pos, b.defaultBlockState(), flag);
+        return this.level.setBlock(pos, withMeta(b, meta), flag);
+    }
+
+    private static final String[] COLORS_16 = {
+            "white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
+            "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"
+    };
+
+    /**
+     * 1.7.10 の「1 ブロック + メタで 16 色」を 1.21 の色別ブロックに読み替える。
+     *
+     * <p>スクリプトは {@code setBlock(x,y,z, Blocks.field_150399_cn, 14, 3)} のように
+     * 「色付きガラス + メタ 14 (赤)」と書く。1.21 では色ごとに別ブロックなので、
+     * 白色版の登録名 (white_stained_glass) の "white" をメタの色に差し替える。
+     * 羊毛・コンクリート・テラコッタ・カーペット等すべて同じ規則で通る。
+     */
+    private static net.minecraft.world.level.block.state.BlockState withMeta(
+            net.minecraft.world.level.block.Block block, int meta) {
+        if (meta <= 0) {
+            return block.defaultBlockState();
+        }
+        String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
+        if (path.startsWith("white_")) {
+            String colored = COLORS_16[meta & 15] + path.substring("white".length());
+            net.minecraft.world.level.block.Block b2 = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                    .getOptional(net.minecraft.resources.ResourceLocation.withDefaultNamespace(colored))
+                    .orElse(null);
+            if (b2 != null) {
+                return b2.defaultBlockState();
+            }
+        }
+        return block.defaultBlockState();
     }
 
     /** func_147468_f = setBlockToAir */
@@ -123,8 +176,23 @@ public class WorldCompat {
     }
 
     /** func_147438_o = getTileEntity(x,y,z) */
-    public net.minecraft.world.level.block.entity.BlockEntity func_147438_o(double x, double y, double z) {
-        return this.level.getBlockEntity(new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z)));
+    public Object func_147438_o(double x, double y, double z) {
+        return wrapBlockEntity(this.level.getBlockEntity(new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z))));
+    }
+
+    /**
+     * コマンドブロックだけラッパーに包む。
+     *
+     * <p>検知器のスクリプトは {@code block instanceof TileEntityCommandBlock} で探すが、
+     * 1.21 の CommandBlockEntity には 1.7.10 のクラスを継承させられない。ここで包んで
+     * instanceof を成立させる。それ以外のブロックエンティティ (レールのコア等) は
+     * 素のまま返す — スクリプトが実クラスのメソッドを直接呼ぶため。
+     */
+    private static Object wrapBlockEntity(net.minecraft.world.level.block.entity.BlockEntity be) {
+        if (be instanceof net.minecraft.world.level.block.entity.CommandBlockEntity cb) {
+            return new jp.ngt.mccompat.tileentity.TileEntityCommandBlock(cb);
+        }
+        return be;
     }
 
     /** func_175625_s = getTileEntity(BlockPos) (1.12) */

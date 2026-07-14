@@ -57,6 +57,18 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public float field_70177_z;
     public float field_70125_A;
     public Entity field_70153_n;
+    //posX / posY / posZ
+    public double field_70165_t;
+    public double field_70163_u;
+    public double field_70161_v;
+    //lastTickPosX / lastTickPosY / lastTickPosZ
+    //(列車検知器のスクリプトは (lastTickPos - pos) で進行方向を出し、
+    // 検知器の向きと突き合わせて「どちら向きに通過したか」を判定する)
+    public double field_70169_q;
+    public double field_70167_r;
+    public double field_70166_s;
+    //boundingBox
+    public jp.ngt.mccompat.AxisAlignedBB field_70121_D;
 
     private final jp.ngt.rtm.modelpack.state.ResourceState resourceState =
             new jp.ngt.rtm.modelpack.state.ResourceState(this::getResourceName);
@@ -121,6 +133,14 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         this.field_70177_z = this.getYRot();
         this.field_70125_A = this.getXRot();
         this.field_70153_n = this.getPassengers().isEmpty() ? null : this.getPassengers().get(0);
+        //前 tick の位置は「今の値で上書きする前」に退避する (進行方向の算出に使われる)
+        this.field_70169_q = this.xOld;
+        this.field_70167_r = this.yOld;
+        this.field_70166_s = this.zOld;
+        this.field_70165_t = this.getX();
+        this.field_70163_u = this.getY();
+        this.field_70161_v = this.getZ();
+        this.field_70121_D = new jp.ngt.mccompat.AxisAlignedBB(this.getBoundingBox());
     }
 
     /**

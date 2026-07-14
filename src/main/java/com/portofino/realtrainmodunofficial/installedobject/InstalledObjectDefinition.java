@@ -39,6 +39,21 @@ public class InstalledObjectDefinition {
     private int animationCycle = 1;
     private int color = 0;
     private int lightValue = 0;
+    // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate(entity, executer) が呼ばれる
+    // スクリプト (列車検知器など)。コンストラクタ引数が既に多いので setter で後付けする。
+    private String serverScriptPath = "";
+
+    public String getServerScriptPath() {
+        return serverScriptPath;
+    }
+
+    public void setServerScriptPath(String serverScriptPath) {
+        this.serverScriptPath = serverScriptPath == null ? "" : serverScriptPath;
+    }
+
+    public boolean hasServerScript() {
+        return !this.serverScriptPath.isBlank();
+    }
 
     public int getAnimationCycle() {
         return animationCycle;

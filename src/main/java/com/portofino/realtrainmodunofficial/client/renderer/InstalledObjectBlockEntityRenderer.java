@@ -341,20 +341,15 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         if (level != null && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity endpoint) {
             InstalledObjectDefinition endpointDef = InstalledObjectRegistry.getById(endpoint.getDefinitionId());
             if (endpointDef != null) {
-                // 本家RTM(TileEntityConnectorBase.getWirePos)準拠: 接続点は wirePos(ブロック単位)を
-                // ブロック底面中央から積む。X/Z は wirePos、Y は「碍子モデルの実描画上端」を採用する。
-                // (パックによっては wirePos.y とモデル上端がズレており、本家設定どおりだと浮く。
-                //  実モデルの先端から出すことで、どの碍子でも確実にモデルから直接電線が出る。)
+                // 本家 TileEntityConnectorBase.getWirePos: 接続点は<b>設定の wirePos そのもの</b>
+                // (ブロック底面中央からの相対座標)。
+                //
+                // ここは以前「碍子モデルの実描画上端」で Y を上書きしていた。だが本家はモデルの形など
+                // 一切見ておらず、wirePos をそのまま使う。腕が伸びている碍子ではモデル上端が
+                // wirePos よりずっと高いため、<b>電線が碍子から浮いて宙に張られる</b>
+                // (Baru's Pole で顕著)。本家どおり wirePos を使う。
                 Vec3 wp = endpointDef.getWireAttachPos();
-                double attachY = wp.y;
-                MqoModelLoader.MqoModel attachModel = MqoModelLoader.loadModelFromPack(
-                    endpointDef.getPackName(), endpointDef.getModelFile(), endpointDef.getTextureOverrides(),
-                    endpointDef.getScriptPath(), endpointDef.isSmoothing());
-                double modelTop = modelTopY(attachModel);
-                if (!Double.isNaN(modelTop)) {
-                    attachY = modelTop * endpointDef.getModelScale();
-                }
-                Vec3 local = new Vec3(wp.x, attachY, wp.z);
+                Vec3 local = new Vec3(wp.x, wp.y, wp.z);
                 // 描画と同じ順序で回転(まず mountPitch を X、次に yaw を Y)。壁挿し碍子の
                 // 取付点もモデルと同じ位置に来るようにする。
                 Vec3 tilted = rotateX(local, endpoint.getMountPitch());

@@ -120,5 +120,25 @@ public final class PlayerCompat {
                 this.field_70462_a[i] = stack.isEmpty() ? null : new ItemStackCompat(stack);
             }
         }
+
+        /**
+         * func_70448_g = getCurrentItem (今持っているアイテム)。手ぶらなら null。
+         *
+         * <p>Baru's Roof の照明スクリプトは「設置物アイテムを持っている間だけ
+         * 目印を描く」ために使う。無いと毎フレーム TypeError で落ちていた。
+         */
+        public ItemStackCompat func_70448_g() {
+            int i = this.field_70461_c;
+            return i >= 0 && i < this.field_70462_a.length ? this.field_70462_a[i] : null;
+        }
+
+        public ItemStackCompat getCurrentItem() {
+            return this.func_70448_g();
+        }
+
+        /** func_70301_a = getStackInSlot(i) */
+        public ItemStackCompat func_70301_a(int i) {
+            return i >= 0 && i < this.field_70462_a.length ? this.field_70462_a[i] : null;
+        }
     }
 }

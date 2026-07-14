@@ -124,6 +124,100 @@ public final class NGTUtil {
     /**
      * 本家 NGTUtil.reverse : 配列を逆順に
      */
+    /**
+     * 本家 NGTUtil.getMethod: リフレクションでメソッドを呼び、戻り値を返す。
+     *
+     * <p>パックはこれで <b>private なメソッド</b> (Formation.getControlCar 等) を叩く。
+     * 未実装だったため、西武 2000 系のような運転台スクリプトが
+     * {@code TypeError: NGTUtil.getMethod is not a function} で落ち、スクリプトごと無効化されて
+     * <b>運転台のオブジェクトが全部おかしくなっていた</b>。
+     *
+     * <p>引数の並びは NGTLib のバージョンで違う:
+     * <pre>
+     *   (clazz, instance, names[], types[], args...)        1.7.10 / KaizPatchX
+     *   (clazz, instance, ???, names[], types[], args...)   RTM 2.x
+     * </pre>
+     * どちらでも通るよう、2 番目を対象インスタンスとし、残りからメソッド名を拾う。
+     */
+    public static Object getMethod(Object... params) {
+        if (params == null || params.length < 2 || params[1] == null) {
+            return null;
+        }
+        Object instance = params[1];
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (int i = 2; i < params.length; i++) {
+            collectStrings(params[i], names);
+        }
+        for (String name : names) {
+            java.lang.reflect.Method method = findMethod(instance.getClass(), name);
+            if (method != null) {
+                try {
+                    method.setAccessible(true);
+                    return method.invoke(instance);
+                } catch (ReflectiveOperationException e) {
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 本家 NGTUtil.getField: リフレクションでフィールドを読む。 */
+    public static Object getField(Object... params) {
+        if (params == null || params.length < 2 || params[1] == null) {
+            return null;
+        }
+        Object instance = params[1];
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (int i = 2; i < params.length; i++) {
+            collectStrings(params[i], names);
+        }
+        for (String name : names) {
+            for (Class<?> c = instance.getClass(); c != null; c = c.getSuperclass()) {
+                try {
+                    java.lang.reflect.Field field = c.getDeclaredField(name);
+                    field.setAccessible(true);
+                    return field.get(instance);
+                } catch (ReflectiveOperationException ignored) {
+                    //次の親クラスへ
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 引数が 文字列 / 文字列配列 / JS 配列 のどれでもメソッド名を拾えるようにする。 */
+    private static void collectStrings(Object obj, java.util.List<String> out) {
+        if (obj instanceof String str) {
+            out.add(str);
+        } else if (obj instanceof Object[] array) {
+            for (Object o : array) {
+                collectStrings(o, out);
+            }
+        } else if (obj instanceof java.util.Collection<?> collection) {
+            for (Object o : collection) {
+                collectStrings(o, out);
+            }
+        } else if (obj instanceof java.util.Map<?, ?> map) {
+            //Nashorn の JS 配列は Map ("0" -> 値) として渡ってくる
+            for (Object o : map.values()) {
+                collectStrings(o, out);
+            }
+        }
+    }
+
+    /** 引数なしのメソッドを、private も含めて親クラスまで探す。 */
+    private static java.lang.reflect.Method findMethod(Class<?> clazz, String name) {
+        for (Class<?> c = clazz; c != null; c = c.getSuperclass()) {
+            try {
+                return c.getDeclaredMethod(name);
+            } catch (NoSuchMethodException ignored) {
+                //次の親クラスへ
+            }
+        }
+        return null;
+    }
+
     public static <T> void reverse(T[] array) {
         for (int i = 0, j = array.length - 1; i < j; ++i, --j) {
             T temp = array[i];

@@ -80,14 +80,36 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             //本家式スクリプト描画 (Nashorn): 成功したらベイクドパスはスキップ
             com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.Scripted scripted =
                     com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
-            if (scripted != null && scripted.render(entity, partialTicks, poseStack, buffer, packedLight,
-                    net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, model)) {
-                return;
+            boolean scriptRendered = scripted != null && scripted.render(entity, partialTicks, poseStack, buffer,
+                    packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, model);
+
+            if (!scriptRendered) {
+                MqoModelLoader.GroupPredicate filter =
+                        groupName -> shouldRenderGroup(groupName, hasSeparateBogieModel);
+
+                //★ ドアの開閉。
+                //
+                //車両 JSON の door_left / door_right (「このグループを開くとき何処へ動かすか」) による
+                //開閉は<b>旧 TrainEntity のレンダラーにしか実装されていなかった</b>。実際に描画されるのは
+                //こちらの本家系レンダラーなので、スクリプトを持たないパック (=大半の車両) では
+                //ドアが一切動かなかった。ここで同じ変換を適用する。
+                MqoModelLoader.GroupTransform doorTransform = (stack, groupName) -> {
+                    TrainEntityRenderer.applyDoorTransform(stack, def.getLeftDoors(), groupName, entity.doorMoveL, true);
+                    TrainEntityRenderer.applyDoorTransform(stack, def.getRightDoors(), groupName, entity.doorMoveR, false);
+                };
+                MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, filter, doorTransform);
             }
 
-            MqoModelLoader.GroupPredicate filter =
-                    groupName -> shouldRenderGroup(groupName, hasSeparateBogieModel);
-            MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, filter);
+            //★ 方向幕 (JSON の rollsigns)。
+            //
+            //本家 RenderVehicleBase は<b>スクリプト描画とは別に</b>方向幕を描く。RTMU では
+            //旧 TrainEntityRenderer にしか実装が無く、実際に列車を描くこちらには無かったため、
+            //京急パックのように「幕はエンジン任せ・車体だけスクリプト」なパックで幕が出なかった。
+            //スクリプトの有無で切り分けてはいけない (自前で幕を描くパックは rollsigns を空にしている)。
+            TrainEntityRenderer.renderConfiguredRollsigns(
+                    entity.getTrainStateData(
+                            jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id),
+                    def, poseStack, buffer, packedLight);
         } finally {
             poseStack.popPose();
         }
@@ -131,6 +153,13 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             return true;
         }
         String n = groupName.toLowerCase(Locale.ROOT);
+        //本家のパックは「影」という名前の<b>偽の影ポリゴン</b>を持つことがある (1.7.10 時代の名残)。
+        //半透明マテリアルで描かれるが<b>深度も書き込む</b>ため、レールの上に乗ると
+        //レールが深度テストに落ちて描かれなくなる (「レールが透ける」)。
+        //1.21 では要らないので描かない。
+        if (n.contains("影")) {
+            return false;
+        }
         if (n.contains("shadow")) {
             return false;
         }

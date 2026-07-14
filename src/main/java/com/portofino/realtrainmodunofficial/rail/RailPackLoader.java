@@ -234,15 +234,41 @@ public class RailPackLoader {
             String id = railName != null ? railName : "rail";
             String displayName = railName != null ? railName : id;
             JsonObject model = getObject(obj, "model");
-            if (model == null) model = getObject(obj, "railModel");
             if (model == null) model = getObject(obj, "railModel2");
-            if (model == null) return;
-            String modelFile = getString(model, "modelFile");
+
+            String modelFile;
+            Map<String, String> tex;
+            if (model != null) {
+                modelFile = getString(model, "modelFile");
+                tex = parseTextures(model);
+            } else {
+                //★ 旧形式 (本家 RailConfig.init): "model" オブジェクトが無いパックは
+                //   "railModel" (モデルのパス) と "railTexture" (テクスチャのパス) を
+                //   <b>文字列で直接</b>持っている。本家は model が無ければこの 2 つから組み立てる:
+                //
+                //     this.model.modelFile = this.railModel;
+                //     this.model.textures  = {{"default", this.railTexture}};
+                //
+                //   これを読めておらず、旧形式のレールを<b>黙って読み飛ばしていた</b>。
+                //   その結果、敷いてあるレールのモデルがレジストリに無く、レンダラーが
+                //   「今選択中のレール」にフォールバックして<b>まったく別のレールに見えていた</b>。
+                modelFile = getString(obj, "railModel");
+                if (modelFile == null || modelFile.isBlank()) {
+                    return;
+                }
+                Map<String, String> legacyTex = new HashMap<>();
+                String railTexture = getString(obj, "railTexture");
+                if (railTexture != null && !railTexture.isBlank()) {
+                    legacyTex.put("default", railTexture);
+                }
+                tex = legacyTex;
+                model = new JsonObject();
+            }
             if (modelFile == null || modelFile.isBlank()) return;
             String scriptPath = getString(model, "rendererPath");
+            if (scriptPath == null || scriptPath.isBlank()) scriptPath = getString(obj, "rendererPath");
             if (scriptPath == null || scriptPath.isBlank()) scriptPath = getString(obj, "scriptPath");
             String buttonTexture = firstNonBlank(getString(obj, "buttonTexture"), getString(model, "buttonTexture"));
-            Map<String, String> tex = parseTextures(model);
             Vec3 offset = parseVec3(model, "offset", 1.0 / 16.0);
             float scale = parseFloat(model, "scale", 1.0F);
             // ballastWidth / defaultBallast (RTM 公式パック互換) / model.ballastWidth のいずれか。

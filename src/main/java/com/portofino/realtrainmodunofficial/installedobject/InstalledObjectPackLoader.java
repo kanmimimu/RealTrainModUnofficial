@@ -445,6 +445,9 @@ public final class InstalledObjectPackLoader {
                 def.setWireParams(sectionLength, deflection);
             }
             def.setWireAttachPos(parseVec3(obj, "wirePos", 1.0));
+            //本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate が回るスクリプト
+            //(列車検知器は全ての処理をここに書く)。
+            def.setServerScriptPath(getString(obj, "serverScriptPath"));
             LOADED.add(def);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse installed object json {} in {}: {}", path, packName, e.getMessage());

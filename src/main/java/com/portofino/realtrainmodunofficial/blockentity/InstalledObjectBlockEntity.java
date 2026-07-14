@@ -171,6 +171,57 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         return this.worldCompat;
     }
 
+    // ---- 本家 EntityInstalledObject 互換 (サーバースクリプト用) ----
+    //
+    // 本家の設置物は「エンティティ」なので、サーバースクリプトは設置物を Entity として扱い、
+    // 座標・向き・当たり判定・World を SRG 名で読む。RTMU ではブロックエンティティだが、
+    // 同じ名前で読めるようにしておく。
+    //
+    // ★ここは必ず public フィールドにすること。スクリプトは entity.field_70170_p と
+    //   「プロパティとして」読む。Nashorn は同名メソッドを自動では呼ばないので、
+    //   メソッドで用意すると値ではなく関数オブジェクトが返り、その後の
+    //   world.func_147438_o(...) が "not a function" で落ちる。
+
+    /** 1.7.10 Entity.worldObj */
+    public jp.ngt.mccompat.WorldCompat field_70170_p;
+    /** posX (ブロック中心) */
+    public double field_70165_t;
+    /** posY */
+    public double field_70163_u;
+    /** posZ (ブロック中心) */
+    public double field_70161_v;
+    /** rotationYaw。検知器は自分の向きと列車の進行方向を突き合わせて通過方向を判定する。 */
+    public float field_70177_z;
+    /** boundingBox。検知器はこれを上下に広げて中の列車を探す。設置物は 1 ブロック大。 */
+    public jp.ngt.mccompat.AxisAlignedBB field_70121_D;
+
+    private jp.ngt.rtm.modelpack.ScriptExecuter scriptExecuter;
+
+    /** サーバースクリプトを呼ぶ直前に、上の SRG フィールドを実際の値に合わせる。 */
+    public void refreshScriptFields() {
+        this.field_70170_p = this.func_145831_w();
+        this.field_70165_t = this.worldPosition.getX() + 0.5D;
+        this.field_70163_u = this.worldPosition.getY();
+        this.field_70161_v = this.worldPosition.getZ() + 0.5D;
+        this.field_70177_z = this.yaw;
+        if (this.field_70121_D == null) {
+            this.field_70121_D = new jp.ngt.mccompat.AxisAlignedBB(
+                    new net.minecraft.world.phys.AABB(this.worldPosition));
+        }
+    }
+
+    /** サーバースクリプトの第 2 引数。設置物ごとに 1 個作って使い回す (count を貯めるため)。 */
+    public jp.ngt.rtm.modelpack.ScriptExecuter getScriptExecuter(net.minecraft.server.level.ServerLevel serverLevel) {
+        if (this.scriptExecuter == null) {
+            this.scriptExecuter = new jp.ngt.rtm.modelpack.ScriptExecuter(
+                    serverLevel,
+                    new net.minecraft.world.phys.Vec3(this.worldPosition.getX() + 0.5D,
+                            this.worldPosition.getY(), this.worldPosition.getZ() + 0.5D),
+                    "RTM Script Executer");
+        }
+        return this.scriptExecuter;
+    }
+
     /**
      * 本家 TileEntityInsulator.wirePos (電線の取付点)。碍子 (コネクタ) 以外は null。
      * スクリプトは {@code tile.wirePos} と書き、Nashorn がこの getter に解決する。
@@ -925,7 +976,7 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
     /** Random decorative scale factor (used by RenderPalm etc.). */
     public float getRandomScale() { return 1.0F; }
 
-    private InstalledObjectDefinition getDefinition() {
+    public InstalledObjectDefinition getDefinition() {
         return InstalledObjectRegistry.getById(definitionId);
     }
 
@@ -973,6 +1024,18 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
                 ClientHooks.tickCrossingGateSound(be);
             } else {
                 ClientHooks.stopCrossingGateSound(level, pos);
+            }
+            return;
+        }
+        //本家 EntityInstalledObject.onUpdate: サーバー側では毎 tick、パックの
+        //serverScriptPath を onUpdate(entity, executer) として呼ぶ。
+        //
+        //列車検知器パック (hi03TrainDetector 等) は全処理をこのスクリプトに書くので、
+        //スクリプトを持つ設置物は<b>パック側の実装に任せて</b> RTMU 内蔵の検知器処理は動かさない
+        //(両方が出力を書くと奪い合いになる)。
+        if (be.getDefinition() != null && be.getDefinition().hasServerScript()) {
+            if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                com.portofino.realtrainmodunofficial.script.InstalledObjectServerScripts.tick(serverLevel, be);
             }
             return;
         }

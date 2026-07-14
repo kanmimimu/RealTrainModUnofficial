@@ -311,7 +311,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             || lower.contains("台車");
     }
 
-    private static void applyDoorTransform(PoseStack poseStack, java.util.List<VehicleDefinition.DoorAnimationDefinition> doors,
+    public static void applyDoorTransform(PoseStack poseStack, java.util.List<VehicleDefinition.DoorAnimationDefinition> doors,
                                            String groupName, float progressTicks, boolean leftSide) {
         if (groupName == null) {
             return;
@@ -388,6 +388,21 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
 
     private static void renderConfiguredRollsigns(TrainEntity entity, VehicleDefinition def, PoseStack poseStack,
                                                   MultiBufferSource buffer, int packedLight) {
+        renderConfiguredRollsigns(entity.getDestinationIndex(), def, poseStack, buffer, packedLight);
+    }
+
+    /**
+     * 車両 JSON の {@code rollsigns} (頂点座標 + UV で定義された方向幕パネル) を描く。
+     *
+     * <p>本家 RenderVehicleBase.renderRollsign と同じで、<b>描画スクリプトの有無に関係なく</b>
+     * エンジン側が描く。パックが自前で幕を描く場合 (西武・E259 等) は {@code "rollsigns": []} と
+     * 空配列にしてあるので、配列が空でなければ描く、で正しく切り分けられる。
+     *
+     * <p>実際に列車を描くのは {@code RtmTrainRenderer} なので、そちらからも呼べるよう
+     * エンティティに依存しない形 (行き先インデックスだけ受ける) にしてある。
+     */
+    static void renderConfiguredRollsigns(int rawDestinationIndex, VehicleDefinition def, PoseStack poseStack,
+                                          MultiBufferSource buffer, int packedLight) {
         if (def == null || def.getRollsigns().isEmpty()) {
             return;
         }
@@ -397,7 +412,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         }
         ResourceLocation texture = MqoModelLoader.resolvePackTexture(def.getPackName(), texturePath);
         int count = Math.max(1, def.getRollsignNames().isEmpty() ? 1 : def.getRollsignNames().size());
-        int destinationIndex = Math.floorMod(entity.getDestinationIndex(), count);
+        int destinationIndex = Math.floorMod(rawDestinationIndex, count);
         float segmentV0 = destinationIndex / (float) count;
         float segmentV1 = (destinationIndex + 1.0F) / (float) count;
         VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
@@ -416,7 +431,10 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             float baseVMax = uv[3];
             float vMin = Mth.lerp(segmentV0, baseVMin, baseVMax);
             float vMax = Mth.lerp(segmentV1, baseVMin, baseVMax);
-            int signLight = rollsign.disableLighting() ? 0x00F000F0 : packedLight;
+            //★本家は disableLighting が false のときに GL のライティングを切って
+            //  ライトマップを最大にする = 幕が自己発光する。名前と逆なので注意
+            //  (RTMU は条件が反転していて、光るべき幕が暗いままだった)。
+            int signLight = rollsign.disableLighting() ? packedLight : 0x00F000F0;
 
             for (float[][] quad : rollsign.pos()) {
                 if (quad == null || quad.length < 4) {
