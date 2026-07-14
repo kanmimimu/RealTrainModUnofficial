@@ -147,6 +147,12 @@ def buildE257DefaultPack = tasks.register('buildE257DefaultPack', Zip) {
 tasks.named('jar', Jar).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     dependsOn buildE257DefaultPack
+    // 利用規約を jar のルートに入れる (本家 RTM も LICENSE.txt を同梱している)。
+    // 入れておかないと、jar だけ手に入れた人が規約を読めない。
+    // ※ META-INF/LICENSE は依存ライブラリ (GraalVM 等) のもので別物。
+    from('LICENSE') {
+        rename { 'LICENSE_RTMU.txt' }
+    }
     from(buildE257DefaultPack.flatMap { it.archiveFile }) {
         into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
     }
