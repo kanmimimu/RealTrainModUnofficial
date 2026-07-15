@@ -15,6 +15,22 @@ public final class ModelPackManager {
         return new jp.ngt.mccompat.ResourceLocation(domain, path);
     }
 
+    /**
+     * 本家 getResource(String): "domain:path" を分割 (既定 domain=minecraft)。
+     * スクリプトの自前 include (eval(NGTText.readText(INSTANCE.getResource(path)))) が
+     * 単一引数で呼ぶため必須。無いと TypeError で include が全滅し、依存スクリプト
+     * (render_function.js 等) が読まれず MCVersionChecker 未定義などに連鎖する。
+     */
+    public jp.ngt.mccompat.ResourceLocation getResource(String path) {
+        String domain = "minecraft";
+        if (path != null && path.contains(":")) {
+            String[] sa = path.split(":", 2);
+            domain = sa[0];
+            path = sa[1];
+        }
+        return getResource(domain, path);
+    }
+
     public String getScript(String path) {
         byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path);
         return bytes != null ? new String(bytes, java.nio.charset.StandardCharsets.UTF_8) : null;

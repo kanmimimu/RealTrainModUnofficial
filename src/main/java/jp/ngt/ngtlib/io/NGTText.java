@@ -16,11 +16,28 @@ public final class NGTText {
     }
 
     public static List<String> readText(Object resource) {
-        return new ArrayList<>();
+        return readTextLines(resource);
     }
 
+    /**
+     * パック内アセット (ResourceLocation / パス文字列) をテキストとして 1 行ずつ読む。
+     * スクリプトの自前 include (eval(append(readText(getResource(path)))) 等) が使う。
+     * 見つからなければ空リスト (パックアセット以外は読まないので安全)。
+     */
     public static List<String> readTextLines(Object resource) {
-        return new ArrayList<>();
+        List<String> lines = new ArrayList<>();
+        try (java.io.InputStream in = NGTFileLoader.getInputStream(resource)) {
+            if (in == null) {
+                return lines;
+            }
+            String text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            for (String line : text.split("\n", -1)) {
+                lines.add(line);
+            }
+        } catch (Exception ignored) {
+            //読めない場合は空 (呼び出し側は include をスキップして続行)
+        }
+        return lines;
     }
 
     public static String loadText(Object resource) {

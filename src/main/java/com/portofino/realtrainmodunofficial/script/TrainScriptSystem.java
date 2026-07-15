@@ -143,8 +143,12 @@ public class TrainScriptSystem {
         // 空 ArrayList を返すと sound_includeSoundLib の eval が no-op になり、
         // onUpdate が再定義されないまま onUpdate(su) を再帰呼出して StackOverflow する。
         // dummy の onUpdate/onUpdate2 定義を1要素入れて、eval で no-op 化させる。
-        "  readText: function(r) { var l = new java.util.ArrayList(); l.add('function onUpdate(su) {} function onUpdate2(su) {} function tick(e) {} function update(e,pt) {}'); return l; },\n" +
-        "  readTextLines: function(r) { return []; },\n" +
+        // include されるパックスクリプト (render_function.js 等) を実際に読む。
+        // r は getResource(...) の戻り値: 実 RL / {path,func_110623_a} / 文字列。
+        // 読めなければ空 onUpdate 等のダミーを返す (sound lib の StackOverflow 対策)。
+        "  __path: function(r) { try { if (r == null) return null; if (typeof r === 'string') return r; if (typeof r.func_110623_a === 'function') return r.func_110623_a(); if (r.path != null) return '' + r.path; if (r.domain != null) return '' + r.domain; } catch (e) {} return null; },\n" +
+        "  readText: function(r) { try { var p = this.__path(r); if (p) { var ls = Packages.jp.ngt.ngtlib.io.NGTFileLoader.readAssetLines(p); if (ls && ls.size() > 0) return ls; } } catch (e) {} var l = new java.util.ArrayList(); l.add('function onUpdate(su) {} function onUpdate2(su) {} function tick(e) {} function update(e,pt) {}'); return l; },\n" +
+        "  readTextLines: function(r) { try { var p = this.__path(r); if (p) return Packages.jp.ngt.ngtlib.io.NGTFileLoader.readAssetLines(p); } catch (e) {} return []; },\n" +
         "  writeText: function() {},\n" +
         "  loadText: function() { return ''; },\n" +
         "  createText: function() { return ''; },\n" +
@@ -173,7 +177,7 @@ public class TrainScriptSystem {
         "try { if (typeof NGTRenderer === 'undefined') NGTRenderer = Java.type('jp.ngt.ngtlib.renderer.NGTRenderer'); } catch (e) {}\n" +
         "try { if (typeof GLHelper === 'undefined') GLHelper = Java.type('jp.ngt.ngtlib.renderer.GLHelper'); } catch (e) {}\n" +
         // ModelPackManager: スクリプトの sound lib include で頻出するので空 stub
-        "if (typeof ModelPackManager === 'undefined') ModelPackManager = { INSTANCE: { getResource: function() { return null; }, getModel: function() { return null; } } };\n" +
+        "if (typeof ModelPackManager === 'undefined') ModelPackManager = { INSTANCE: { getResource: function(a, b) { var d, p; if (b === undefined || b === null) { d = 'minecraft'; p = a; } else { d = a; p = b; } return { domain: d, path: p, func_110624_b: function() { return d; }, func_110623_a: function() { return p; }, getResourceDomain: function() { return d; }, getResourcePath: function() { return p; } }; }, getModel: function() { return null; } } };\n" +
         // MCTE (ミニチュア) — NGTO Builder 系がロード時に参照する。レガシー環境 (モデル
         // 選択画面のプレビュー等) では実体不要 — 未定義エラーでスクリプト全体が死ぬのを防ぐ。
         "if (typeof MCTE === 'undefined') MCTE = { itemMiniature: null };\n" +
@@ -860,7 +864,9 @@ public class TrainScriptSystem {
                 ""+
                 "var VecAccuracy = { LOW: 0, MEDIUM: 1, HIGH: 2 };\n" +
                 "var ModelLoader = { loadModel: function(resource, accuracy, options) { return { renderAll: function() {}, renderOnly: function() {}, renderPart: function() {}, objects: [] }; } };\n" +
-                "var ModelPackManager = { INSTANCE: { getResource: function(domain, path) { return { domain: domain, path: path, func_110624_b: function() { return domain; }, func_110623_a: function() { return path; } }; } } };\n" +
+                // getResource(path) の 1 引数呼び出し (パックの include で頻出) に対応。
+                // 2 引数なら (domain,path)、1 引数なら path とみなし domain=minecraft。
+                "var ModelPackManager = { INSTANCE: { getResource: function(a, b) { var d, p; if (b === undefined || b === null) { d = 'minecraft'; p = a; } else { d = a; p = b; } return { domain: d, path: p, func_110624_b: function() { return d; }, func_110623_a: function() { return p; }, getResourceDomain: function() { return d; }, getResourcePath: function() { return p; } }; }, getModel: function() { return null; } } };\n" +
                 "var TrainState = { getStateType: function(value) { return value; }, suggestState: function(value, fallback) { return value == null ? fallback : value; } };\n" +
                 "TrainState.TrainStateType = { Reverser: 0, Notch: 1, Rail: 2, Door: 4, Light: 5, Pantograph: 6, Speed: 7, Destination: 8, Sound: 9, Interior: 11 };\n" +
                 "var RenderPass = {\n" +
@@ -5214,11 +5220,64 @@ public class TrainScriptSystem {
      * readText は本来テキストファイル内容を List<String> で返す。
      */
     public static final class NGTTextCompat {
+        /**
+         * パックの自前 include (eval(append(NGTText.readText(getResource(path))))) が呼ぶ。
+         * 従来は無条件で空を返していたため、render_function.js 等を include する車両
+         * (500系など) で MCVersionChecker 等が未定義になり描画スクリプトが丸ごと死んでいた。
+         * resource から実パスを取り出し、パックアセットを実際に読む。
+         * 見つからないときだけ、sound lib include の StackOverflow 対策ダミーを返す。
+         */
         public java.util.List<String> readText(Object resource) {
-            return new java.util.ArrayList<>();
+            String path = extractResourcePath(resource);
+            if (path != null && !path.isBlank()) {
+                java.util.List<String> lines = jp.ngt.ngtlib.io.NGTFileLoader.readAssetLines(path);
+                if (!lines.isEmpty()) {
+                    return lines;
+                }
+            }
+            //読めない場合: 空 ArrayList だと sound lib の onUpdate 再帰で StackOverflow するため
+            //空の onUpdate/onUpdate2/tick/update を定義するダミー行を1つ返す (従来 JS シム互換)。
+            java.util.List<String> dummy = new java.util.ArrayList<>();
+            dummy.add("function onUpdate(su) {} function onUpdate2(su) {} function tick(e) {} function update(e,pt) {}");
+            return dummy;
         }
         public String[] readTextLines(Object resource) {
-            return new String[0];
+            String path = extractResourcePath(resource);
+            if (path == null || path.isBlank()) {
+                return new String[0];
+            }
+            return jp.ngt.ngtlib.io.NGTFileLoader.readAssetLines(path).toArray(new String[0]);
+        }
+        /**
+         * getResource(...) の戻り値からアセットパスを取り出す。
+         * 実 ResourceLocation / JS オブジェクト ({path,func_110623_a}) / 文字列 に対応。
+         */
+        private static String extractResourcePath(Object resource) {
+            if (resource == null) {
+                return null;
+            }
+            if (resource instanceof jp.ngt.mccompat.ResourceLocation rl) {
+                return rl.func_110623_a();
+            }
+            if (resource instanceof CharSequence) {
+                String s = resource.toString();
+                int i = s.indexOf(':');
+                //"domain:path" は path 部だけ (単純パスはそのまま)
+                return i > 0 && i < s.length() - 1 && !s.contains("/") ? s.substring(i + 1) : s;
+            }
+            //Nashorn の JS オブジェクトは javax.script.Bindings (Map) 実装
+            if (resource instanceof javax.script.Bindings b) {
+                Object p = b.get("path");
+                if (p != null && !String.valueOf(p).equals("undefined")) {
+                    return String.valueOf(p);
+                }
+                //1引数 getResource の取り違え対策: path が無ければ domain 側を見る
+                Object d = b.get("domain");
+                if (d != null && !String.valueOf(d).equals("undefined")) {
+                    return String.valueOf(d);
+                }
+            }
+            return null;
         }
         public void writeText(Object a) {}
         public String loadText(Object a) { return ""; }

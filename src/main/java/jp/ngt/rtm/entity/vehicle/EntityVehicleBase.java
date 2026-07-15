@@ -334,9 +334,31 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
     /**
      * 本家 updatePosAndRotationClient の忠実移植 (クライアント補間)。
-     * 回転: float 同期値 (DATA_YAW/PITCH/ROLL) を毎 tick そのまま採用し、
-     * フレーム間は yRotO との描画補間で滑らかにする (バニラと同じ方式)。
-     * 漸近補間 (t=1/3) は回転がワンテンポ遅れて見えるため廃止。
+     * <p>
+     * 位置・回転 (ヨー/ピッチ/ロール) を<b>どちらも同じ 1/inc で漸近補間</b>する。
+     * inc (= {@link #vehiclePosRotationInc}) は移動パケットの steps (バニラ既定 3)。
+     * 走行中は毎 tick リセットされるので実質 EMA (α=1/3, 約 2tick 遅れ) として働き、
+     * 停車 (パケットが止まる) と inc が 3→2→1 と減って 1/inc→1/1 でターゲットへ
+     * 残差なく収束するため、止まった車体が僅かに傾いたまま残ることもない。
+     * <p>
+     * <b>なぜ回転も補間するか (このバグの修正点)。</b>
+     * 以前は回転だけ「同期 float 値へ毎 tick 直接代入」していた。位置は約 2tick 遅れの
+     * 補間・回転は遅れ 0、という<b>非対称</b>が次を招いていた:
+     * <ul>
+     *   <li>車体: 補間で遅れた位置に最新の向きが載るため、カーブで車体が線路に対して
+     *       ねじれて見えた (位置と向きの基準時刻がずれる)。</li>
+     *   <li>統合サーバでもサーバ/クライアントは別スレッドで、移動パケットは 1tick あたり
+     *       0/1/2 個とばらつく。直接代入だとその揺らぎが車体ヨーにそのまま乗り、描画補間は
+     *       1tick ぶんしか均さないので周期的にガクついた。</li>
+     *   <li>{@link #rotateRiders()} は車体の毎 tick ヨー/ピッチ差分を乗客カメラへ渡すため、
+     *       その揺らぎが視点の揺れ (カーブでの視界揺れ) になっていた。</li>
+     * </ul>
+     * 位置と同じ補間へ戻すと、車体の位置と向きの遅れが揃って線路上で一貫し、パケットの
+     * 揺らぎは位置と同様に均される。rotateRiders も補間後の滑らかな差分を読むのでカメラも
+     * 滑らかになる ({@code EntityBogie.updatePosAndRotationClient} と同一方式)。
+     * <p>
+     * 「回転がワンテンポ遅れる」件は<b>回転だけが位置と無関係に遅れた</b>場合の話。ここでは
+     * 位置・回転・台車がいずれも同じ ~2tick 遅れになるため、車体基準では遅れは知覚されない。
      */
     protected void updatePosAndRotationClient() {
         if (!this.clientRotInit) {
@@ -352,13 +374,15 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
             double x = this.getX() + (this.vehicleX - this.getX()) * d0;
             double y = this.getY() + (this.vehicleY - this.getY()) * d0;
             double z = this.getZ() + (this.vehicleZ - this.getZ()) * d0;
+            //回転も位置と同じ 1/inc で補間。ヨーはラップ跨ぎ (179→-179 等) で逆回りしないよう
+            //wrapDegrees で現在値の近傍へ展開してから寄せる。
+            float yaw = this.getYRot() + Mth.wrapDegrees(this.vehicleYaw - this.getYRot()) * d0;
+            float pitch = this.getXRot() + (this.vehiclePitch - this.getXRot()) * d0;
+            this.rotationRoll += (this.vehicleRoll - this.rotationRoll) * d0;
             --this.vehiclePosRotationInc;
             this.setPos(x, y, z);
+            this.setRot(yaw, pitch);
         }
-        //ラップ跨ぎ (179→-179 等) でフレーム補間が逆回りしないよう、現在値の近傍へ展開
-        float yaw = this.getYRot() + Mth.wrapDegrees(this.vehicleYaw - this.getYRot());
-        this.setRot(yaw, this.vehiclePitch);
-        this.rotationRoll = this.vehicleRoll;
     }
 
     protected void onVehicleUpdate() {

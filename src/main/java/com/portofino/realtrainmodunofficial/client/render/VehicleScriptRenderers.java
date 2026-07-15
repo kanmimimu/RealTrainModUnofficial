@@ -169,12 +169,19 @@ public final class VehicleScriptRenderers {
         //安全網。静止車両でもこの間隔で必ず描き直す。10 フレーム = 約 6Hz でリフレッシュ。
         private static final int CACHE_REFRESH_FRAMES = 10;
 
+        //状態が変わった直後 (方向転換・ドア操作等) は、スクリプトが pass==1 で進める時間依存
+        //アニメ (座席回転・ドア開閉。本パックは 5000ms) がこの間かけて進む。その間はキャッシュ
+        //せず毎フレーム描いて滑らかにアニメさせる。5000ms のアニメに余裕を持たせて 6000ms。
+        private static final long ANIMATION_GRACE_MS = 6000L;
+
         /** 1 車両ぶんのキャッシュ。 */
         private static final class EntityCache {
             boolean valid;
             boolean drew;
             long sig;
             int framesSinceRun;
+            //この時刻 (currentTimeMillis) までは毎フレーム描く (アニメ進行中とみなす)。
+            long animUntilMs;
             final List<CachedPass> passes = new ArrayList<>();
         }
 
@@ -213,8 +220,17 @@ public final class VehicleScriptRenderers {
 
             EntityCache ec = this.entityCaches.computeIfAbsent(entity, k -> new EntityCache());
             long sig = signature(entity);
-            //キャッシュヒット: 記録済みパスを再生するだけ (Nashorn 実行なし)。
-            if (ec.valid && ec.sig == sig && ec.framesSinceRun < CACHE_REFRESH_FRAMES) {
+            long now = System.currentTimeMillis();
+            //シグネチャ変化 (方向転換・ドア操作・初出現) = スクリプトの時間依存アニメが始まる
+            //合図。ここから ANIMATION_GRACE_MS の間は毎フレーム描いてアニメを進める
+            //(座席回転・ドア開閉は pass==1 で時計が進むため、毎フレームの Nashorn 実行が必須)。
+            if (!ec.valid || ec.sig != sig) {
+                ec.animUntilMs = now + ANIMATION_GRACE_MS;
+            }
+            boolean animating = now < ec.animUntilMs;
+
+            //キャッシュヒット: 記録済みパスを再生するだけ (Nashorn 実行なし)。アニメ中は不可。
+            if (!animating && ec.valid && ec.sig == sig && ec.framesSinceRun < CACHE_REFRESH_FRAMES) {
                 ec.framesSinceRun++;
                 if (!ec.drew) {
                     return false;
@@ -226,7 +242,7 @@ public final class VehicleScriptRenderers {
                 return true;
             }
 
-            //ミス: 実際に描画しつつ、各パスの記録を集めてキャッシュに保存。
+            //ミス or アニメ中: 実際に描画しつつ、各パスの記録を集めてキャッシュに保存。
             List<CachedPass> sink = new ArrayList<>();
             boolean drew = renderReal(entity, partialTick, poseStack, buffer, packedLight, packedOverlay, bodyModel, sink);
             ec.valid = true;
@@ -263,6 +279,13 @@ public final class VehicleScriptRenderers {
                 //excluded はエンティティ内部のライブ集合なので、キャッシュにはスナップショットを残す。
                 sink.add(new CachedPass(normal, RenderPass.NORMAL.id, excluded == null ? null : Set.copyOf(excluded)));
             }
+            //★半透明パス (TRANSPARENT=1) をスクリプトに実行させる。本家 RenderVehicleBase は
+            //  毎フレーム全パスを回すが、RTMU は従来これを飛ばしていた。座席回転・ドア開閉・
+            //  ドアライトのアニメ時計はスクリプト内で「if(pass==1){ setDouble(GetSystemTime()) }」と
+            //  pass==1 のときだけ進むため、pass 1 が来ないと時計が永久に止まり、座席が中途半端な
+            //  角度・ドアが開いたまま固定される。ここで実行して時計を進める。ジオメトリは通常パス
+            //  (pass 0) と重複するので replay しない (記録=時計進行の副作用だけ使い、二重描画を避ける)。
+            record(entity, RenderPass.TRANSPARENT.id, partialTick);
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
                     bodyModel, graph, sink);
             return true;

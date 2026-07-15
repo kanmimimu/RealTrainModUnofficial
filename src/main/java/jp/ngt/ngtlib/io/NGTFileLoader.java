@@ -93,6 +93,25 @@ public final class NGTFileLoader {
     }
 
     /**
+     * パックアセットをテキスト行として読む安定 API (単一引数・オーバーロード無し)。
+     * スクリプトの自前 include (eval(append(NGTText.readText(getResource(path)))) ) は
+     * 最終的にここへ来る。見つからなければ空リスト。
+     * <p>Nashorn の Java オーバーロード解決が不安定なので、あえて 1 引数 String 固定。
+     */
+    public static List<String> readAssetLines(String path) {
+        List<String> lines = new ArrayList<>();
+        byte[] bytes = findAsset(path);
+        if (bytes == null) {
+            return lines;
+        }
+        String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        for (String line : text.split("\n", -1)) {
+            lines.add(line);
+        }
+        return lines;
+    }
+
+    /**
      * パック内画像を動的テクスチャとして登録し RL を返す (NGTUtilClient.bindTexture 用)。
      */
     public static net.minecraft.resources.ResourceLocation resolvePackTexture(String path) {
