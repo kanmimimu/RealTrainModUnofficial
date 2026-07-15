@@ -366,8 +366,9 @@ public final class LegacyScriptSoundManager {
         if (soundName == null || soundName.isBlank()) {
             return null;
         }
-        String resolvedNamespace = namespace == null || namespace.isBlank() ? "minecraft" : namespace.toLowerCase(java.util.Locale.ROOT);
-        String resolvedPath = soundName.trim().replace('\\', '/').toLowerCase(java.util.Locale.ROOT);
+        //生成側 (ExternalSoundPackBridge) と同じ規則で空白・大文字を安全化してから ResourceLocation 化する。
+        String resolvedNamespace = namespace == null || namespace.isBlank() ? "minecraft" : ExternalSoundPackBridge.sanitizeSoundPath(namespace);
+        String resolvedPath = ExternalSoundPackBridge.sanitizeSoundPath(soundName.trim().replace('\\', '/'));
         if (resolvedPath.startsWith("sounds/")) {
             resolvedPath = resolvedPath.substring("sounds/".length());
         }

@@ -250,6 +250,9 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction.id, (byte) value);
             case "set_destination" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id, (byte) value);
+            //RTMU 追加: 種別幕の選択 (方向幕とは独立した State_Type)
+            case "set_type" -> train.setTrainStateData(
+                    jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Type.id, (byte) value);
             case "set_announcement" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Announcement.id, (byte) value);
             //車内放送: 選択中のアナウンス (TrainState の Announcement が本家のインデックス) を鳴らす。

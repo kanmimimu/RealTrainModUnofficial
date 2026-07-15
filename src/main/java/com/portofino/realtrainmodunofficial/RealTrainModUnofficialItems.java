@@ -79,6 +79,9 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> SIGNBOARD_ITEM = ITEMS.register(
         "signboard", () -> new InstalledObjectItem(InstalledObjectCategory.SIGNBOARD)
     );
+    public static final DeferredItem<InstalledObjectItem> PIPE_ITEM = ITEMS.register(
+        "pipe", () -> new InstalledObjectItem(InstalledObjectCategory.PIPE)
+    );
     public static final DeferredItem<InstalledObjectItem> INSULATOR_ITEM = ITEMS.register(
         "insulator", () -> new InstalledObjectItem(InstalledObjectCategory.INSULATOR)
     );

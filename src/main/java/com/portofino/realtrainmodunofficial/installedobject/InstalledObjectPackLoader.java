@@ -584,10 +584,21 @@ public final class InstalledObjectPackLoader {
             if (ornamentType.equals("pole") || containsAny(lowerFile, "pole", "架線柱")) {
                 return InstalledObjectCategory.OVERHEAD_LINE_POLE;
             }
+            //本家 ModelOrnament_Pipe01 / Pipe01_Connectable (ornamentType="Pipe")
+            if (ornamentType.equals("pipe") || containsAny(lowerFile, "pipe", "パイプ")) {
+                return InstalledObjectCategory.PIPE;
+            }
             return null;
         }
         // 踏切は改札より先に判定する(CrossingGate を "gate" で改札に誤分類しないため)。
+        // 本家 RTM は machineType="Gate" (RTMResource.MACHINE_GATE = MACHINE.getSubType("Gate"),
+        // 既定 "CrossingGate01L") をすべて踏切カテゴリに入れる。名前やファイル名に "crossing" を
+        // 含まない踏切系設置物 (hi03 Train Melodies の ModelMachine_hi03ECDM-* など、machineType が
+        // 素の "Gate" でメロディ音を鳴らす音響ブロック) が、キーワード判定を素通りして modelmachine_
+        // フォールバックの LIGHT に落ち、踏切の選択画面に出てこなくなっていた。machineType の完全一致で
+        // 拾えば本家と同じく踏切に並ぶ。改札(Turnstile)や券売機は machineType が別なので誤取り込みしない。
         if (lowerFile.startsWith("modelcrossing_") || looksLikeCrossing
+                || machineType.equals("gate")
                 || containsAny(hay, "crossing", "fumikiri", "踏切", "toryanse")) {
             return InstalledObjectCategory.CROSSING;
         }

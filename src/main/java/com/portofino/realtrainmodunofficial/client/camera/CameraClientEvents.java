@@ -41,6 +41,8 @@ public final class CameraClientEvents {
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
+        //方向幕/種別幕のアニメーション GIF のフレーム送り (毎 tick)
+        com.portofino.realtrainmodunofficial.client.model.GifTextures.tick();
         //カメラを持っていない / 死んだ / ワールドを出た → 自動で閉じる
         RtmCamera cam = RtmCamera.INSTANCE;
         if (cam.isActive() && (mc.level == null || mc.player == null || !holdingCamera(mc))) {

@@ -210,7 +210,9 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         //ブロックと同じくグリッドに揃えて置くだけ。RenderConnectablePole.js が隣の柱を見て
         //partXP / partXN / partZP / partZN を<b>ワールド軸で</b>出し分けるため、少しでも回すと
         //腕の向きが実際の接続方向とずれる。よって斜め置きも壁挿しもさせない。
-        boolean gridAligned = category == InstalledObjectCategory.OVERHEAD_LINE_POLE;
+        //パイプも RenderConnectablePipe.js が隣接パイプをワールド軸で見て腕を出すので、回さずグリッドに揃える。
+        boolean gridAligned = category == InstalledObjectCategory.OVERHEAD_LINE_POLE
+                || category == InstalledObjectCategory.PIPE;
         //列車検知器と車止め: 本家 ItemInstalledObject.setEntityOnRail 準拠で、クリックしたレールの
         //曲線上に載せる (位置・向き・勾配・カント)。汎用の壁挿し/逆さ設置には乗せない。
         boolean railMounted = category == InstalledObjectCategory.TRAIN_DETECTOR
@@ -258,6 +260,12 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
                         //本家 ItemInstalledObject: direction = 設置したプレイヤーの向き (0-3)。
                         blockEntity.setSignDirection(signDirectionOf(player.getYRot()));
                     }
+                } else if (category == InstalledObjectCategory.PIPE) {
+                    //パイプ: クリック面 (0-5) を保存する。RenderPipe.js は getAttachedSide() の軸に
+                    //真っ直ぐ描き、RenderConnectablePipe.js はその面へ向かう腕を出す。モデルはワールド軸で
+                    //描くのでモデル自体は回さない (gridAligned で placeYaw=0)。
+                    blockEntity.setMountFace(clickedFace.ordinal());
+                    blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
                 } else if (category == InstalledObjectCategory.SIGNAL) {
                     // 当たり判定はそのままで、見た目だけ「クリックした柱」の中へ押し込む。
                     // 本家は信号が柱ブロックを置き換えてそこに描くため、横面設置のみ押し込む。

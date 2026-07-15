@@ -188,6 +188,7 @@ public final class ClientItemHelper {
             case LIGHT -> "screen.realtrainmodunofficial.select_light";
             case SIGNBOARD -> "screen.realtrainmodunofficial.select_signboard";
             case INSULATOR -> "screen.realtrainmodunofficial.select_insulator";
+            case PIPE -> "screen.realtrainmodunofficial.select_pipe";
             case OVERHEAD_LINE_POLE -> "screen.realtrainmodunofficial.select_overhead_line_pole";
             case WIRE -> "screen.realtrainmodunofficial.select_wire";
             case SIGNAL -> "screen.realtrainmodunofficial.select_signal";

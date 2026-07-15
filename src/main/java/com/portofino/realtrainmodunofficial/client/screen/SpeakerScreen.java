@@ -18,29 +18,34 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * スピーカー設定GUI。
+ * スピーカー設定GUI（本家 RTM GuiSpeaker 風のスロット選択方式）。
  * <ul>
- *   <li>可聴範囲(ブロック)を設定。</li>
- *   <li>レッドストーン信号強度(1〜15)ごとに鳴らす音(サウンドイベントID)を割り当て。</li>
- *   <li>音名は検索ボックスで候補を絞り込み、クリックで入力欄へ（同時に試聴）。</li>
+ *   <li>左: レッドストーン信号強度 1〜15 のスロット一覧（縦スクロール可）。各行に「select」ボタン。</li>
+ *   <li>select を押すと右にサウンド一覧（検索付き・スクロール可）が出て、クリックでそのスロットに割り当てる。</li>
+ *   <li>上に可聴範囲(ブロック)。</li>
  * </ul>
- * 本家 RTM の「信号強度で音IDを選ぶ」方式を踏襲（MC のレッドストーンは 0-15。
- * レバー/レッドストーンブロックは強度15なので、割り当ては必ず入力する信号強度に合わせること）。
+ * バックエンド（ConfigureSpeakerPayload / InstalledObjectBlockEntity の per-block 音・範囲）は従来通り。
  */
 public class SpeakerScreen extends Screen {
-    private static final int MAX_CANDIDATES = 6;
-    private static final int BOX_W = 220;
-    private static final int ROW_H = 16;
+    private static final int SLOT_COUNT = 15;
+    private static final int SLOT_ROW_H = 16;
+    private static final int SOUND_ROW_H = 14;
 
     private final BlockPos pos;
     private EditBox rangeBox;
-    private EditBox slotBox;
-    private EditBox soundBox;
     private EditBox searchBox;
     private int speakerRange = 32;
-    private int listTop;
-    private int leftX;
-    private final List<Button> candidateButtons = new ArrayList<>();
+
+    private int selectedSlot = -1;           // select 中のスロット (信号強度)。-1 = 未選択
+    private int slotScroll = 0;              // スロット一覧のスクロール位置
+    private int soundScroll = 0;             // サウンド一覧のスクロール位置
+
+    private int slotTop, slotRowsVisible, slotLabelX, slotSelectX, slotSelectW;
+    private int soundListX, soundListTop, soundListRows, soundListW;
+
+    private final List<Button> slotSelectButtons = new ArrayList<>();
+    private final List<ResourceLocation> filteredSounds = new ArrayList<>();
+    private final List<Button> soundButtons = new ArrayList<>();
 
     public SpeakerScreen(BlockPos pos) {
         super(Component.literal("スピーカー設定"));
@@ -50,44 +55,43 @@ public class SpeakerScreen extends Screen {
     @Override
     protected void init() {
         readState();
-        leftX = (width - BOX_W) / 2;
-        int x = leftX;
-        // 画面上端から絶対配置にして、GUIスケールが大きくても見切れないようにする。
-        int y = 22;
 
-        rangeBox = new EditBox(font, x, y, 120, 18, Component.literal("可聴範囲(ブロック)"));
+        int margin = 12;
+        int top = 24;
+
+        // 可聴範囲 (上部)
+        rangeBox = new EditBox(font, margin, top, 70, 18, Component.literal("可聴範囲(ブロック)"));
         rangeBox.setMaxLength(4);
         rangeBox.setValue(Integer.toString(speakerRange));
         addRenderableWidget(rangeBox);
         addRenderableWidget(Button.builder(Component.literal("範囲を設定"), b -> submitRange())
-            .bounds(x + 124, y, BOX_W - 124, 18).build());
+            .bounds(margin + 74, top, 96, 18).build());
 
-        int y2 = y + 28;
-        slotBox = new EditBox(font, x, y2, 50, 18, Component.literal("信号強度(1-15)"));
-        slotBox.setMaxLength(2);
-        slotBox.setValue("15");
-        addRenderableWidget(slotBox);
+        // 左: スロット一覧レイアウト (縦スクロール可)
+        slotTop = top + 28;
+        int slotLabelW = 150;
+        slotLabelX = margin;
+        slotSelectX = margin + slotLabelW;
+        slotSelectW = 54;
+        int bottomLimit = height - 30;                     // 完了ボタンの上まで
+        slotRowsVisible = Math.max(1, Math.min(SLOT_COUNT, (bottomLimit - slotTop) / SLOT_ROW_H));
 
-        soundBox = new EditBox(font, x + 56, y2, BOX_W - 56, 18, Component.literal("サウンドID"));
-        soundBox.setMaxLength(128);
-        addRenderableWidget(soundBox);
-
-        addRenderableWidget(Button.builder(Component.literal("この信号レベルに割当"), b -> submitSound())
-            .bounds(x, y2 + 20, BOX_W, 18).build());
-
-        int y3 = y2 + 44;
-        searchBox = new EditBox(font, x, y3, BOX_W, 18, Component.literal("音を検索"));
+        // 右: サウンド一覧レイアウト
+        soundListX = slotSelectX + slotSelectW + 16;
+        soundListW = Math.max(140, width - soundListX - margin);
+        searchBox = new EditBox(font, soundListX, top, Math.min(soundListW, 220), 18, Component.literal("音を検索"));
         searchBox.setMaxLength(64);
-        searchBox.setResponder(s -> rebuildCandidates());
+        searchBox.setResponder(s -> { soundScroll = 0; rebuildSoundList(); });
         addRenderableWidget(searchBox);
+        soundListTop = top + 24;
+        soundListRows = Math.max(4, (bottomLimit - soundListTop) / SOUND_ROW_H);
 
-        listTop = y3 + 22;
-
-        // Done は画面下端に固定 → 必ず押せる。
+        // 完了
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), b -> onClose())
-            .bounds(width / 2 - 50, height - 26, 100, 20).build());
+            .bounds(margin, height - 26, 100, 20).build());
 
-        rebuildCandidates();
+        rebuildSlots();
+        rebuildSoundList();
     }
 
     private void readState() {
@@ -97,73 +101,130 @@ public class SpeakerScreen extends Screen {
         }
     }
 
-    /** 検索語にマッチするサウンドイベントID候補を最大 MAX_CANDIDATES 個ボタン表示する。 */
-    private void rebuildCandidates() {
-        for (Button b : candidateButtons) {
+    private int maxSlotScroll() {
+        return Math.max(0, SLOT_COUNT - slotRowsVisible);
+    }
+
+    /** 表示中のスロット窓だけ select ボタンを作る (縦スクロール分だけずらす)。 */
+    private void rebuildSlots() {
+        for (Button b : slotSelectButtons) {
             removeWidget(b);
         }
-        candidateButtons.clear();
+        slotSelectButtons.clear();
+        slotScroll = Math.max(0, Math.min(maxSlotScroll(), slotScroll));
+        for (int row = 0; row < slotRowsVisible; row++) {
+            final int level = slotScroll + row + 1;   // 1..15
+            if (level > SLOT_COUNT) {
+                break;
+            }
+            int y = slotTop + row * SLOT_ROW_H;
+            Button sel = Button.builder(Component.literal("select"), b -> selectSlot(level))
+                .bounds(slotSelectX, y, slotSelectW, SLOT_ROW_H - 2).build();
+            addRenderableWidget(sel);
+            slotSelectButtons.add(sel);
+        }
+    }
 
+    private void selectSlot(int level) {
+        selectedSlot = level;
+        soundScroll = 0;
+        rebuildSoundList();
+    }
+
+    /** 検索語でフィルタしたサウンド一覧を、選択スロットがあるときだけ表示する。 */
+    private void rebuildSoundList() {
+        for (Button b : soundButtons) {
+            removeWidget(b);
+        }
+        soundButtons.clear();
+        filteredSounds.clear();
+        if (selectedSlot < 0) {
+            return;
+        }
         Minecraft mc = Minecraft.getInstance();
         if (mc.getSoundManager() == null) {
             return;
         }
         String query = searchBox == null ? "" : searchBox.getValue().trim().toLowerCase(Locale.ROOT);
+        List<ResourceLocation> all = new ArrayList<>(mc.getSoundManager().getAvailableSounds());
+        all.sort((a, b) -> a.toString().compareTo(b.toString()));
+        for (ResourceLocation id : all) {
+            if (query.isEmpty() || id.toString().toLowerCase(Locale.ROOT).contains(query)) {
+                filteredSounds.add(id);
+            }
+        }
 
         int shown = 0;
-        for (ResourceLocation id : mc.getSoundManager().getAvailableSounds()) {
-            if (shown >= MAX_CANDIDATES) {
-                break;
-            }
-            String idStr = id.toString();
-            if (!query.isEmpty() && !idStr.toLowerCase(Locale.ROOT).contains(query)) {
-                continue;
-            }
-            final String chosen = idStr;
-            Button b = Button.builder(Component.literal(idStr), btn -> {
-                    soundBox.setValue(chosen);
-                    // クリックで音名を割り当てるだけ。自動試聴はしない
-                    // (ユーザー報告「割り当てた瞬間に音が流れる」対策。再生はレッドストーン信号で行う)。
-                })
-                .bounds(leftX, listTop + shown * ROW_H, BOX_W, ROW_H - 1)
+        // 先頭に「（なし / 割り当て解除）」
+        Button clear = Button.builder(Component.literal("（なし / 解除）"), b -> assignSound(""))
+            .bounds(soundListX, soundListTop, soundListW, SOUND_ROW_H - 1).build();
+        addRenderableWidget(clear);
+        soundButtons.add(clear);
+        shown++;
+
+        soundScroll = Math.max(0, Math.min(Math.max(0, filteredSounds.size() - 1), soundScroll));
+        for (int i = soundScroll; i < filteredSounds.size() && shown < soundListRows; i++) {
+            final String chosen = filteredSounds.get(i).toString();
+            Button b = Button.builder(Component.literal(chosen), btn -> assignSound(chosen))
+                .bounds(soundListX, soundListTop + shown * SOUND_ROW_H, soundListW, SOUND_ROW_H - 1)
                 .build();
             addRenderableWidget(b);
-            candidateButtons.add(b);
+            soundButtons.add(b);
             shown++;
         }
+    }
+
+    private void assignSound(String sound) {
+        if (selectedSlot < 1 || selectedSlot > 15) {
+            return;
+        }
+        PacketDistributor.sendToServer(new ConfigureSpeakerPayload(pos, selectedSlot, sound, 0));
+        toast(sound.isEmpty()
+            ? ("信号強度 " + selectedSlot + " の割り当てを解除しました")
+            : ("信号強度 " + selectedSlot + " → " + sound));
+        selectedSlot = -1;
+        rebuildSoundList();
     }
 
     private void submitRange() {
         try {
             int range = Integer.parseInt(rangeBox.getValue().trim());
-            PacketDistributor.sendToServer(new ConfigureSpeakerPayload(pos, 0, "", Math.max(1, range)));
             speakerRange = Math.max(1, range);
-            toast("範囲を " + speakerRange + " に設定しました");
+            PacketDistributor.sendToServer(new ConfigureSpeakerPayload(pos, 0, "", speakerRange));
+            toast("可聴範囲を " + speakerRange + " ブロックに設定しました");
         } catch (NumberFormatException ignored) {
-            notifyNumber();
+            toast("数字で入力してください");
         }
     }
 
-    private void submitSound() {
-        try {
-            int slot = Integer.parseInt(slotBox.getValue().trim());
-            String sound = soundBox.getValue().trim();
-            if (slot < 1 || slot > 15) {
-                toast("信号強度は 1〜15 で入力してください");
-                return;
-            }
-            PacketDistributor.sendToServer(new ConfigureSpeakerPayload(pos, slot, sound, 0));
-            toast(sound.isEmpty()
-                ? ("信号強度 " + slot + " の割り当てを解除しました")
-                : ("信号強度 " + slot + " → " + sound + " を割り当てました"));
-            // 割当時の自動試聴は廃止(「割り当てた瞬間に音が流れる」対策)。再生はレッドストーン信号で行う。
-        } catch (NumberFormatException ignored) {
-            notifyNumber();
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int dir = -(int) Math.signum(scrollY);
+        // 右のサウンド一覧の上 → サウンドをスクロール
+        if (selectedSlot >= 0 && mouseX >= soundListX) {
+            int max = Math.max(0, filteredSounds.size() - 1);
+            soundScroll = Math.max(0, Math.min(max, soundScroll + dir));
+            rebuildSoundList();
+            return true;
         }
+        // 左のスロット一覧の上 → スロットをスクロール
+        if (mouseX < soundListX && maxSlotScroll() > 0) {
+            slotScroll = Math.max(0, Math.min(maxSlotScroll(), slotScroll + dir));
+            rebuildSlots();
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
-    private void notifyNumber() {
-        toast("数字で入力してください");
+    private String currentSound(int level) {
+        InstalledObjectBlockEntity be = speakerBe();
+        String s = be != null ? be.getSpeakerSound(level) : SpeakerSoundConfig.getSound(level);
+        return s == null ? "" : s;
+    }
+
+    private InstalledObjectBlockEntity speakerBe() {
+        return minecraft != null && minecraft.level != null
+            && minecraft.level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity b ? b : null;
     }
 
     private void toast(String msg) {
@@ -178,32 +239,31 @@ public class SpeakerScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(font, title, width / 2, 8, 0xFFFFFF);
 
-        // 現在の信号強度→音の割当を、候補リストの下に1行ずつコンパクト表示。
-        int py = listTop + MAX_CANDIDATES * ROW_H + 4;
-        graphics.drawString(font, Component.literal("現在の割当 (信号強度=音)"), leftX, py, 0xAAAAAA, false);
-        py += 11;
-        StringBuilder line = new StringBuilder();
-        int perLine = 0;
-        //本家準拠: このスピーカー固有の割当を優先表示 (未登録はグローバルへフォールバック)
-        InstalledObjectBlockEntity speakerBe =
-            minecraft != null && minecraft.level != null
-                && minecraft.level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity b ? b : null;
-        for (int i = 1; i <= 15; i++) {
-            String s = speakerBe != null ? speakerBe.getSpeakerSound(i) : SpeakerSoundConfig.getSound(i);
-            if (s == null || s.isBlank()) {
-                continue;
+        // 左: 表示中スロットの「N : 現在の音」ラベル
+        for (int row = 0; row < slotRowsVisible; row++) {
+            int level = slotScroll + row + 1;
+            if (level > SLOT_COUNT) {
+                break;
             }
-            String shortS = s.length() > 26 ? s.substring(0, 25) + "…" : s;
-            line.append(i).append("=").append(shortS).append("   ");
-            if (++perLine >= 1) {
-                graphics.drawString(font, Component.literal(line.toString()), leftX, py, 0x88FF88, false);
-                py += 10;
-                line.setLength(0);
-                perLine = 0;
-                if (py > height - 32) {
-                    break;
-                }
-            }
+            int y = slotTop + row * SLOT_ROW_H + 3;
+            String snd = currentSound(level);
+            String shown = snd.isEmpty() ? "null" : (snd.length() > 24 ? snd.substring(0, 23) + "…" : snd);
+            int color = (level == selectedSlot) ? 0xFFFF66 : (snd.isEmpty() ? 0x888888 : 0xFFFFFF);
+            graphics.drawString(font, Component.literal(level + " : " + shown), slotLabelX, y, color, false);
+        }
+        // スクロール可能なことを示す控えめな表示
+        if (maxSlotScroll() > 0) {
+            graphics.drawString(font, Component.literal("[" + (slotScroll + 1) + "-"
+                + Math.min(SLOT_COUNT, slotScroll + slotRowsVisible) + "/" + SLOT_COUNT + " ホイールで移動]"),
+                slotLabelX, slotTop - 11, 0xAAAAAA, false);
+        }
+        // 右: 見出し
+        if (selectedSlot >= 0) {
+            graphics.drawString(font, Component.literal("信号強度 " + selectedSlot + " に割り当てる音"),
+                soundListX, soundListTop - 11, 0xFFFF66, false);
+        } else {
+            graphics.drawString(font, Component.literal("← select で信号強度を選ぶ"),
+                soundListX, soundListTop, 0xAAAAAA, false);
         }
     }
 

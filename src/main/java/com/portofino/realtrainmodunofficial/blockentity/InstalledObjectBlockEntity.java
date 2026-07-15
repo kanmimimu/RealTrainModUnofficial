@@ -967,11 +967,32 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         }
     }
 
-    /** Whether this block is connected to a neighbor on the given RTM side (0–5). Always false stub. */
-    public boolean isConnected(int side) { return false; }
+    /**
+     * 指定方向 (RTM side 0-5) の隣に接続相手がいるか。
+     * RTM の side 番号 (0=下,1=上,2=北,3=南,4=西,5=東) は MC の {@link net.minecraft.core.Direction#from3DDataValue}
+     * と一致する。パイプは隣接パイプ同士で接続する (RenderConnectablePipe.js が partXP..partZN の腕を出す)。
+     */
+    public boolean isConnected(int side) {
+        if (level == null || side < 0 || side > 5 || getCategory() != InstalledObjectCategory.PIPE) {
+            return false;
+        }
+        net.minecraft.core.BlockPos neighbor = worldPosition.relative(net.minecraft.core.Direction.from3DDataValue(side));
+        return level.getBlockEntity(neighbor) instanceof InstalledObjectBlockEntity io
+            && io.getCategory() == InstalledObjectCategory.PIPE;
+    }
 
-    /** Side index this block is attached to (0=down,1=up,2-5=NSWE). Returns 1 (attached to ground). */
-    public int getAttachedSide() { return 1; }
+    /**
+     * このブロックが貼り付いている面 (0=下,1=上,2-5=NSWE)。
+     * パイプ: 設置時のクリック面 (mountFace)。RenderPipe.js はこの軸に真っ直ぐ描き
+     * (side 4/5=X, 0/1=Y, 2/3=Z、該当なしだと<b>何も描かない</b>)、RenderConnectablePipe.js は
+     * この面へ向かう腕を出す。未設定(-1)は縦置き(1)にフォールバック。それ以外の設置物は従来通り 1。
+     */
+    public int getAttachedSide() {
+        if (getCategory() == InstalledObjectCategory.PIPE) {
+            return mountFace >= 0 ? mountFace : 1;
+        }
+        return 1;
+    }
 
     /** Random decorative scale factor (used by RenderPalm etc.). */
     public float getRandomScale() { return 1.0F; }

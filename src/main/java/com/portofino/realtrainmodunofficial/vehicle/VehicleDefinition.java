@@ -447,6 +447,31 @@ public class VehicleDefinition {
         return rollsigns;
     }
 
+    // --- RTMU 追加: 種別幕 (方向幕/rollsign とは別レイヤー) ---
+    // 既存の巨大コンストラクタを崩さないよう、構築後に setTypeSign() で注入する
+    // (setWireAttachPos と同じ後付けパターン)。パネル定義は rollsign と同じ RollsignDefinition を流用。
+    private List<String> typeSignNames = List.of();
+    private String typeSignTexture = "";
+    private List<RollsignDefinition> typeSigns = List.of();
+
+    public void setTypeSign(List<String> names, String texture, List<RollsignDefinition> signs) {
+        this.typeSignNames = names == null ? List.of() : List.copyOf(names);
+        this.typeSignTexture = texture == null ? "" : texture;
+        this.typeSigns = signs == null ? List.of() : List.copyOf(signs);
+    }
+
+    public List<String> getTypeSignNames() {
+        return typeSignNames;
+    }
+
+    public String getTypeSignTexture() {
+        return typeSignTexture;
+    }
+
+    public List<RollsignDefinition> getTypeSigns() {
+        return typeSigns;
+    }
+
     public List<LightDefinition> getHeadLights() {
         return headLights;
     }

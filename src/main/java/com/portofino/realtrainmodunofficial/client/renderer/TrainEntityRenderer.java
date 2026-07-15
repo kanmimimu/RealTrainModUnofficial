@@ -30,6 +30,8 @@ import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
+import java.util.List;
+
 public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     private static ResourceLocation glowTexture;
 
@@ -403,16 +405,41 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
      */
     static void renderConfiguredRollsigns(int rawDestinationIndex, VehicleDefinition def, PoseStack poseStack,
                                           MultiBufferSource buffer, int packedLight) {
-        if (def == null || def.getRollsigns().isEmpty()) {
+        if (def == null) {
             return;
         }
-        String texturePath = def.getRollsignTexture();
+        renderSignPanels(rawDestinationIndex, def.getPackName(), def.getRollsignTexture(),
+                def.getRollsignNames(), def.getRollsigns(), poseStack, buffer, packedLight);
+    }
+
+    /**
+     * RTMU 追加: 種別幕 (方向幕と同じ仕組みで別テクスチャ・別インデックス State_Type)。
+     */
+    static void renderConfiguredTypeSigns(int rawTypeIndex, VehicleDefinition def, PoseStack poseStack,
+                                          MultiBufferSource buffer, int packedLight) {
+        if (def == null) {
+            return;
+        }
+        renderSignPanels(rawTypeIndex, def.getPackName(), def.getTypeSignTexture(),
+                def.getTypeSignNames(), def.getTypeSigns(), poseStack, buffer, packedLight);
+    }
+
+    /**
+     * uv+pos で定義された幕パネル群を、名前数で縦分割したテクスチャの index 番目の帯で描く。
+     * 方向幕 (rollsigns) と種別幕 (typeSigns) の共通処理。
+     */
+    private static void renderSignPanels(int rawIndex, String packName, String texturePath,
+                                         List<String> names, List<VehicleDefinition.RollsignDefinition> panels,
+                                         PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
+        if (panels == null || panels.isEmpty()) {
+            return;
+        }
         if (texturePath == null || texturePath.isBlank()) {
             return;
         }
-        ResourceLocation texture = MqoModelLoader.resolvePackTexture(def.getPackName(), texturePath);
-        int count = Math.max(1, def.getRollsignNames().isEmpty() ? 1 : def.getRollsignNames().size());
-        int destinationIndex = Math.floorMod(rawDestinationIndex, count);
+        ResourceLocation texture = MqoModelLoader.resolvePackTexture(packName, texturePath);
+        int count = Math.max(1, names == null || names.isEmpty() ? 1 : names.size());
+        int destinationIndex = Math.floorMod(rawIndex, count);
         float segmentV0 = destinationIndex / (float) count;
         float segmentV1 = (destinationIndex + 1.0F) / (float) count;
         VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
@@ -420,7 +447,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         Matrix4f mat = pose.pose();
         Matrix3f normalMatrix = pose.normal();
 
-        for (VehicleDefinition.RollsignDefinition rollsign : def.getRollsigns()) {
+        for (VehicleDefinition.RollsignDefinition rollsign : panels) {
             float[] uv = rollsign.uv();
             if (uv == null || uv.length < 4) {
                 continue;

@@ -48,6 +48,7 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.LIGHT_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.SIGNBOARD_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.INSULATOR_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.PIPE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TRAIN_DETECTOR_ITEM.get());
                 //架線柱: 本家モデル (LinePole01/02/Frame01/SignalPole01) を同梱したので再追加。

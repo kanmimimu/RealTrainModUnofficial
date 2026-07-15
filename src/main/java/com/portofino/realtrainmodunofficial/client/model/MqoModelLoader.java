@@ -373,6 +373,17 @@ public final class MqoModelLoader {
         if (packPath == null) {
             return fallbackTexture();
         }
+        //RTMU 追加: アニメーション GIF を方向幕/種別幕などに直接使えるようにする。
+        //拡張子 .gif は ImageIO でフレーム分解し、毎 tick 貼り替わる DynamicTexture を返す。
+        if (texturePath.toLowerCase(Locale.ROOT).endsWith(".gif")) {
+            final String gifRel = texturePath;
+            ResourceLocation gif = GifTextures.resolve(packPath + "|gif|" + gifRel,
+                    () -> openTexture(packPath, gifRel));
+            if (gif != null) {
+                return gif;
+            }
+            //デコード失敗時のみ下の静止経路へフォールバック
+        }
         TextureBinding binding = TextureBinding.parse(texturePath);
         String cacheKey = packPath + "|" + binding.cacheKey();
         TextureInfo info = TEXTURE_INFO_CACHE.computeIfAbsent(cacheKey, key -> registerTextureFromZip(binding, new TextureOpener() {
@@ -914,7 +925,12 @@ public final class MqoModelLoader {
                 String[] p = line.split("\\s+");
                 if (p.length > 1) {
                     int axis = Integer.parseInt(p[1]);
-                    mirrorType = axis == 1 ? 0 : axis == 2 ? 1 : axis == 3 ? 2 : -1;
+                    //MQO の mirror_axis はビットマスク (1=X, 2=Y, 4=Z)。列挙値扱いで axis==4(Z) を
+                    //取りこぼすと Z 鏡像のオブジェクトが片側しか描かれない (本家 6R_Yo8000 の「車輪」等が
+                    //+Z 側だけモデリング+mirror_axis 4 で、後台車/テール/ドアが消えていた)。ビット判定にする。
+                    //mirrorType: 0=X, 1=Y, 2=Z (mirror() の軸と一致)。単一 int なので複合軸(例 5=X+Z)は
+                    //先勝ちで1軸のみ (現行パックに複合軸の使用は無いため実害なし)。
+                    mirrorType = (axis & 1) != 0 ? 0 : (axis & 2) != 0 ? 1 : (axis & 4) != 0 ? 2 : -1;
                 }
             }
         }

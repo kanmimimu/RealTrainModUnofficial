@@ -110,6 +110,11 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                     entity.getTrainStateData(
                             jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id),
                     def, poseStack, buffer, packedLight);
+            //RTMU 追加: 種別幕 (方向幕とは別の State_Type インデックスで別テクスチャを表示)
+            TrainEntityRenderer.renderConfiguredTypeSigns(
+                    entity.getTrainStateData(
+                            jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Type.id),
+                    def, poseStack, buffer, packedLight);
         } finally {
             poseStack.popPose();
         }

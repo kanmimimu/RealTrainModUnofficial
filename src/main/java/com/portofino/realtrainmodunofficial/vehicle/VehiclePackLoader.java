@@ -461,6 +461,10 @@ public class VehiclePackLoader {
             List<List<String>> customButtonOptions = parseCustomButtonOptions(obj, trainModel);
             String rollsignTexture = firstNonBlank(getString(trainModel, "rollsignTexture"), getString(obj, "rollsignTexture"));
             List<VehicleDefinition.RollsignDefinition> rollsigns = parseRollsigns(obj, trainModel);
+            //RTMU 追加: 種別幕 (方向幕と同じ書式・別項目)。typeSignNames / typeSignTexture / typeSigns。
+            List<String> typeSignNames = parseStringList(obj, trainModel, "typeSignNames");
+            String typeSignTexture = firstNonBlank(getString(trainModel, "typeSignTexture"), getString(obj, "typeSignTexture"));
+            List<VehicleDefinition.RollsignDefinition> typeSigns = parseSignPanels(obj, trainModel, "typeSigns");
             List<VehicleDefinition.LightDefinition> headLights = parseLights(obj, trainModel, "headLights");
             List<VehicleDefinition.LightDefinition> tailLights = parseLights(obj, trainModel, "tailLights");
             List<VehicleDefinition.LightDefinition> interiorLights = parseLights(obj, trainModel, "interiorLights");
@@ -540,6 +544,7 @@ public class VehiclePackLoader {
                 soundDecelerationStop
             );
             definition.setBrakeReleaseSounds(soundBrakeRelease, soundBrakeRelease2);
+            definition.setTypeSign(typeSignNames, typeSignTexture, typeSigns);
             LOADED.add(definition);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse train json {} in {}: {}", sourcePath, packName, e.getMessage());
@@ -869,11 +874,16 @@ public class VehiclePackLoader {
     }
 
     private static List<VehicleDefinition.RollsignDefinition> parseRollsigns(JsonObject root, JsonObject trainModel) {
+        return parseSignPanels(root, trainModel, "rollsigns");
+    }
+
+    /** rollsigns / typeSigns など、uv+pos で定義された幕パネル配列を読む (種別幕でも流用)。 */
+    private static List<VehicleDefinition.RollsignDefinition> parseSignPanels(JsonObject root, JsonObject trainModel, String key) {
         JsonArray array = null;
-        if (trainModel != null && trainModel.has("rollsigns") && trainModel.get("rollsigns").isJsonArray()) {
-            array = trainModel.getAsJsonArray("rollsigns");
-        } else if (root != null && root.has("rollsigns") && root.get("rollsigns").isJsonArray()) {
-            array = root.getAsJsonArray("rollsigns");
+        if (trainModel != null && trainModel.has(key) && trainModel.get(key).isJsonArray()) {
+            array = trainModel.getAsJsonArray(key);
+        } else if (root != null && root.has(key) && root.get(key).isJsonArray()) {
+            array = root.getAsJsonArray(key);
         }
         if (array == null) {
             return List.of();

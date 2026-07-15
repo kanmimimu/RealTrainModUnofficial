@@ -157,6 +157,39 @@ public final class VehicleScriptRenderers {
         private final ModelObject modelObject;
         private boolean warnedRenderFail;
 
+        //--- スクリプト描画結果のキャッシュ ---------------------------------------------
+        //完全に静止した車両 (速度0・ドア/パンタが端点=アニメ中でない) は、スクリプトが
+        //partialTick を使っても毎フレーム同じ絵になる。その 1 フレーム分の記録 (GLRecorder)
+        //を車両ごとに保持し、状態シグネチャが変わらない限り再生するだけにして、毎フレームの
+        //Nashorn 実行を省く。描画結果 (見た目) は一切変えない。動作/アニメ中の車両はキャッシュ
+        //しないので滑らかさも不変。
+        private final Map<Object, EntityCache> entityCaches =
+                java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+        //シグネチャに含めない時間依存アニメ (点滅灯・スクロール幕等) の取りこぼしを救済する
+        //安全網。静止車両でもこの間隔で必ず描き直す。10 フレーム = 約 6Hz でリフレッシュ。
+        private static final int CACHE_REFRESH_FRAMES = 10;
+
+        /** 1 車両ぶんのキャッシュ。 */
+        private static final class EntityCache {
+            boolean valid;
+            boolean drew;
+            long sig;
+            int framesSinceRun;
+            final List<CachedPass> passes = new ArrayList<>();
+        }
+
+        /** 1 パスぶんの記録 (通常パス or 発光パス)。 */
+        private static final class CachedPass {
+            final GLRecorder rec;
+            final int pass;
+            final Set<String> excluded;
+            CachedPass(GLRecorder rec, int pass, Set<String> excluded) {
+                this.rec = rec;
+                this.pass = pass;
+                this.excluded = excluded;
+            }
+        }
+
         Scripted(VehiclePartsRenderer renderer, ScriptEngine engine, ModelObject modelObject) {
             this.renderer = renderer;
             this.engine = engine;
@@ -171,6 +204,47 @@ public final class VehicleScriptRenderers {
         public boolean render(Object entity, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel bodyModel) {
+            //完全静止した車両だけキャッシュ対象にする (アニメ中の車両は毎フレーム描いて滑らかさ維持)。
+            boolean canCache = isFullyStatic(entity);
+            if (!canCache) {
+                this.entityCaches.remove(entity);
+                return renderReal(entity, partialTick, poseStack, buffer, packedLight, packedOverlay, bodyModel, null);
+            }
+
+            EntityCache ec = this.entityCaches.computeIfAbsent(entity, k -> new EntityCache());
+            long sig = signature(entity);
+            //キャッシュヒット: 記録済みパスを再生するだけ (Nashorn 実行なし)。
+            if (ec.valid && ec.sig == sig && ec.framesSinceRun < CACHE_REFRESH_FRAMES) {
+                ec.framesSinceRun++;
+                if (!ec.drew) {
+                    return false;
+                }
+                PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
+                for (CachedPass cp : ec.passes) {
+                    replay(cp.rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, cp.pass, cp.excluded);
+                }
+                return true;
+            }
+
+            //ミス: 実際に描画しつつ、各パスの記録を集めてキャッシュに保存。
+            List<CachedPass> sink = new ArrayList<>();
+            boolean drew = renderReal(entity, partialTick, poseStack, buffer, packedLight, packedOverlay, bodyModel, sink);
+            ec.valid = true;
+            ec.drew = drew;
+            ec.sig = sig;
+            ec.framesSinceRun = 0;
+            ec.passes.clear();
+            ec.passes.addAll(sink);
+            return drew;
+        }
+
+        /**
+         * スクリプト描画の実処理 (本家 RenderVehicleBase.doRender と同じ)。
+         * sink が非 null のとき、再生した各パスの記録を追加してキャッシュに残す。
+         */
+        private boolean renderReal(Object entity, float partialTick, PoseStack poseStack,
+                                   MultiBufferSource buffer, int packedLight, int packedOverlay,
+                                   MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
             //本家 RenderVehicleBase.doRender: 通常描画 (RenderPass.NORMAL) → 発光描画 (renderBodyLight)
             GLRecorder normal = record(entity, RenderPass.NORMAL.id, partialTick);
             //★ isEmpty ではなく hasGeometry で判定する。スクリプトが何も描かずに落ちると
@@ -185,8 +259,12 @@ public final class VehicleScriptRenderers {
             java.util.Set<String> excluded = exclusionPartsOf(entity);
             replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
                     RenderPass.NORMAL.id, excluded);
+            if (sink != null) {
+                //excluded はエンティティ内部のライブ集合なので、キャッシュにはスナップショットを残す。
+                sink.add(new CachedPass(normal, RenderPass.NORMAL.id, excluded == null ? null : Set.copyOf(excluded)));
+            }
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
-                    bodyModel, graph);
+                    bodyModel, graph, sink);
             return true;
         }
 
@@ -216,7 +294,7 @@ public final class VehicleScriptRenderers {
          */
         private void renderBodyLight(Object entity, float partialTick, PoseStack poseStack,
                                      MultiBufferSource buffer, int packedLight, int packedOverlay,
-                                     MqoModelLoader.MqoModel bodyModel, PolygonModel graph) {
+                                     MqoModelLoader.MqoModel bodyModel, PolygonModel graph, List<CachedPass> sink) {
             if (!(entity instanceof EntityTrainBase train)) {
                 return;
             }
@@ -246,7 +324,63 @@ public final class VehicleScriptRenderers {
                     continue;
                 }
                 replay(rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, pass);
+                if (sink != null) {
+                    sink.add(new CachedPass(rec, pass, null));
+                }
             }
+        }
+
+        /**
+         * 完全に静止した車両か? = 速度0 かつ ドア/パンタが端点 (アニメ中でない)。
+         * ここが true の間だけ描画結果をキャッシュする。動作/アニメ中は毎フレーム描いて
+         * partialTick 補間の滑らかさを保つ。
+         */
+        private static boolean isFullyStatic(Object entity) {
+            if (!(entity instanceof EntityTrainBase train)) {
+                return false;
+            }
+            if (train.getSpeed() != 0.0F) {
+                return false;
+            }
+            if (entity instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> v) {
+                if (!atEndpoint(v.doorMoveL, jp.ngt.rtm.entity.vehicle.EntityVehicleBase.MAX_DOOR_MOVE)
+                        || !atEndpoint(v.doorMoveR, jp.ngt.rtm.entity.vehicle.EntityVehicleBase.MAX_DOOR_MOVE)
+                        || !atEndpoint(v.pantograph_F, jp.ngt.rtm.entity.vehicle.EntityVehicleBase.MAX_PANTOGRAPH_MOVE)
+                        || !atEndpoint(v.pantograph_B, jp.ngt.rtm.entity.vehicle.EntityVehicleBase.MAX_PANTOGRAPH_MOVE)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static boolean atEndpoint(int value, int max) {
+            return value <= 0 || value >= max;
+        }
+
+        /**
+         * 描画結果を左右する車両状態のシグネチャ。これが変わったら即座に描き直す。
+         * (時間依存アニメなど、ここに含まれない変化は CACHE_REFRESH_FRAMES で救済する)
+         */
+        private long signature(Object entity) {
+            EntityTrainBase train = (EntityTrainBase) entity;
+            long h = 1125899906842597L;
+            h = 31L * h + Float.floatToIntBits(train.wheelRotationR);
+            h = 31L * h + Float.floatToIntBits(train.wheelRotationL);
+            int dir = train.getTrainDirection();
+            h = 31L * h + dir;
+            h = 31L * h + train.getTrainStateData(TrainState.TrainStateType.State_Light.id);
+            h = 31L * h + train.getTrainStateData(TrainState.TrainStateType.State_Destination.id);
+            h = 31L * h + (train.getConnectedTrain(dir) == null ? 0 : 1);
+            h = 31L * h + (train.getConnectedTrain(1 - dir) == null ? 0 : 1);
+            if (entity instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> v) {
+                h = 31L * h + v.doorMoveL;
+                h = 31L * h + v.doorMoveR;
+                h = 31L * h + v.pantograph_F;
+                h = 31L * h + v.pantograph_B;
+            }
+            Set<String> ex = exclusionPartsOf(entity);
+            h = 31L * h + (ex == null ? 0 : ex.hashCode());
+            return h;
         }
 
         /** スクリプトの render(entity, pass, partialTick) を 1 パスぶん記録する。 */

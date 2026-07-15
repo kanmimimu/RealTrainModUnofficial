@@ -242,7 +242,7 @@ public final class ExternalSoundPackBridge {
                 if (parts.length >= 4 && "sounds".equalsIgnoreCase(parts[2])) {
                     Path target = GENERATED_PACK_ROOT.resolve("assets").resolve(namespace).resolve("sounds");
                     for (int i = 3; i < parts.length; i++) {
-                        target = target.resolve(parts[i].toLowerCase(Locale.ROOT));
+                        target = target.resolve(sanitizeSoundPath(parts[i]));
                     }
                     Files.createDirectories(target.getParent());
                     try (InputStream input = zipFile.getInputStream(entry)) {
@@ -259,16 +259,42 @@ public final class ExternalSoundPackBridge {
     private static Path lowercasePath(Path path) {
         Path lowered = Path.of("");
         for (Path part : path) {
-            lowered = lowered.resolve(part.toString().toLowerCase(Locale.ROOT));
+            lowered = lowered.resolve(sanitizeSoundPath(part.toString()));
         }
         return lowered;
+    }
+
+    /**
+     * ResourceLocation のパスに使えない文字 (空白・大文字・記号) を安全化する。
+     * 1.21 のリソースパスは [a-z0-9/._-] のみ許可。本家 1.7.10 は緩く、hi03 Train Melodies の
+     * "Amairo no kami no otome.ogg" のように<b>空白・大文字入りのサウンド名</b>を持つパックがあり、
+     * そのままだと ResourceLocation 生成が例外→無音 (踏切ならデフォルトのベル音にフォールバック) になる。
+     * <b>生成側 (このパック) と再生側 (CrossingGateSoundManager / LegacyScriptSoundManager) で必ず同じ変換</b>を
+     * 使うこと。そろっていないと参照先がずれて鳴らない。
+     */
+    public static String sanitizeSoundPath(String s) {
+        if (s == null) {
+            return "";
+        }
+        String lower = s.toLowerCase(Locale.ROOT);
+        StringBuilder sb = new StringBuilder(lower.length());
+        for (int i = 0; i < lower.length(); i++) {
+            char c = lower.charAt(i);
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                    || c == '/' || c == '.' || c == '_' || c == '-') {
+                sb.append(c);
+            } else {
+                sb.append('_');
+            }
+        }
+        return sb.toString();
     }
 
     private static void registerCopiedSound(Map<String, JsonObject> mergedSoundDefs, String namespace, Path relativePath) {
         if (relativePath == null) {
             return;
         }
-        String soundPath = normalize(relativePath.toString()).toLowerCase(Locale.ROOT);
+        String soundPath = sanitizeSoundPath(normalize(relativePath.toString()));
         if (!soundPath.endsWith(".ogg")) {
             return;
         }
@@ -297,7 +323,7 @@ public final class ExternalSoundPackBridge {
             JsonObject target = mergedSoundDefs.computeIfAbsent(namespace, ignored -> new JsonObject());
             JsonObject source = parsed.getAsJsonObject();
             for (Map.Entry<String, JsonElement> entry : source.entrySet()) {
-                target.add(entry.getKey().toLowerCase(Locale.ROOT), normalizeSoundEvent(namespace, entry.getValue()));
+                target.add(sanitizeSoundPath(entry.getKey()), normalizeSoundEvent(namespace, entry.getValue()));
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.debug("Could not merge sounds.json for namespace {}", namespace, e);
@@ -361,7 +387,7 @@ public final class ExternalSoundPackBridge {
         if (ns == null || ns.isBlank() || "minecraft".equalsIgnoreCase(ns)) {
             return raw;
         }
-        return ns.toLowerCase(Locale.ROOT) + ":" + path.toLowerCase(Locale.ROOT);
+        return sanitizeSoundPath(ns) + ":" + sanitizeSoundPath(path);
     }
 
     private static boolean writeMergedSoundsJson(Map<String, JsonObject> mergedSoundDefs) throws IOException {

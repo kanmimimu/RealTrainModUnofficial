@@ -59,7 +59,12 @@ public enum TrainState {
          * 編成内の位置(前,中,後)
          */
         State_Direction(10, "direction", 0, 2),
-        State_InteriorLight(11, "interior_light", 0, 2);
+        State_InteriorLight(11, "interior_light", 0, 2),
+        /**
+         * RTMU 追加: 種別幕。方向幕 (State_Destination) とは別に「種別」を選ぶための状態。
+         * id 12 は 16 バイトの状態配列 (0..15) の空き。0..127 で種別インデックスを持つ。
+         */
+        State_Type(12, "type", 0, 127);
 
         public final int id;
         public final String stateName;

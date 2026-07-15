@@ -48,5 +48,10 @@ public enum InstalledObjectCategory {
      * 本家: 券売機 (BlockTicketVendor / machineType="Vendor")。
      * 右クリックで切符/回数券を購入できる。
      */
-    TICKET_VENDOR
+    TICKET_VENDOR,
+    /**
+     * 本家: パイプ (BlockPipe / ModelOrnament ornamentType="Pipe")。
+     * 鉄管の飾り。Pipe01 と Pipe01_Connectable (隣接パイプへ接続) がある。
+     */
+    PIPE
 }

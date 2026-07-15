@@ -67,38 +67,57 @@ public class RtmTrainControlScreen extends Screen {
             addArrowButton(left + 4, top + 52, "<", "toggle_chunk_loader", 0);
             addButton(left + 28, top + 52, 120, "チャンクロード" + (loaderOn ? " ON" : " OFF"), "toggle_chunk_loader", 0);
             addArrowButton(left + 152, top + 52, ">", "toggle_chunk_loader", 0);
+            //方向幕/種別/アナウンスの3行は、チャンクロードの下で行間を詰める (高さ18)。
+            //行を1つ増やした (種別) ぶん下がホットバー/インベントリに被らないように上へ寄せる。
+            final int rowH = 18;
             //方向幕: 持っていないパックでは null と出して押せなくする
             int destCount = rollsignNames().length;
             if (destCount == 0) {
-                addArrowButton(left + 4, top + 76, "<", "noop", 0);
-                addButton(left + 28, top + 76, 120, "方向幕 null", "noop", 0);
-                addArrowButton(left + 152, top + 76, ">", "noop", 0);
+                addArrowButton(left + 4, top + 73, rowH, "<", "noop", 0);
+                addButton(left + 28, top + 73, 120, rowH, "方向幕 null", "noop", 0);
+                addArrowButton(left + 152, top + 73, rowH, ">", "noop", 0);
             } else {
                 int dest = Math.floorMod(
                         train.getTrainStateData(TrainStateType.State_Destination.id), destCount);
-                addArrowButton(left + 4, top + 76, "<", "set_destination",
+                addArrowButton(left + 4, top + 73, rowH, "<", "set_destination",
                         Math.floorMod(dest - 1, destCount));
-                addButton(left + 28, top + 76, 120, destinationLabel(), "set_destination",
+                addButton(left + 28, top + 73, 120, rowH, destinationLabel(), "set_destination",
                         Math.floorMod(dest + 1, destCount));
-                addArrowButton(left + 152, top + 76, ">", "set_destination",
+                addArrowButton(left + 152, top + 73, rowH, ">", "set_destination",
                         Math.floorMod(dest + 1, destCount));
+            }
+            //RTMU 追加: 種別幕。方向幕のすぐ下に同じ操作感で並べる。持たないパックは null で押せなくする。
+            int typeCount = typeSignNames().length;
+            if (typeCount == 0) {
+                addArrowButton(left + 4, top + 92, rowH, "<", "noop", 0);
+                addButton(left + 28, top + 92, 120, rowH, "種別 null", "noop", 0);
+                addArrowButton(left + 152, top + 92, rowH, ">", "noop", 0);
+            } else {
+                int type = Math.floorMod(
+                        train.getTrainStateData(TrainStateType.State_Type.id), typeCount);
+                addArrowButton(left + 4, top + 92, rowH, "<", "set_type",
+                        Math.floorMod(type - 1, typeCount));
+                addButton(left + 28, top + 92, 120, rowH, typeLabel(), "set_type",
+                        Math.floorMod(type + 1, typeCount));
+                addArrowButton(left + 152, top + 92, rowH, ">", "set_type",
+                        Math.floorMod(type + 1, typeCount));
             }
             //アナウンスも方向幕と同じ回し方にする。
             //以前は上限も循環も無く、パックのアナウンス数を超えて増え続けていた。
             int announceCount = announcementCount();
             if (announceCount == 0) {
                 //アナウンスを持たないパック: 空欄ではなく null と出して、押せなくする
-                addArrowButton(left + 4, top + 100, "<", "noop", 0);
-                addButton(left + 28, top + 100, 120, "アナウンス null", "noop", 0);
-                addArrowButton(left + 152, top + 100, ">", "noop", 0);
+                addArrowButton(left + 4, top + 111, rowH, "<", "noop", 0);
+                addButton(left + 28, top + 111, 120, rowH, "アナウンス null", "noop", 0);
+                addArrowButton(left + 152, top + 111, rowH, ">", "noop", 0);
             } else {
                 int announce = Math.floorMod(
                         train.getTrainStateData(TrainStateType.State_Announcement.id), announceCount);
-                addArrowButton(left + 4, top + 100, "<", "set_announcement",
+                addArrowButton(left + 4, top + 111, rowH, "<", "set_announcement",
                         Math.floorMod(announce - 1, announceCount));
-                addButton(left + 28, top + 100, 120, announcementLabel(announce), "set_announcement",
+                addButton(left + 28, top + 111, 120, rowH, announcementLabel(announce), "set_announcement",
                         Math.floorMod(announce + 1, announceCount));
-                addArrowButton(left + 152, top + 100, ">", "set_announcement",
+                addArrowButton(left + 152, top + 111, rowH, ">", "set_announcement",
                         Math.floorMod(announce + 1, announceCount));
             }
         } else if (selectedTab == ControlTab.FUNCTION) {
@@ -134,7 +153,11 @@ public class RtmTrainControlScreen extends Screen {
     }
 
     private Button addButton(int x, int y, int w, String label, String action, int value) {
-        Button button = Button.builder(Component.literal(label), b -> send(action, value)).bounds(x, y, w, 20).build();
+        return addButton(x, y, w, 20, label, action, value);
+    }
+
+    private Button addButton(int x, int y, int w, int h, String label, String action, int value) {
+        Button button = Button.builder(Component.literal(label), b -> send(action, value)).bounds(x, y, w, h).build();
         if ("noop".equals(action)) {
             button.active = false;
         }
@@ -142,7 +165,11 @@ public class RtmTrainControlScreen extends Screen {
     }
 
     private void addArrowButton(int x, int y, String label, String action, int value) {
-        Button button = Button.builder(Component.literal(label), b -> send(action, value)).bounds(x, y, 20, 20).build();
+        addArrowButton(x, y, 20, label, action, value);
+    }
+
+    private void addArrowButton(int x, int y, int h, String label, String action, int value) {
+        Button button = Button.builder(Component.literal(label), b -> send(action, value)).bounds(x, y, 20, h).build();
         if ("noop".equals(action)) {
             button.active = false;
         }
@@ -207,6 +234,21 @@ public class RtmTrainControlScreen extends Screen {
         }
         int dest = Math.floorMod(train.getTrainStateData(TrainStateType.State_Destination.id), names.length);
         return "方向幕 " + names[dest];
+    }
+
+    //RTMU 追加: 種別幕 (typeSignNames)。方向幕とは別の State_Type で選ぶ。
+    private String[] typeSignNames() {
+        VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
+        return def == null ? new String[0] : def.getTypeSignNames().toArray(new String[0]);
+    }
+
+    private String typeLabel() {
+        String[] names = typeSignNames();
+        if (names.length == 0) {
+            return "種別 null";
+        }
+        int type = Math.floorMod(train.getTrainStateData(TrainStateType.State_Type.id), names.length);
+        return "種別 " + names[type];
     }
 
     private void send(String action, int value) {

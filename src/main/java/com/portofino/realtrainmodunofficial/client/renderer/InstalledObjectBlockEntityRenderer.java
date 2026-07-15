@@ -111,7 +111,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     poseStack.pushPose();
                     pushed = true;
                     if (blockEntity.getCategory() == InstalledObjectCategory.FLUORESCENT
-                            || blockEntity.getCategory() == InstalledObjectCategory.OVERHEAD_LINE_POLE) {
+                            || blockEntity.getCategory() == InstalledObjectCategory.OVERHEAD_LINE_POLE
+                            || blockEntity.getCategory() == InstalledObjectCategory.PIPE) {
                         //本家 RenderOrnament: 飾り物はブロック中心を原点にするだけで回転しない。
                         //
                         //蛍光灯: 取付方向 (0..7) に応じた ±0.4375 の寄せと Y90度回転は
@@ -166,6 +167,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
                             || blockEntity.getCategory() == InstalledObjectCategory.FLUORESCENT
                             || blockEntity.getCategory() == InstalledObjectCategory.OVERHEAD_LINE_POLE
+                            || blockEntity.getCategory() == InstalledObjectCategory.PIPE
                             || blockEntity.getCategory() == InstalledObjectCategory.POINT)
                             && definition.getScriptPath() != null && !definition.getScriptPath().isBlank()) {
                         com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.Scripted machineScripted =
