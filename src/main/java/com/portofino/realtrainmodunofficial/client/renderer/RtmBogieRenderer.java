@@ -4,7 +4,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
-import jp.ngt.ngtlib.math.Vec3;
 import jp.ngt.rtm.entity.train.EntityBogie;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -70,23 +69,12 @@ public class RtmBogieRenderer extends EntityRenderer<EntityBogie> {
             }
         }
 
-        //本家 RenderBogie: 補完済み台車位置を引き、車体基準の bogiePos に置き直す
-        double bogieFX = Mth.lerp(partialTicks, bogie.xOld, bogie.getX());
-        double bogieFY = Mth.lerp(partialTicks, bogie.yOld, bogie.getY());
-        double bogieFZ = Mth.lerp(partialTicks, bogie.zOld, bogie.getZ());
-
-        float[][] pos = train.getConfig().getBogiePos();
-        Vec3 v31 = new Vec3(pos[index][0], pos[index][1], pos[index][2]);
-        v31 = v31.rotateAroundX(Mth.lerp(partialTicks, train.xRotO, train.getXRot()));
-        v31 = v31.rotateAroundY(Mth.rotLerp(partialTicks, train.yRotO, train.getYRot()));
-        double newX = v31.getX() + Mth.lerp(partialTicks, train.xOld, train.getX());
-        double newY = v31.getY() + Mth.lerp(partialTicks, train.yOld, train.getY());
-        double newZ = v31.getZ() + Mth.lerp(partialTicks, train.zOld, train.getZ());
-
+        //台車エンティティの位置は EntityBogie.updatePosAndRotationClient で実レール(弧)上へ
+        //吸着済み。EntityRenderDispatcher が既にその補間位置へ poseStack を移動しているので、
+        //本家のように車体基準の弦 bogiePos へ置き直さず、台車自身の補間位置にそのまま描く。
+        //(以前は毎フレーム弦位置へ置き直していたため、急カーブで台車がレールから外れて見えた)
         poseStack.pushPose();
         try {
-            poseStack.translate(newX - bogieFX, newY - bogieFY, newZ - bogieFZ);
-
             float roll = Mth.lerp(partialTicks, bogie.prevRotationRoll, bogie.rotationRoll);
             if (Math.abs(roll) > 0.001F) {
                 poseStack.mulPose(Axis.ZP.rotationDegrees(roll));

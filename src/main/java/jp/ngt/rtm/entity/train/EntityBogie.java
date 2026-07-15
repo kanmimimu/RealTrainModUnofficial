@@ -375,15 +375,60 @@ public class EntityBogie extends Entity {
         if (train != null) {
             TrainConfig cfg = train.getConfig();
             if (cfg != null) {
-                //Clientでの台車位置決定は車両位置から
+                //Clientでの台車位置決定は車両位置から (弦 = 車体位置 + bogiePos を直線に置いたもの)
                 float[][] pos = cfg.getBogiePos();
                 int bogieIndex = this.getBogieId();
                 Vec3 v31 = new Vec3(pos[bogieIndex][0], pos[bogieIndex][1], pos[bogieIndex][2]);
                 v31 = v31.rotateAroundX(train.getXRot());
                 v31 = v31.rotateAroundY(train.getYRot());
-                this.setPos(train.getX() + v31.getX(), train.getY() + v31.getY(), train.getZ() + v31.getZ());
+                double cx = train.getX() + v31.getX();
+                double cy = train.getY() + v31.getY();
+                double cz = train.getZ() + v31.getZ();
+                //急カーブでは弦上の bogiePos が実レール(弧)から外れ、台車がレールから浮く。
+                //サーバの updateBogiePos と同じレール API で最寄りの弧上点へ吸着させる。
+                //直線区間では弧上点 == 弦上点なので従来と完全に同一。レール未検出(空中/
+                //未ロード)時は弦位置へフォールバックし、台車が消えないようにする。
+                double[] arc = this.snapToRailArc(cx, cy, cz);
+                if (arc != null) {
+                    this.setPos(arc[0], arc[1], arc[2]);
+                } else {
+                    this.setPos(cx, cy, cz);
+                }
             }
         }
+    }
+
+    /**
+     * クライアント描画専用: 弦上の推定位置 (cx,cz) に最も近いレール曲線 (弧) 上の点へ吸着する。
+     * サーバ {@link #updateBogiePos} と同じレール取得・サンプリングを行うが、
+     * <b>台車の物理状態フィールド (currentRailObj/currentRailMap/split/prevPosIndex) は
+     * 一切変更しない</b>。そのため hasRailMap()・連結判定・onChangeRail(ジョイント音) など
+     * クライアント挙動へ副作用を与えず、純粋に描画位置のみを補正する。
+     *
+     * @return レール弧上の {x, y, z}。レール未検出時は null (呼び出し側で弦へフォールバック)。
+     */
+    private double[] snapToRailArc(double cx, double cy, double cz) {
+        TileEntityLargeRailCore coreObj = this.getRail(cx, cy, cz);
+        if (coreObj == null) {
+            return null;
+        }
+        //resetRailObj と同じ分岐でレールマップを取得 (分岐器/ポイント対応)
+        RailMap railMap;
+        if (coreObj instanceof TileEntityLargeRailSwitchCore switchObj) {
+            railMap = switchObj.getSwitch() != null
+                    ? switchObj.getSwitch().getNearestPoint(this).getActiveRailMap(this.level())
+                    : null;
+        } else {
+            railMap = coreObj.getRailMap(this);
+        }
+        if (railMap == null) {
+            return null;
+        }
+        int railSplit = (int) (railMap.getLength() * (double) SPLITS_PER_METER);
+        int pIndex = railMap.getNearlestPoint(railSplit, cx, cz);
+        double[] posZX = railMap.getRailPos(railSplit, pIndex);//{z, x}
+        double py = railMap.getRailHeight(railSplit, pIndex) + EntityTrainBase.TRAIN_HEIGHT;
+        return new double[]{posZX[1], py, posZX[0]};
     }
 
     @Override
