@@ -445,6 +445,8 @@ public final class InstalledObjectPackLoader {
                 def.setWireParams(sectionLength, deflection);
             }
             def.setWireAttachPos(parseVec3(obj, "wirePos", 1.0));
+            //本家 MachineConfig.rotateByMetadata。true の照明はクリック面 (meta) で回して置く。
+            def.setRotateByMetadata(getBoolean(obj, "rotateByMetadata", false));
             //本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate が回るスクリプト
             //(列車検知器は全ての処理をここに書く)。
             def.setServerScriptPath(getString(obj, "serverScriptPath"));

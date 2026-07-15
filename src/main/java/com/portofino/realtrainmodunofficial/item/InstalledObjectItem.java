@@ -203,6 +203,12 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         boolean uprightOnly = category == InstalledObjectCategory.POINT
                 || category == InstalledObjectCategory.TICKET_VENDOR
                 || category == InstalledObjectCategory.RAILROAD_SIGN;
+        //照明 (本家 LIGHT + rotateByMetadata、サーチライト等): 本家 ItemInstalledObject は
+        //setBlock(..., sideIndex=クリック面, 3) + setRotation(player, 15.0F, true)。クリック面 (meta 0-5)
+        //だけを保存し、向きは 15 度刻みに丸める。壁挿し (横倒し+持ち上げ) には乗せない
+        //(それが「面から浮く」原因だった)。描画は RenderMachine と同じブロック中心ピボット+面回転+向き。
+        boolean lightRotateByMeta = category == InstalledObjectCategory.LIGHT
+                && definition.isRotateByMetadata();
         //蛍光灯: 本家 ItemInstalledObject は取付方向 (0..7) だけを持たせ、平行移動と回転は
         //レンダースクリプト側でやる。汎用の壁挿し/逆さ設置には乗せない。
         boolean fluorescent = category == InstalledObjectCategory.FLUORESCENT;
@@ -223,7 +229,7 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         if (railSnap != null) {
             placeYaw = railSnap.yaw();
             placeMountPitch = railSnap.pitch();
-        } else if (uprightOnly) {
+        } else if (uprightOnly || lightRotateByMeta) {
             placeYaw = Math.round(player.getYRot() / 15.0F) * 15.0F;
         } else if (fluorescent || gridAligned) {
             placeYaw = 0.0F;
@@ -251,6 +257,10 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
                     //本家 ItemInstalledObject の蛍光灯: 取付方向 (0..7) だけを持たせる。
                     //RenderFluorescent.js が getDir() を読んで自分で寄せて回す。
                     blockEntity.setFluorescentDir(fluorescentDir(clickedFace, player.getYRot()));
+                    blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
+                } else if (lightRotateByMeta) {
+                    //本家 meta = クリック面 (0-5)。RenderMachine と同じ面回転+向きで描くための保存。
+                    blockEntity.setMountFace(clickedFace.ordinal());
                     blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
                 } else if (honkeFaceMount) {
                     //本家 meta = クリック面 (1.7.10 side と 1.21 Direction.ordinal は同一)

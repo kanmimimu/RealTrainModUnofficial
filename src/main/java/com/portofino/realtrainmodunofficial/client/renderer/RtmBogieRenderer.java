@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
+import jp.ngt.ngtlib.math.Vec3;
 import jp.ngt.rtm.entity.train.EntityBogie;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -69,12 +70,31 @@ public class RtmBogieRenderer extends EntityRenderer<EntityBogie> {
             }
         }
 
-        //台車エンティティの位置は EntityBogie.updatePosAndRotationClient で実レール(弧)上へ
-        //吸着済み。EntityRenderDispatcher が既にその補間位置へ poseStack を移動しているので、
-        //本家のように車体基準の弦 bogiePos へ置き直さず、台車自身の補間位置にそのまま描く。
-        //(以前は毎フレーム弦位置へ置き直していたため、急カーブで台車がレールから外れて見えた)
+        //★毎フレーム、補間済みの車体位置から弦上の bogiePos を求め、実レール(弧)上の最寄り点へ
+        //スナップして描く。急カーブでは弦のままだと台車がレールから外れ、逆に per-tick でスナップ
+        //すると高速時に台車が車体の毎フレーム補間へ追従しきれず次第に遅れて見える。描画フレーム
+        //単位で「補間車体位置→弧」を計算することで、どの速度でも車体と同期しつつレールに乗る。
+        double bogieFX = Mth.lerp(partialTicks, bogie.xOld, bogie.getX());
+        double bogieFY = Mth.lerp(partialTicks, bogie.yOld, bogie.getY());
+        double bogieFZ = Mth.lerp(partialTicks, bogie.zOld, bogie.getZ());
+
+        float[][] cfgPos = train.getConfig().getBogiePos();
+        Vec3 v31 = new Vec3(cfgPos[index][0], cfgPos[index][1], cfgPos[index][2]);
+        v31 = v31.rotateAroundX(Mth.lerp(partialTicks, train.xRotO, train.getXRot()));
+        v31 = v31.rotateAroundY(Mth.rotLerp(partialTicks, train.yRotO, train.getYRot()));
+        double chordX = v31.getX() + Mth.lerp(partialTicks, train.xOld, train.getX());
+        double chordY = v31.getY() + Mth.lerp(partialTicks, train.yOld, train.getY());
+        double chordZ = v31.getZ() + Mth.lerp(partialTicks, train.zOld, train.getZ());
+        //弧へスナップ (レール未検出時は弦のまま)。物理状態は変更しない純粋な描画補正。
+        double[] arc = bogie.snapToRailArc(chordX, chordY, chordZ);
+        double targetX = arc != null ? arc[0] : chordX;
+        double targetY = arc != null ? arc[1] : chordY;
+        double targetZ = arc != null ? arc[2] : chordZ;
+
         poseStack.pushPose();
         try {
+            poseStack.translate(targetX - bogieFX, targetY - bogieFY, targetZ - bogieFZ);
+
             float roll = Mth.lerp(partialTicks, bogie.prevRotationRoll, bogie.rotationRoll);
             if (Math.abs(roll) > 0.001F) {
                 poseStack.mulPose(Axis.ZP.rotationDegrees(roll));

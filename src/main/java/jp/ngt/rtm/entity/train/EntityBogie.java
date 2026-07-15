@@ -375,25 +375,15 @@ public class EntityBogie extends Entity {
         if (train != null) {
             TrainConfig cfg = train.getConfig();
             if (cfg != null) {
-                //Clientでの台車位置決定は車両位置から (弦 = 車体位置 + bogiePos を直線に置いたもの)
+                //Clientでの台車エンティティ位置は車両位置から (弦 = 車体位置 + bogiePos を直線配置)。
+                //実レール(弧)へのスナップは描画側 (RtmBogieRenderer) が毎フレーム行う。ここ(毎tick)で
+                //やると高速時に台車が車体の毎フレーム補間へ追従しきれず、次第に遅れて見えるため。
                 float[][] pos = cfg.getBogiePos();
                 int bogieIndex = this.getBogieId();
                 Vec3 v31 = new Vec3(pos[bogieIndex][0], pos[bogieIndex][1], pos[bogieIndex][2]);
                 v31 = v31.rotateAroundX(train.getXRot());
                 v31 = v31.rotateAroundY(train.getYRot());
-                double cx = train.getX() + v31.getX();
-                double cy = train.getY() + v31.getY();
-                double cz = train.getZ() + v31.getZ();
-                //急カーブでは弦上の bogiePos が実レール(弧)から外れ、台車がレールから浮く。
-                //サーバの updateBogiePos と同じレール API で最寄りの弧上点へ吸着させる。
-                //直線区間では弧上点 == 弦上点なので従来と完全に同一。レール未検出(空中/
-                //未ロード)時は弦位置へフォールバックし、台車が消えないようにする。
-                double[] arc = this.snapToRailArc(cx, cy, cz);
-                if (arc != null) {
-                    this.setPos(arc[0], arc[1], arc[2]);
-                } else {
-                    this.setPos(cx, cy, cz);
-                }
+                this.setPos(train.getX() + v31.getX(), train.getY() + v31.getY(), train.getZ() + v31.getZ());
             }
         }
     }
@@ -407,7 +397,7 @@ public class EntityBogie extends Entity {
      *
      * @return レール弧上の {x, y, z}。レール未検出時は null (呼び出し側で弦へフォールバック)。
      */
-    private double[] snapToRailArc(double cx, double cy, double cz) {
+    public double[] snapToRailArc(double cx, double cy, double cz) {
         TileEntityLargeRailCore coreObj = this.getRail(cx, cy, cz);
         if (coreObj == null) {
             return null;

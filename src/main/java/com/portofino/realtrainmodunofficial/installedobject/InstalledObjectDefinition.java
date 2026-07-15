@@ -42,6 +42,17 @@ public class InstalledObjectDefinition {
     // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate(entity, executer) が呼ばれる
     // スクリプト (列車検知器など)。コンストラクタ引数が既に多いので setter で後付けする。
     private String serverScriptPath = "";
+    // 本家 MachineConfig.rotateByMetadata。true の照明 (サーチライト/回転灯/灯台灯) は
+    // RenderMachine と同じく「クリック面 (meta 0-5) の回転 ∘ プレイヤー向き」で描く。
+    private boolean rotateByMetadata = false;
+
+    public boolean isRotateByMetadata() {
+        return rotateByMetadata;
+    }
+
+    public void setRotateByMetadata(boolean rotateByMetadata) {
+        this.rotateByMetadata = rotateByMetadata;
+    }
 
     public String getServerScriptPath() {
         return serverScriptPath;

@@ -127,6 +127,28 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         applyAdjustments(poseStack, blockEntity);
                         poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
                         poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
+                    } else if (blockEntity.getCategory() == InstalledObjectCategory.LIGHT
+                            && definition.isRotateByMetadata() && blockEntity.getMountFace() >= 0) {
+                        //本家 RenderMachine (rotateByMetadata=true の照明 = サーチライト等) の移植:
+                        //ブロック垂直中心 (+0.5) を軸に meta(クリック面 0-5) で回し、-0.5 で戻してから
+                        //プレイヤー向き (getYaw) を掛ける。汎用の getMountFace 分岐 (碍子の面回転) とは別物。
+                        //持ち上げ/横倒しハックを使わないので面から浮かない。
+                        poseStack.translate(0.5D, 0.0D, 0.5D);
+                        Vec3 renderOffset = blockEntity.getRenderOffset();
+                        poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
+                        applyAdjustments(poseStack, blockEntity);
+                        poseStack.translate(0.0D, 0.5D, 0.0D);
+                        applyLightMetadataRotation(poseStack, blockEntity.getMountFace());
+                        poseStack.translate(0.0D, -0.5D, 0.0D);
+                        //本家 getRotation() = round(180 - playerYaw)。RTMU の yaw は playerYaw なので
+                        //YP(180 - yaw) が本家 rotate(getRotation()) と一致する。meta==0 は本家同様に反転。
+                        float lightYaw = 180.0F - blockEntity.getYaw();
+                        if (blockEntity.getMountFace() == 0) {
+                            lightYaw = -lightYaw;
+                        }
+                        poseStack.mulPose(Axis.YP.rotationDegrees(lightYaw));
+                        poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
+                        poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
                     } else if (blockEntity.getMountFace() >= 0) {
                         //本家 RenderElectricalWiring (碍子/コネクタ) 準拠:
                         //ブロック中心 (+0.5,+0.5,+0.5) を基準に、クリック面 (meta 0-5) で回転。
@@ -856,6 +878,29 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
      * 本家 RenderElectricalWiring の meta (クリック面 0-5) 回転。
      * 0=下面(天井吊り)=Z180, 1=上面=そのまま, 2-5=側面=横倒し(取り付け面向き)。
      */
+    /**
+     * 本家 RenderMachine の rotateByMetadata 面回転 (meta = クリック面 0-5)。ブロック垂直中心を軸に回す。
+     * 碍子/コネクタの {@link #applyHonkeMountFaceRotation} (RenderElectricalWiring) とは別物で、
+     * 照明 (サーチライト/回転灯/灯台灯) 専用。GL11.glRotatef の符号をそのまま Axis.*.rotationDegrees へ移植。
+     * <pre>
+     *   0=下面: Z 180 / 1=上面: なし / 2=北: X -90 / 3=南: X +90 / 4=西: Z +90 / 5=東: Z -90
+     * </pre>
+     * (本家は case 0 が break せず case 1 に落ちるが、case 1 は何もしないので Z 180 のみが効く)
+     */
+    private static void applyLightMetadataRotation(PoseStack poseStack, int face) {
+        switch (face) {
+            case 0 -> poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
+            case 2 -> poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F));
+            case 3 -> poseStack.mulPose(Axis.XP.rotationDegrees(90.0F));
+            case 4 -> poseStack.mulPose(Axis.ZP.rotationDegrees(90.0F));
+            case 5 -> poseStack.mulPose(Axis.ZP.rotationDegrees(-90.0F));
+            case 1 -> {
+            }
+            default -> {
+            }
+        }
+    }
+
     private static void applyHonkeMountFaceRotation(PoseStack poseStack, int face) {
         switch (face) {
             case 0 -> poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
