@@ -166,6 +166,12 @@ public class VehiclePackLoader {
                     if (lowerName.contains("realtrainmodunofficial")) {
                         return;
                     }
+                    //README 同意ゲート: 未同意/拒否のパックはロードしない (タイトル画面で同意を取る)。
+                    //zip のみ対象 (ディレクトリ展開パックは README 同梱の概念が無いので従来どおり)。
+                    if (!Files.isDirectory(path)
+                            && !com.portofino.realtrainmodunofficial.pack.PackConsent.isAllowed(path)) {
+                        return;
+                    }
                     if (Files.isDirectory(path)) {
                         if (looksLikeVehiclePackDirectory(path)) {
                             RealTrainModUnofficial.LOGGER.info("Scanning vehicle pack directory: {}", path);
@@ -476,6 +482,8 @@ public class VehiclePackLoader {
             String soundDecelerationStop = firstNonBlank(getString(trainModel, "sound_D_S"), getString(obj, "sound_D_S"));
             String soundBrakeRelease = firstNonBlank(getString(trainModel, "sound_BrakeRelease"), getString(obj, "sound_BrakeRelease"));
             String soundBrakeRelease2 = firstNonBlank(getString(trainModel, "sound_BrakeRelease2"), getString(obj, "sound_BrakeRelease2"));
+            String soundDoorOpen = firstNonBlank(getString(trainModel, "sound_DoorOpen"), getString(obj, "sound_DoorOpen"));
+            String soundDoorClose = firstNonBlank(getString(trainModel, "sound_DoorClose"), getString(obj, "sound_DoorClose"));
             List<String> announcementSounds = parseAnnouncementSounds(obj, trainModel);
             float acceleration = parseFloat(trainModel, "acceleration",
                 parseFloat(trainModel, "accelerateion", parseFloat(obj, "acceleration", parseFloat(obj, "accelerateion", 0.00243F))));
@@ -544,6 +552,7 @@ public class VehiclePackLoader {
                 soundDecelerationStop
             );
             definition.setBrakeReleaseSounds(soundBrakeRelease, soundBrakeRelease2);
+            definition.setDoorSounds(soundDoorOpen, soundDoorClose);
             definition.setTypeSign(typeSignNames, typeSignTexture, typeSigns);
             LOADED.add(definition);
         } catch (Exception e) {

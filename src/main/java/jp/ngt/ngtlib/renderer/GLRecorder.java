@@ -111,6 +111,20 @@ public final class GLRecorder {
         return false;
     }
 
+    /**
+     * NGTTessellator の即時描画 (DRAW_TESS) を 1 つでも含むか。
+     * マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ等) を持つ
+     * マテリアルを発見するために使う (VehicleScriptRenderers)。
+     */
+    public boolean hasTess() {
+        for (Cmd cmd : this.cmds) {
+            if (cmd.op == Op.DRAW_TESS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void push() {
         this.cmds.add(new Cmd(Op.PUSH, 0, 0, 0, 0, null));
     }

@@ -87,6 +87,11 @@ public final class RealTrainModUnofficialClientModEvents {
             com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.CAR.get(),
             CarRenderer::new
         );
+        //本家 EntityMotorman (運転士): プレイヤーモデル + 同梱スキン
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.MOTORMAN.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.MotormanRenderer::new
+        );
     }
 
     @SubscribeEvent
@@ -105,6 +110,8 @@ public final class RealTrainModUnofficialClientModEvents {
     @SubscribeEvent
     public static void registerPackFinders(AddPackFindersEvent event) {
         ExternalSoundPackBridge.register(event);
+        //mods フォルダの 1.7.10 建材ブロックぶんの blockstate/model/texture/lang を生成注入。
+        com.portofino.realtrainmodunofficial.client.building.ExternalBuildingPackBridge.register(event);
     }
 
     // 本家RTM同様、テクスチャ(白の marker_0 等)は変えず tint 色だけ変える。

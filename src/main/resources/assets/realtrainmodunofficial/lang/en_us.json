@@ -22,6 +22,8 @@
   "block.realtrainmodunofficial.legacy_marker_switch": "Branch Marker",
   "item.realtrainmodunofficial.example_item": "Example Item",
   "item.realtrainmodunofficial.rail": "Rail",
+  "item.realtrainmodunofficial.motorman": "Motorman",
+  "entity.realtrainmodunofficial.rtm_motorman": "Motorman",
   "item.realtrainmodunofficial.train": "Train",
   "item.realtrainmodunofficial.test_train": "Test Vehicle",
   "item.realtrainmodunofficial.train_vehicle": "Vehicle Item",

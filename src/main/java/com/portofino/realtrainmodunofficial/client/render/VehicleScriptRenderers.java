@@ -174,6 +174,15 @@ public final class VehicleScriptRenderers {
         //せず毎フレーム描いて滑らかにアニメさせる。5000ms のアニメに余裕を持たせて 6000ms。
         private static final long ANIMATION_GRACE_MS = 6000L;
 
+        //本家式マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED)。
+        //スクリプトは render() 内で「var MatId = renderer.currentMatId; if(MatId==5){ tessで方向幕描画 }」
+        //のように、描画中のマテリアル番号に応じてオーバーレイを描く。本家は render() をマテリアル
+        //ごとに呼ぶが、RTMU は currentMatId=0 で 1 回しか呼んでいなかったため方向幕等が永久に
+        //描かれなかった。ここで「オーバーレイ (tess 描画) を持つ matId」を初回に 1 度だけ発見して
+        //キャッシュし、以降はその matId だけ追加で render() する (毎フレーム全マテリアル実行を避ける)。
+        //空配列 = オーバーレイ無し。null = 未スキャン。車種定義ごとに 1 度だけ確定する。
+        private volatile int[] overlayMatIds;
+
         /** 1 車両ぶんのキャッシュ。 */
         private static final class EntityCache {
             boolean valid;
@@ -185,15 +194,22 @@ public final class VehicleScriptRenderers {
             final List<CachedPass> passes = new ArrayList<>();
         }
 
-        /** 1 パスぶんの記録 (通常パス or 発光パス)。 */
+        /** 1 パスぶんの記録 (通常パス or 発光パス or マテリアル別オーバーレイ)。 */
         private static final class CachedPass {
             final GLRecorder rec;
             final int pass;
             final Set<String> excluded;
+            //非 null = マテリアル別 tessellator オーバーレイ (方向幕等)。この場合は tess 描画のみを
+            //このテクスチャで再生する (本体グループは通常パスで既に描かれているため描かない)。
+            final ResourceLocation overlayTexture;
             CachedPass(GLRecorder rec, int pass, Set<String> excluded) {
+                this(rec, pass, excluded, null);
+            }
+            CachedPass(GLRecorder rec, int pass, Set<String> excluded, ResourceLocation overlayTexture) {
                 this.rec = rec;
                 this.pass = pass;
                 this.excluded = excluded;
+                this.overlayTexture = overlayTexture;
             }
         }
 
@@ -237,7 +253,12 @@ public final class VehicleScriptRenderers {
                 }
                 PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
                 for (CachedPass cp : ec.passes) {
-                    replay(cp.rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, cp.pass, cp.excluded);
+                    if (cp.overlayTexture != null) {
+                        //マテリアル別 tessellator オーバーレイ (方向幕等): tess 描画のみ再生。
+                        replayTessOnly(cp.rec, poseStack, buffer, packedLight, packedOverlay, cp.overlayTexture);
+                    } else {
+                        replay(cp.rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, cp.pass, cp.excluded);
+                    }
                 }
                 return true;
             }
@@ -279,13 +300,29 @@ public final class VehicleScriptRenderers {
                 //excluded はエンティティ内部のライブ集合なので、キャッシュにはスナップショットを残す。
                 sink.add(new CachedPass(normal, RenderPass.NORMAL.id, excluded == null ? null : Set.copyOf(excluded)));
             }
-            //★半透明パス (TRANSPARENT=1) をスクリプトに実行させる。本家 RenderVehicleBase は
-            //  毎フレーム全パスを回すが、RTMU は従来これを飛ばしていた。座席回転・ドア開閉・
-            //  ドアライトのアニメ時計はスクリプト内で「if(pass==1){ setDouble(GetSystemTime()) }」と
-            //  pass==1 のときだけ進むため、pass 1 が来ないと時計が永久に止まり、座席が中途半端な
-            //  角度・ドアが開いたまま固定される。ここで実行して時計を進める。ジオメトリは通常パス
-            //  (pass 0) と重複するので replay しない (記録=時計進行の副作用だけ使い、二重描画を避ける)。
-            record(entity, RenderPass.TRANSPARENT.id, partialTick);
+            //★マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED)。
+            //  スクリプトは currentMatId に応じてオーバーレイを描くため、pass0 の本体描画とは別に
+            //  「オーバーレイを持つ matId」で render() を呼び直して tess 描画のみを拾う。
+            renderMaterialOverlays(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
+                    bodyModel, sink);
+            //★半透明パス (TRANSPARENT=1)。本家 RenderVehicleBase は毎フレーム pass0(不透明)+
+            //  pass1(半透明) を回すが、RTMU は従来 pass1 を飛ばしていた。そのため:
+            //  (a) 座席回転・ドア開閉・ドアライトのアニメ時計 (スクリプト内で
+            //      「if(pass==1){ setDouble(GetSystemTime()) }」と pass==1 でのみ進む) が永久に止まり、
+            //  (b) 色付き半透明の窓 (RTM スクリプトは body_a_* 等の半透明部を pass1 で描く) が
+            //      描画されず色が出なかった (KQ パックの窓)。
+            //  ここで pass 1 を実行し replay する。下記 replay は legacyPass==TRANSPARENT のとき
+            //  renderNamedGroups を translucent=true で呼び、window テクスチャ+ブレンドで描く。
+            //  pass0 は opaque テクスチャ (窓の部分αは落ちる) なので二重描画にはならない。
+            GLRecorder transparent = record(entity, RenderPass.TRANSPARENT.id, partialTick);
+            if (transparent != null && transparent.hasGeometry()) {
+                replay(transparent, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
+                        RenderPass.TRANSPARENT.id, excluded);
+                if (sink != null) {
+                    sink.add(new CachedPass(transparent, RenderPass.TRANSPARENT.id,
+                            excluded == null ? null : Set.copyOf(excluded)));
+                }
+            }
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
                     bodyModel, graph, sink);
             return true;
@@ -430,12 +467,165 @@ public final class VehicleScriptRenderers {
             this.renderer.consumeScriptFailure();
             return rec;
         }
+
+        /**
+         * マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED) を描く。
+         * スクリプトは render() 内で currentMatId を見てオーバーレイを描くため、pass0 の本体描画とは
+         * 別に「オーバーレイ (tess) を持つ matId」で render() を呼び直し、tess 描画だけをそのマテリアルの
+         * テクスチャで再生する。初回に全マテリアルをスキャンして該当 matId を発見・キャッシュし、以降は
+         * その matId だけ実行する (毎フレーム全マテリアル実行を避ける = perf)。
+         */
+        private void renderMaterialOverlays(Object entity, float partialTick, PoseStack poseStack,
+                                            MultiBufferSource buffer, int packedLight, int packedOverlay,
+                                            MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
+            if (bodyModel == null) {
+                return;
+            }
+            MqoModelLoader.ScriptModel sm = bodyModel.getScriptModel();
+            if (sm == null || sm.textures == null || sm.textures.length <= 1) {
+                return;
+            }
+            int matCount = sm.textures.length;
+            int pass = RenderPass.NORMAL.id;
+
+            int[] ids = this.overlayMatIds;
+            if (ids != null) {
+                //発見済み: オーバーレイを持つ matId だけ実行。
+                for (int matId : ids) {
+                    drawOneOverlay(entity, pass, partialTick, matId, sm, poseStack, buffer, packedLight, packedOverlay, sink);
+                }
+                return;
+            }
+            //初回スキャン: 全マテリアルで render() を回し、tess 描画を出す matId を発見・キャッシュ。
+            java.util.List<Integer> found = new ArrayList<>();
+            for (int matId = 1; matId < matCount; matId++) {
+                if (drawOneOverlay(entity, pass, partialTick, matId, sm, poseStack, buffer, packedLight, packedOverlay, sink)) {
+                    found.add(matId);
+                }
+            }
+            int[] arr = new int[found.size()];
+            for (int i = 0; i < found.size(); i++) {
+                arr[i] = found.get(i);
+            }
+            this.overlayMatIds = arr;
+        }
+
+        /** 1 マテリアルぶんのオーバーレイを描く。tess 描画があれば true。 */
+        private boolean drawOneOverlay(Object entity, int pass, float partialTick, int matId,
+                                       MqoModelLoader.ScriptModel sm, PoseStack poseStack, MultiBufferSource buffer,
+                                       int packedLight, int packedOverlay, List<CachedPass> sink) {
+            GLRecorder rec = recordMat(entity, pass, partialTick, matId);
+            if (rec == null || !rec.hasTess()) {
+                return false;
+            }
+            ResourceLocation tex = materialTexture(sm, matId);
+            replayTessOnly(rec, poseStack, buffer, packedLight, packedOverlay, tex);
+            if (sink != null) {
+                sink.add(new CachedPass(rec, pass, null, tex));
+            }
+            return true;
+        }
+
+        /** render() を指定 matId で 1 パス記録する (tessellator オーバーレイ捕捉用)。 */
+        private GLRecorder recordMat(Object entity, int pass, float partialTick, int matId) {
+            GLRecorder rec = new GLRecorder();
+            GLRecorder.activate(rec);
+            try {
+                this.renderer.currentMatId = matId;
+                this.renderer.currentPass = pass;
+                this.renderer.render(entity, pass, partialTick);
+            } catch (Throwable t) {
+                return null;
+            } finally {
+                this.renderer.currentMatId = 0;
+                this.renderer.currentPass = 0;
+                GLRecorder.deactivate();
+            }
+            this.renderer.consumeScriptFailure();
+            return rec;
+        }
+
+        /** マテリアル matId のテクスチャ (MqoModel が matId 順に解決済みで保持)。 */
+        private static ResourceLocation materialTexture(MqoModelLoader.ScriptModel sm, int matId) {
+            if (sm == null || sm.textures == null || matId < 0 || matId >= sm.textures.length) {
+                return null;
+            }
+            MqoModelLoader.ScriptMaterialTexture smt = sm.textures[matId];
+            if (smt == null || smt.material == null) {
+                return null;
+            }
+            Object tex = smt.material.texture;
+            if (tex instanceof ResourceLocation rl) {
+                return rl;
+            }
+            //ScriptMaterial.texture は ScriptTexture でラップされている (namespace/path を保持)。
+            //ここを ResourceLocation と誤判定して null を返していたため、方向幕がテクスチャ無し=空白だった。
+            if (tex instanceof MqoModelLoader.ScriptTexture st) {
+                try {
+                    return ResourceLocation.fromNamespaceAndPath(st.namespace, st.path);
+                } catch (Exception e) {
+                    return null;
+                }
+            }
+            return null;
+        }
     }
 
     static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                        int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
                        PolygonModel bodyGraph) {
         replay(rec, poseStack, buffer, packedLight, packedOverlay, model, bodyGraph, RenderPass.NORMAL.id, null);
+    }
+
+    /**
+     * tessellator 描画 (DRAW_TESS) だけを再生する (本家式マテリアル別オーバーレイ = 方向幕等)。
+     * 本体グループ (RENDER_GROUPS/RENDER_PARTS/DRAW_MODEL_GROUP) は通常パスで既に描かれているので描かない。
+     * defaultTex = そのマテリアルのテクスチャ (スクリプトが BIND_TEXTURE で上書きしたらそれを優先)。
+     */
+    static void replayTessOnly(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
+                               int packedLight, int packedOverlay, ResourceLocation defaultTex) {
+        //方向幕/速度計/ATC/モニタ/室内LED は発光する表示器 (JSON の "Light" マテリアル) なので、
+        //既定で FULL_BRIGHT にして昼夜問わず読めるようにする。スクリプトが明示 setBrightness した
+        //場合はそれを優先 (負値リセットは表示器なので FULL_BRIGHT に戻す)。
+        final int fullBright = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
+        int light = fullBright;
+        ResourceLocation tex = defaultTex;
+        int depth = 0;
+        for (GLRecorder.Cmd cmd : rec.getCommands()) {
+            switch (cmd.op) {
+                case PUSH -> {
+                    poseStack.pushPose();
+                    depth++;
+                }
+                case POP -> {
+                    if (depth > 0) {
+                        poseStack.popPose();
+                        depth--;
+                    }
+                }
+                case TRANSLATE -> poseStack.translate(cmd.a, cmd.b, cmd.c);
+                case ROTATE -> {
+                    if (cmd.payload instanceof org.joml.Quaternionf quat) {
+                        poseStack.mulPose(quat);
+                    }
+                }
+                case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
+                case BRIGHTNESS -> light = cmd.a < 0 ? fullBright : (int) cmd.a;
+                case BIND_TEXTURE -> tex = cmd.payload instanceof ResourceLocation rl ? rl : defaultTex;
+                case DRAW_TESS -> {
+                    if (cmd.payload instanceof GLRecorder.TessDraw draw) {
+                        drawTess(draw, poseStack, buffer, light, packedOverlay, tex);
+                    }
+                }
+                default -> {
+                    //RENDER_GROUPS/RENDER_PARTS/DRAW_MODEL_GROUP/COLOR は本体描画なので無視
+                }
+            }
+        }
+        while (depth > 0) {
+            poseStack.popPose();
+            depth--;
+        }
     }
 
     static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
@@ -503,9 +693,13 @@ public final class VehicleScriptRenderers {
                             model.renderNamedGroupsEmissive(poseStack, buffer, light, packedOverlay,
                                     (Set<String>) names, legacyPass);
                         } else if (model != null) {
-                            //translucent=false は全バッチ描画 (renderSelectedBatches のフィルタ仕様)。
+                            //本家 RenderVehicleBase と同じく pass で不透明/半透明を切り替える。
+                            //pass0(NORMAL)=不透明テクスチャ、pass1(TRANSPARENT)=window テクスチャ+ブレンド。
+                            //これで色付き半透明の窓 (body_a_* を pass1 で描く RTM スクリプト) が
+                            //テクスチャ本来の色で半透明描画される (KQ パックの窓が色付かない問題)。
                             //excluded はスクリプトが除外指定したパーツ (開いたドア等) を落とす。
-                            model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false,
+                            boolean translucentPass = legacyPass == RenderPass.TRANSPARENT.id;
+                            model.renderNamedGroups(poseStack, buffer, light, packedOverlay, translucentPass,
                                     (Set<String>) names, null, excluded);
                         }
                     }

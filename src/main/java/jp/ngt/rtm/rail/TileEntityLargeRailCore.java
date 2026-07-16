@@ -49,6 +49,26 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     // see RailMapBasic.fixRTMRailMapVersion
     protected int fixRTMRailMapVersion;
 
+    //WebCTC (別mod) 用: ロード済みレールコアの一覧。weak なのでチャンクアンロードで自然に消える。
+    private static final java.util.Set<TileEntityLargeRailCore> LOADED_CORES =
+            java.util.Collections.synchronizedSet(
+                    java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>()));
+
+    /** 指定ワールドのロード済みレールコア一覧 (WebCTC の地図 API が使用)。 */
+    public static java.util.List<TileEntityLargeRailCore> getLoadedCores(net.minecraft.world.level.Level level) {
+        synchronized (LOADED_CORES) {
+            return LOADED_CORES.stream()
+                    .filter(c -> c.getLevel() == level && !c.isRemoved())
+                    .collect(java.util.stream.Collectors.toList());
+        }
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        LOADED_CORES.add(this);
+    }
+
     public TileEntityLargeRailCore(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
     }

@@ -87,6 +87,11 @@ public class SignalNetworkSavedData extends SavedData {
         return entries.containsKey(channel);
     }
 
+    /** WebCTC (別mod) 用: 全チャンネルのエントリ (読み取り専用コピー)。 */
+    public java.util.Map<Integer, SignalEntry> getEntries() {
+        return java.util.Map.copyOf(this.entries);
+    }
+
     public SignalAspect getAspect(int channel) {
         SignalEntry entry = entries.get(channel);
         return entry == null ? SignalAspect.STOP : entry.aspect();
@@ -151,6 +156,6 @@ public class SignalNetworkSavedData extends SavedData {
         return level.dimension().location().toString();
     }
 
-    private record SignalEntry(String dimensionId, BlockPos pos, SignalAspect aspect) {
+    public record SignalEntry(String dimensionId, BlockPos pos, SignalAspect aspect) {
     }
 }

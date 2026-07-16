@@ -1,0 +1,1 @@
+package com.myname.legacyloader.bridge.util; public class LegacyDamageSource { public static final LegacyDamageSource field_76377_j=new LegacyDamageSource("generic"); public final String damageType; public LegacyDamageSource(String s){damageType=s;} public LegacyDamageSource func_76348_h(){return this;} }

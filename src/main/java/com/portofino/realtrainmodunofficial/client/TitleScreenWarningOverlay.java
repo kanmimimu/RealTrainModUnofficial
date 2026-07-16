@@ -16,6 +16,35 @@ public final class TitleScreenWarningOverlay {
     private TitleScreenWarningOverlay() {
     }
 
+    //同意画面をこのセッションで一度開いたか (タイトルへ戻る度に開き直さない)。
+    private static boolean consentOpened;
+
+    /**
+     * タイトル画面が開いたら、README 未同意のパックがあれば同意画面を出す。
+     * (パック読み込みはタイトル画面より前に済んでいるので、この時点で未決一覧が揃っている)
+     */
+    @SubscribeEvent
+    public static void onScreenInit(ScreenEvent.Init.Post event) {
+        if (!(event.getScreen() instanceof TitleScreen)) {
+            return;
+        }
+        if (consentOpened || !com.portofino.realtrainmodunofficial.pack.PackConsent.hasPending()) {
+            return;
+        }
+        consentOpened = true;
+        Minecraft mc = Minecraft.getInstance();
+        //init 中の setScreen 再入を避けて次tickで開く。
+        mc.execute(() -> {
+            if (mc.screen instanceof TitleScreen) {
+                var screen = com.portofino.realtrainmodunofficial.client.screen.PackConsentScreen
+                        .createIfPending(mc.screen);
+                if (screen != null) {
+                    mc.setScreen(screen);
+                }
+            }
+        });
+    }
+
     @SubscribeEvent
     public static void onScreenRender(ScreenEvent.Render.Post event) {
         if (!(event.getScreen() instanceof TitleScreen)) {

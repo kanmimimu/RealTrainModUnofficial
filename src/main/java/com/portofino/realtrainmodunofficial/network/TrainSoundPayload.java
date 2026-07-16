@@ -55,7 +55,9 @@ public record TrainSoundPayload(int trainEntityId, String soundId, float volume,
             //(以前は TrainEntity 決め打ちで、実際に出る本家系の列車では黙って捨てていた)
             net.minecraft.world.entity.Entity entity = minecraft.level.getEntity(payload.trainEntityId());
             if (LegacyScriptSoundManager.isTrain(entity)) {
-                LegacyScriptSoundManager.playLegacyId(entity, payload.soundId(), payload.volume(), payload.pitch(), false);
+                //サーバー発の離散イベント音 (レバー/警笛/緩解音等): 抑制なしで送られた回数だけ鳴らす
+                //(連続ノッチ操作のガタガタ音は本家挙動。スクリプト用の抑制を通すと欠落する)
+                LegacyScriptSoundManager.playLegacyId(entity, payload.soundId(), payload.volume(), payload.pitch(), false, true);
             }
         });
     }

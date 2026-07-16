@@ -50,6 +50,11 @@ public final class TrainCommands {
                     .requires(source -> source.hasPermission(2))
                     .executes(context -> executeDeleteTrain(context.getSource()))
                 )
+                //小文字表記でも効くように (コマンドリテラルは大文字小文字を区別する)
+                .then(Commands.literal("delalltrain")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(context -> executeDeleteTrain(context.getSource()))
+                )
                 .then(Commands.literal("flyspeed")
                     .requires(source -> source.hasPermission(2))
                     .then(Commands.argument("speed", IntegerArgumentType.integer(1, 10))
@@ -63,6 +68,31 @@ public final class TrainCommands {
                     .requires(source -> source.hasPermission(2))
                     .executes(context -> executeNashornTest(context.getSource()))
                 )
+                //本家 MacroRecorder: 運転操作 (ノッチ/ドア/警笛) をマクロとして録画する。
+                //start → 列車を運転 → stop で config/realtrainmodunofficial/macro/日時.txt へ保存。
+                //保存したマクロは運転士 (素手右クリック) が再生できる。
+                .then(Commands.literal("macro")
+                    .then(Commands.literal("start")
+                        .executes(context -> {
+                            var player = context.getSource().getPlayerOrException();
+                            if (!jp.ngt.rtm.entity.npc.macro.MacroRecorder.start(player)) {
+                                context.getSource().sendFailure(
+                                    net.minecraft.network.chat.Component.literal("すでに録画中です"));
+                            }
+                            return 1;
+                        })
+                    )
+                    .then(Commands.literal("stop")
+                        .executes(context -> {
+                            var player = context.getSource().getPlayerOrException();
+                            if (!jp.ngt.rtm.entity.npc.macro.MacroRecorder.stop(player)) {
+                                context.getSource().sendFailure(
+                                    net.minecraft.network.chat.Component.literal("録画していません (/rtm macro start)"));
+                            }
+                            return 1;
+                        })
+                    )
+                )
         );
     }
 
@@ -74,6 +104,7 @@ public final class TrainCommands {
         for (ServerLevel level : server.getAllLevels()) {
             removedCount += removeTrainEntities(level);
             removeBogieEntities(level);
+            removedCount += removeRtmTrainEntities(level);
             removeRailCollisionBlocks(level);
         }
 
@@ -153,6 +184,31 @@ public final class TrainCommands {
         for (TrainBogieEntity bogie : bogies) {
             bogie.discard();
         }
+    }
+
+    /**
+     * 本家系の列車 (jp.ngt.rtm.entity.train.EntityTrainBase — 設置される列車はこちら) と
+     * その台車・車両パーツを全て削除する。旧 TrainEntity の削除だけでは実車が残る。
+     */
+    private static int removeRtmTrainEntities(ServerLevel level) {
+        List<Entity> targets = new ArrayList<>();
+        int trainCount = 0;
+        try {
+            for (Entity entity : level.getAllEntities()) {
+                if (entity instanceof jp.ngt.rtm.entity.train.EntityTrainBase) {
+                    targets.add(entity);
+                    trainCount++;
+                } else if (entity instanceof jp.ngt.rtm.entity.train.EntityBogie
+                        || entity instanceof jp.ngt.rtm.entity.train.parts.EntityVehiclePart) {
+                    targets.add(entity);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        for (Entity entity : targets) {
+            entity.discard();
+        }
+        return trainCount;
     }
 
     private static void removeRailCollisionBlocks(ServerLevel level) {

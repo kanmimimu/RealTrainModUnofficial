@@ -165,6 +165,11 @@ public class EntityBogie extends Entity {
         return this.currentRailMap != null;
     }
 
+    /** 現在乗っているレールコア (WebCTC の RailGroup 在線判定などが使う)。 */
+    public TileEntityLargeRailCore getCurrentRailObj() {
+        return this.currentRailObj;
+    }
+
     /**
      * @return 位置更新が成功したらtrue
      */

@@ -413,16 +413,29 @@ public class MarkerBlock extends BaseEntityBlock {
     private List<RailPosition> searchAllMarkers(Level level, BlockPos origin) {
         List<RailPosition> list = new ArrayList<>();
         int ox = origin.getX(), oy = origin.getY(), oz = origin.getZ();
+        //探索範囲 = 一度に敷設できるレール長の上限 (コンフィグ railMarkerSearchRange/Height で変更可)
+        int range = com.portofino.realtrainmodunofficial.Config.railMarkerSearchRange();
+        int height = com.portofino.realtrainmodunofficial.Config.railMarkerSearchHeight();
 
-        for (int i = -SEARCH_DISTANCE; i <= SEARCH_DISTANCE; i++) {
-            for (int j = -SEARCH_HEIGHT; j <= SEARCH_HEIGHT; j++) {
-                for (int k = -SEARCH_DISTANCE; k <= SEARCH_DISTANCE; k++) {
-                    BlockPos check = new BlockPos(ox + i, oy + j, oz + k);
-                    BlockEntity be = level.getBlockEntity(check);
+        //ブロック総当たり (旧実装は range=50 で 101×101×21 回の getBlockEntity) ではなく、
+        //範囲内チャンクの BlockEntity 一覧を走査する。範囲を広げても軽い。
+        int minCX = (ox - range) >> 4, maxCX = (ox + range) >> 4;
+        int minCZ = (oz - range) >> 4, maxCZ = (oz + range) >> 4;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                if (!level.hasChunk(cx, cz)) {
+                    continue;
+                }
+                for (BlockEntity be : level.getChunk(cx, cz).getBlockEntities().values()) {
                     if (be instanceof MarkerBlockEntity me) {
-                        RailPosition rp = me.getMarkerRP();
-                        if (rp != null) {
-                            list.add(copyRailPosition(rp));
+                        BlockPos p = me.getBlockPos();
+                        if (Math.abs(p.getX() - ox) <= range
+                                && Math.abs(p.getY() - oy) <= height
+                                && Math.abs(p.getZ() - oz) <= range) {
+                            RailPosition rp = me.getMarkerRP();
+                            if (rp != null) {
+                                list.add(copyRailPosition(rp));
+                            }
                         }
                     }
                 }

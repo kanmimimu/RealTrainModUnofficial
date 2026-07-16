@@ -236,6 +236,11 @@ public class TrainEntity extends Entity {
     private float prevRotationRoll;
     public float doorMoveL;
     public float doorMoveR;
+    //クライアント側ドア開閉音 (sound_DoorOpen/sound_DoorClose) の状態変化検出用。
+    //多くのパック (209/125 系等) はサウンドスクリプトでドア音を鳴らさず、この設定に頼る。
+    private boolean prevDoorLeftForSound;
+    private boolean prevDoorRightForSound;
+    private boolean doorSoundStateInitialized;
     public float pantograph_F = 40.0F;
     public float pantograph_B = 40.0F;
     public float seatRotation;
@@ -970,6 +975,9 @@ public class TrainEntity extends Entity {
     private void updateTrainAnimationState() {
         doorMoveL = approach(doorMoveL, isDoorLeftOpen() ? 60.0F : 0.0F, 1.0F);
         doorMoveR = approach(doorMoveR, isDoorRightOpen() ? 60.0F : 0.0F, 1.0F);
+        if (level().isClientSide()) {
+            updateDoorSound();
+        }
         // 本家RTM準拠: pantograph movement(=pantograph_F/40) は「下降量」。DOWN で 40(=1.0)、UP で 0。
         // (RTMU は従来 UP で 40 にしており、パンタ上で下降表示・下で上昇表示と逆になっていた。)
         pantograph_F = approach(pantograph_F, isPantographUp() ? 0.0F : 40.0F, 1.0F);
@@ -982,6 +990,48 @@ public class TrainEntity extends Entity {
             seatRotation += 1.0F;
         }
         seatRotation = Mth.clamp(seatRotation, -45.0F, 45.0F);
+    }
+
+    /**
+     * クライアント側: ドア開閉状態の変化を検出し、車両定義の sound_DoorOpen / sound_DoorClose を鳴らす。
+     * 多くのパック (209/125 系等) はサウンドスクリプトでドア音を鳴らさず、この JSON 設定に頼るため、
+     * 本家 RTM と同じくエンジン側で鳴らす。初回 tick は状態を記録するだけ (スポーン時に鳴らさない)。
+     */
+    private void updateDoorSound() {
+        boolean left = isDoorLeftOpen();
+        boolean right = isDoorRightOpen();
+        if (!doorSoundStateInitialized) {
+            prevDoorLeftForSound = left;
+            prevDoorRightForSound = right;
+            doorSoundStateInitialized = true;
+            return;
+        }
+        if (left == prevDoorLeftForSound && right == prevDoorRightForSound) {
+            return;
+        }
+        //開いた側があれば開音、閉じた側があれば閉音 (左右同時操作は各 1 回に集約)。
+        boolean opened = (left && !prevDoorLeftForSound) || (right && !prevDoorRightForSound);
+        boolean closed = (!left && prevDoorLeftForSound) || (!right && prevDoorRightForSound);
+        prevDoorLeftForSound = left;
+        prevDoorRightForSound = right;
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def == null) {
+            return;
+        }
+        if (opened) {
+            playDoorSound(def.getSoundDoorOpen());
+        }
+        if (closed) {
+            playDoorSound(def.getSoundDoorClose());
+        }
+    }
+
+    private void playDoorSound(String soundId) {
+        if (soundId == null || soundId.isBlank()) {
+            return;
+        }
+        com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
+            .playLegacyId(this, soundId, 1.0F, 1.0F, false);
     }
 
     private boolean canTravelOnRail(Vec3 worldPos) {

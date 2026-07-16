@@ -1001,9 +1001,23 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         return InstalledObjectRegistry.getById(definitionId);
     }
 
+    /** ロード済み設置物 (WebCTC の信号地図 API が使用。レールコアの LOADED_CORES と同じ方式)。 */
+    private static final java.util.Set<InstalledObjectBlockEntity> LOADED_OBJECTS =
+            java.util.Collections.synchronizedSet(
+                    java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>()));
+
+    public static java.util.List<InstalledObjectBlockEntity> getLoadedObjects(net.minecraft.world.level.Level level) {
+        synchronized (LOADED_OBJECTS) {
+            return LOADED_OBJECTS.stream()
+                    .filter(o -> o.getLevel() == level && !o.isRemoved())
+                    .collect(java.util.stream.Collectors.toList());
+        }
+    }
+
     @Override
     public void onLoad() {
         super.onLoad();
+        LOADED_OBJECTS.add(this);
         if (level instanceof ServerLevel serverLevel && isSignal()) {
             SignalNetworkSavedData.get(serverLevel).syncLoadedSignal(serverLevel, this);
         }

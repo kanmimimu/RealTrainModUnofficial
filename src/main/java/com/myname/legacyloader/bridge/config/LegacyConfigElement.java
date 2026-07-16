@@ -1,0 +1,1 @@
+package com.myname.legacyloader.bridge.config; import java.util.*; public class LegacyConfigElement { public LegacyConfigElement(Object o){} public List<Object> getChildElements(){return Collections.emptyList();} }

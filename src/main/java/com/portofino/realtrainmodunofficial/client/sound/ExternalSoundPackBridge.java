@@ -81,6 +81,11 @@ public final class ExternalSoundPackBridge {
             boolean copiedAnySoundAsset = false;
             for (Path candidate : collectCandidatePacks()) {
                 try {
+                    //README 同意ゲート: 未同意/拒否のパックの音は取り込まない (zip のみ対象)。
+                    if (!Files.isDirectory(candidate)
+                            && !com.portofino.realtrainmodunofficial.pack.PackConsent.isAllowed(candidate)) {
+                        continue;
+                    }
                     if (Files.isDirectory(candidate)) {
                         copiedAnySoundAsset |= collectFromDirectory(candidate, mergedSoundDefs);
                     } else if (isSupportedArchive(candidate)) {

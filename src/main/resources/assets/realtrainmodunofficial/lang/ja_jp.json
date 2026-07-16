@@ -22,6 +22,8 @@
   "block.realtrainmodunofficial.legacy_marker_switch": "分岐マーカー",
   "item.realtrainmodunofficial.example_item": "サンプルアイテム",
   "item.realtrainmodunofficial.rail": "レール",
+  "item.realtrainmodunofficial.motorman": "運転士",
+  "entity.realtrainmodunofficial.rtm_motorman": "運転士",
   "item.realtrainmodunofficial.train": "列車",
   "item.realtrainmodunofficial.test_train": "試験用車両",
   "item.realtrainmodunofficial.train_vehicle": "車両アイテム",

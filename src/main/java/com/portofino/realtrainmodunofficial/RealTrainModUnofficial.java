@@ -35,6 +35,8 @@ public class RealTrainModUnofficial {
             .displayItems((parameters, output) -> {
                 output.accept(RealTrainModUnofficialItems.TRAIN_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CAR_ITEM.get());
+                //本家 itemMotorman (運転士): 列車に使うと乗車して信号/ダイヤ/マクロで自動運転
+                output.accept(RealTrainModUnofficialItems.MOTORMAN_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.IC_CARD_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.RAIL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.WIRE_ITEM.get());
@@ -76,6 +78,24 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.CAMERA_ITEM.get());
             }).build());
 
+    /**
+     * mods フォルダの 1.7.10 建材 mod からかき集めたブロックを全部並べる専用タブ。
+     * 中身は {@link com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks#TAB_ITEMS}
+     * (コンストラクタの init() で構築)。空でもタブ自体は出す (レンガアイコン)。
+     */
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXTERNAL_BUILDING_TAB =
+        CREATIVE_MODE_TABS.register("external_building_tab", () -> CreativeModeTab.builder()
+            .title(Component.literal("外部建材 (1.7.10)"))
+            .withTabsAfter(MAIN_TAB.getKey())
+            .icon(() -> com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks.TAB_ITEMS.isEmpty()
+                ? new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BRICKS)
+                : com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks.TAB_ITEMS.get(0).get().getDefaultInstance())
+            .displayItems((parameters, output) -> {
+                for (var item : com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks.TAB_ITEMS) {
+                    output.accept(item.get());
+                }
+            }).build());
+
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
         // 軽量化: 既定のログレベルは INFO に固定する(描画には無関係)。
         // 以前はバグ追跡のため DEBUG を強制していたが、毎tick/毎フレームの DEBUG ログが
@@ -97,6 +117,9 @@ public class RealTrainModUnofficial {
             event.register(com.portofino.realtrainmodunofficial.world.TrainChunkLoader.CONTROLLER));
 
         RealTrainModUnofficialBlocks.BLOCKS.register(modEventBus);
+        //mods フォルダの 1.7.10 建材 mod をスキャンし、ブロックテクスチャをフルキューブブロックとして
+        //登録する (レジストリ凍結前に走らせる必要があるのでここで呼ぶ)。
+        com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks.init(modEventBus);
         // jp.ngt.rtm.rail: 本家忠実移植のレール/マーカー (Phase 1)
         jp.ngt.rtm.rail.RTMRailBlocks.REGISTER.register(modEventBus);
         jp.ngt.rtm.rail.RTMRailBlockEntities.REGISTER.register(modEventBus);
@@ -109,10 +132,7 @@ public class RealTrainModUnofficial {
         RealTrainModUnofficialBlockEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         RealTrainModUnofficialComponents.REGISTRAR.register(modEventBus);
-        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
-            com.portofino.realtrainmodunofficial.compat.webctc.WebCtcCompat::onServerStarted);
-        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
-            com.portofino.realtrainmodunofficial.compat.webctc.WebCtcCompat::onServerStopping);
+        //WebCTC は別 mod (RTMU-WebCTC_1.21.1, webctc サブプロジェクト) へ分離した。
         // スピーカー音源マッピングをサーバー起動時にロードし、プレイヤー接続時に同期する。
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
             (net.neoforged.neoforge.event.server.ServerStartingEvent e) ->

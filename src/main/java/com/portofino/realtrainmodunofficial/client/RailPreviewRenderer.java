@@ -149,16 +149,29 @@ public final class RailPreviewRenderer {
         if (mc.level == null) {
             return result;
         }
-        for (int dx = -SEARCH_DISTANCE; dx <= SEARCH_DISTANCE; dx++) {
-            for (int dy = -SEARCH_HEIGHT; dy <= SEARCH_HEIGHT; dy++) {
-                for (int dz = -SEARCH_DISTANCE; dz <= SEARCH_DISTANCE; dz++) {
-                    BlockEntity be = mc.level.getBlockEntity(center.offset(dx, dy, dz));
+        //探索範囲 = 敷設上限 (コンフィグ連動)。ブロック総当たりではなくチャンクの BlockEntity
+        //一覧を走査する (旧実装は毎フレーム 129x21x129 回の getBlockEntity で重かった)。
+        int range = Math.max(SEARCH_DISTANCE, com.portofino.realtrainmodunofficial.Config.railMarkerSearchRange());
+        int height = Math.max(SEARCH_HEIGHT, com.portofino.realtrainmodunofficial.Config.railMarkerSearchHeight());
+        int minCX = (center.getX() - range) >> 4, maxCX = (center.getX() + range) >> 4;
+        int minCZ = (center.getZ() - range) >> 4, maxCZ = (center.getZ() + range) >> 4;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                if (!mc.level.hasChunk(cx, cz)) {
+                    continue;
+                }
+                for (BlockEntity be : mc.level.getChunk(cx, cz).getBlockEntities().values()) {
                     if (!(be instanceof MarkerBlockEntity marker)) {
                         continue;
                     }
-                    RailPosition rp = marker.getMarkerRP();
-                    if (rp != null) {
-                        result.add(rp);
+                    BlockPos p = marker.getBlockPos();
+                    if (Math.abs(p.getX() - center.getX()) <= range
+                            && Math.abs(p.getY() - center.getY()) <= height
+                            && Math.abs(p.getZ() - center.getZ()) <= range) {
+                        RailPosition rp = marker.getMarkerRP();
+                        if (rp != null) {
+                            result.add(rp);
+                        }
                     }
                 }
             }

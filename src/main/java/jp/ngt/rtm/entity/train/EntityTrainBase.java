@@ -143,6 +143,11 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return 1.0F;
     }
 
+    //クライアント側ドア開閉音 (sound_DoorOpen/sound_DoorClose) の状態変化検出用。
+    //209/125 系等の多くのパックはサウンドスクリプトでドア音を鳴らさず、この JSON 設定に頼る。
+    private int prevDoorStateForSound;
+    private boolean doorSoundStateInitialized;
+
     /**
      * 本家 updateAnimation (Client): 座席/ドア/パンタのアニメカウンタ。
      */
@@ -171,6 +176,33 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             }
         } else if (this.doorMoveL > 0) {
             --this.doorMoveL;
+        }
+
+        //クライアント側: ドア状態 (State_Door, bit0=右/bit1=左) の変化を検出して開閉音を鳴らす。
+        //本家 RTM 同様、サウンドスクリプトを持たない/ドア音を扱わないパック (209/125 系等) でも
+        //JSON の sound_DoorOpen/sound_DoorClose が鳴るようにする。初回は状態記録のみ (スポーン時無音)。
+        if (this.level().isClientSide()) {
+            if (!this.doorSoundStateInitialized) {
+                this.prevDoorStateForSound = doorState;
+                this.doorSoundStateInitialized = true;
+            } else if (doorState != this.prevDoorStateForSound) {
+                int prev = this.prevDoorStateForSound;
+                this.prevDoorStateForSound = doorState;
+                boolean opened = (doorState & ~prev & 3) != 0; //新たに開いた側
+                boolean closed = (~doorState & prev & 3) != 0; //新たに閉じた側
+                com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
+                        com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
+                if (def != null) {
+                    if (opened && !def.getSoundDoorOpen().isBlank()) {
+                        com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
+                                .playLegacyId(this, def.getSoundDoorOpen(), 1.0F, 1.0F, false);
+                    }
+                    if (closed && !def.getSoundDoorClose().isBlank()) {
+                        com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
+                                .playLegacyId(this, def.getSoundDoorClose(), 1.0F, 1.0F, false);
+                    }
+                }
+            }
         }
 
         int pantoState = this.getTrainStateData(TrainStateType.State_Pantograph.id);
@@ -328,7 +360,26 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             this.tickSound();
         } else {
             this.syncFormationData();
+            this.syncDataMap();
         }
+    }
+
+    /**
+     * サーバー: DataMap の flag=1 書き込み (ATSA の HUD 情報等) をクライアントへ配信する。
+     * 変更があった時だけ・10 tick おきにまとめて送る (軽量)。
+     */
+    private void syncDataMap() {
+        if ((this.tickCount % 10) != 0) {
+            return;
+        }
+        java.util.Map<String, Object> pending = this.getResourceState().getDataMap().drainPendingSync();
+        if (pending.isEmpty()) {
+            return;
+        }
+        java.util.Map<String, String> encoded = new java.util.HashMap<>(pending.size());
+        pending.forEach((k, v) -> encoded.put(k, jp.ngt.rtm.modelpack.state.DataMap.encodeSyncedValue(v)));
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntity(this,
+                new com.portofino.realtrainmodunofficial.network.DataMapSyncPayload(this.getId(), encoded));
     }
 
     /** サーバー: 編成の位置情報をクライアントへ流す (値が変わった時だけ同期が走る)。 */
@@ -412,7 +463,14 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         if (this.soundScriptEngine != null) {
             //スクリプトが鳴らす音と JSON 定義の自動走行音が二重に鳴らないようにする
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAutoRunningSound(this);
-            com.portofino.realtrainmodunofficial.script.TrainScriptSystem.invokeSoundScript(this.soundScriptEngine, this);
+            //本家 SoundUpdater 互換: onUpdate を挟み、今 tick 鳴らさなかったループ音を止める
+            //(明示 stopSound しないスクリプトのループ音が無限に鳴り続ける不具合の対策)。
+            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.beginScriptTick(this);
+            try {
+                com.portofino.realtrainmodunofficial.script.TrainScriptSystem.invokeSoundScript(this.soundScriptEngine, this);
+            } finally {
+                com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.endScriptTick(this);
+            }
         } else {
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
         }
@@ -774,6 +832,23 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                         jp.ngt.ngtlib.io.NGTLog.sendChatMessage(player, "message.train.deconcatenation");
                     }
                 }
+            } else if (!itemstack.isEmpty()
+                    && itemstack.getItem() instanceof com.portofino.realtrainmodunofficial.item.MotormanItem) {
+                //本家: 運転士アイテムで列車を右クリック → 運転士がスポーンして運転台に乗車
+                boolean driverSeatFree = this.getPassengers().stream().allMatch(this::hasSeat);
+                if (id1 >= 0 && driverSeatFree) {
+                    jp.ngt.rtm.entity.npc.EntityMotorman motorman =
+                            jp.ngt.rtm.entity.RTMEntities.MOTORMAN.get().create(this.level());
+                    if (motorman != null) {
+                        motorman.moveTo(this.getX(), this.getY(), this.getZ(), 0.0F, 0.0F);
+                        if (this.level().addFreshEntity(motorman)) {
+                            this.mountEntityToTrain(motorman, id1);
+                            if (!player.getAbilities().instabuild) {
+                                itemstack.shrink(1);
+                            }
+                        }
+                    }
+                }
             } else if (id1 >= 0) {
                 this.mountEntityToTrain(player, id1);
             }
@@ -962,6 +1037,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     /** 本家 rtm:sounds/train/lever.ogg (マスコン/ブレーキハンドルの操作音)。 */
     private static final String SOUND_LEVER = "rtm:sounds/train/lever.ogg";
 
+    /** 本家 EntityTrainBase.atsCount (ATS 確認カウンタ)。ATSAssistMod (別mod) が使用する。 */
+    public int atsCount;
+
     public boolean addNotch(Entity driver, int par2) {
         if (par2 != 0) {
             int i = this.getNotch();
@@ -973,6 +1051,8 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 if (i < 0 && par2 > 0 && !this.level().isClientSide()) {
                     this.playBrakeReleaseSound(i == -1);
                 }
+                //本家: マクロ録画中ならノッチ増分を記録 (/rtm macro start)
+                jp.ngt.rtm.entity.npc.macro.MacroRecorder.recNotch(driver, par2);
                 return true;
             }
         }

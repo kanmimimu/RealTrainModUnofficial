@@ -56,20 +56,27 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
         // GraalJS スクリプト) を絶対に走らせない — DataMap/入力の二重処理や
         // __SRB__ クライアント敷設の誤発動を起こすため。
         var scripted = com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
+        boolean scriptRendered = false;
         if (scripted != null) {
             poseStack.pushPose();
             try {
                 poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
                 //ボディモデルはスクリプト無しロード (レガシースクリプトを起動させない)
                 MqoModelLoader.MqoModel bodyModel = MqoModelLoader.loadModelForVehicleNoScript(def);
-                scripted.render(entity, partialTick, poseStack, bufferSource,
+                //戻り値 = スクリプトが実際にジオメトリを描いたか。false のとき (render() が
+                //何も描かず終わる / 例外で落ちる) は下の素モデル描画にフォールバックする。
+                scriptRendered = scripted.render(entity, partialTick, poseStack, bufferSource,
                         packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, bodyModel);
             } catch (Throwable ignored) {
             } finally {
                 poseStack.popPose();
             }
-        } else {
-            //新パイプラインが無い車両のみ: 旧 MQO パイプライン (ベイクドモデル+レガシースクリプト)
+        }
+        //スクリプトが無い or スクリプト描画に失敗した車両: 旧 MQO パイプライン (ベイクドモデル)。
+        //本家系の列車レンダラ (RtmTrainRenderer) と同じフォールバック。これが無いと、レンダー
+        //スクリプトが RTMU の Nashorn 環境で geometry を出せなかった自動車 (MFCP パトカー等) が
+        //「当たり判定はあるのにモデルが出ない」= 透明になっていた。
+        if (!scriptRendered) {
             MqoModelLoader.MqoModel model = MqoModelLoader.loadModelForVehicle(def);
             if (model != null) {
                 poseStack.pushPose();

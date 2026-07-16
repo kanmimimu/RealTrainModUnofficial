@@ -52,6 +52,10 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<CarItem> CAR_ITEM = ITEMS.register(
         "car", CarItem::new
     );
+    //本家 itemMotorman (運転士)。列車に使うと運転台に乗り、信号/ダイヤ/マクロで自動運転する
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.MotormanItem> MOTORMAN_ITEM = ITEMS.register(
+        "motorman", com.portofino.realtrainmodunofficial.item.MotormanItem::new
+    );
     public static final DeferredItem<IcCardItem> IC_CARD_ITEM = ITEMS.register(
         "ic_card", IcCardItem::new
     );

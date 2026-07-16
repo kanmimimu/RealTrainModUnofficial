@@ -79,6 +79,10 @@ public class VehicleDefinition {
     private String soundBrakeRelease = "";
     /** 本家 sound_BrakeRelease2: 同上 (弱、ノッチ -1 以外から戻したとき)。 */
     private String soundBrakeRelease2 = "";
+    /** 本家 sound_DoorOpen / sound_DoorClose: ドア開閉時にエンジンが鳴らす音。
+     *  多くのパック (209/125 系等) はサウンドスクリプトでドア音を鳴らさず、この設定に頼る。 */
+    private String soundDoorOpen = "";
+    private String soundDoorClose = "";
     private final boolean doCulling;
     private final boolean renderLight;
     private final boolean notDisplayCab;
@@ -535,6 +539,19 @@ public class VehicleDefinition {
     public void setBrakeReleaseSounds(String brakeRelease, String brakeRelease2) {
         this.soundBrakeRelease = brakeRelease == null ? "" : brakeRelease;
         this.soundBrakeRelease2 = brakeRelease2 == null ? "" : brakeRelease2;
+    }
+
+    public String getSoundDoorOpen() {
+        return soundDoorOpen;
+    }
+
+    public String getSoundDoorClose() {
+        return soundDoorClose;
+    }
+
+    public void setDoorSounds(String doorOpen, String doorClose) {
+        this.soundDoorOpen = doorOpen == null ? "" : doorOpen;
+        this.soundDoorClose = doorClose == null ? "" : doorClose;
     }
 
     public boolean hasJsonRunningSounds() {

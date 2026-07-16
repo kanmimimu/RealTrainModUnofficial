@@ -211,7 +211,10 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             }
             case "toggle_door" -> {
                 byte data = train.getTrainStateData(doorType.id);
-                train.setTrainStateData(doorType.id, (byte) (data == 0 ? 3 : 0));
+                byte next = (byte) (data == 0 ? 3 : 0);
+                train.setTrainStateData(doorType.id, next);
+                jp.ngt.rtm.entity.npc.macro.MacroRecorder.recDoor(player,
+                        jp.ngt.rtm.entity.train.util.TrainState.getState(doorType.id, next));
             }
             //ドアボタンの左右→ドアビット変換。車両自身のドア byte は「その車両の物理左右」
             //なので、運転士から見た左右は運転台の向き (cabDirection) だけで決まる
@@ -221,12 +224,18 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             case "toggle_door_left" -> {
                 byte data = train.getTrainStateData(doorType.id);
                 boolean dir = (train.getCabDirection() & 1) == 0;
-                train.setTrainStateData(doorType.id, (byte) (data ^ (dir ? 1 : 2)));
+                byte next = (byte) (data ^ (dir ? 1 : 2));
+                train.setTrainStateData(doorType.id, next);
+                jp.ngt.rtm.entity.npc.macro.MacroRecorder.recDoor(player,
+                        jp.ngt.rtm.entity.train.util.TrainState.getState(doorType.id, next));
             }
             case "toggle_door_right" -> {
                 byte data = train.getTrainStateData(doorType.id);
                 boolean dir = (train.getCabDirection() & 1) == 0;
-                train.setTrainStateData(doorType.id, (byte) (data ^ (dir ? 2 : 1)));
+                byte next = (byte) (data ^ (dir ? 2 : 1));
+                train.setTrainStateData(doorType.id, next);
+                jp.ngt.rtm.entity.npc.macro.MacroRecorder.recDoor(player,
+                        jp.ngt.rtm.entity.train.util.TrainState.getState(doorType.id, next));
             }
             case "toggle_headlight" -> {
                 byte data = train.getTrainStateData(lightType.id);
@@ -250,6 +259,18 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction.id, (byte) value);
             case "set_destination" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id, (byte) value);
+            //方向幕の送り/戻し。GUI (TrainControlScreen) はこの action を送るが、旧 EntityTrain
+            //(=設置される列車) 側ハンドラに case が無く、行先が一切変わらなかった (方向幕が空白のまま)。
+            //rollsignNames のコマ数で循環させ、スクリプトが読む State_Destination を更新する。
+            case "next_destination", "prev_destination" -> {
+                VehicleDefinition destDef = VehicleRegistry.getById(train.getModelName());
+                int count = destDef != null ? Math.max(1, destDef.getRollsignNames().size()) : 1;
+                var destType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination;
+                int cur = train.getTrainStateData(destType.id);
+                int step = "next_destination".equals(action) ? 1 : -1;
+                int next = Math.floorMod(cur + step, count);
+                train.setTrainStateData(destType.id, (byte) next);
+            }
             //RTMU 追加: 種別幕の選択 (方向幕とは独立した State_Type)
             case "set_type" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Type.id, (byte) value);
@@ -271,6 +292,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
                 if (def != null && !def.getHornSound().isBlank()) {
                     TrainSoundPayload.broadcast(train, def.getHornSound(), 1.0F, 1.0F);
+                    jp.ngt.rtm.entity.npc.macro.MacroRecorder.recHorn(player);
                 }
             }
             case "cycle_custom_button" -> {

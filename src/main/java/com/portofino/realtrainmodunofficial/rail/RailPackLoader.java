@@ -125,6 +125,10 @@ public class RailPackLoader {
             // RTM 系 pack は zip / jar の両方で配られるので、入口は archive に寄せる。
             stream.filter(RailPackLoader::isSupportedArchive)
                 .forEach(zipPath -> {
+                    //README 同意ゲート: 未同意/拒否のパックはロードしない。
+                    if (!com.portofino.realtrainmodunofficial.pack.PackConsent.isAllowed(zipPath)) {
+                        return;
+                    }
                     try {
                         int before = LOADED.size();
                         loadRailPackFile(zipPath, zipPath.getFileName().toString());

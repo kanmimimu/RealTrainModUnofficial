@@ -3945,7 +3945,16 @@ public final class MqoModelLoader {
                             && drawBatchWithEntityVbo(batch, renderType, poseStack, packedLight)) {
                             continue;
                         }
-                        VertexConsumer consumer = buffer.getBuffer(renderType);
+                        //列車のガラス等 (半透明) は専用の遅延バッファへ。エンティティ用の非固定
+                        //RenderType は途中フラッシュされるため、車両ごとに描くと「他の車両の
+                        //ガラス越しに座席が見えたり消えたりする」(描画順が毎フレーム変わる)。
+                        //遅延バッファは地形の半透明の後に一括描画され、常に正しい順序になる。
+                        MultiBufferSource targetBuffer = buffer;
+                        if (needsBlend
+                                && com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.shouldDefer(entity)) {
+                            targetBuffer = com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.buffer();
+                        }
+                        VertexConsumer consumer = targetBuffer.getBuffer(renderType);
                         //計測: CPU が毎フレーム流している頂点数 (F8 オーバーレイに出す)
                         com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.addVertices(batch.vertexCount);
                         PoseStack.Pose pose = poseStack.last();

@@ -41,6 +41,14 @@ public final class RTMEntities {
                     .updateInterval(3)
                     .build("rtm_floor"));
 
+    //本家 EntityMotorman (運転士)。setSize(0.6F, 1.8F)
+    public static final DeferredHolder<EntityType<?>, EntityType<jp.ngt.rtm.entity.npc.EntityMotorman>> MOTORMAN =
+            REGISTER.register("rtm_motorman", () -> EntityType.Builder.of(
+                            jp.ngt.rtm.entity.npc.EntityMotorman::new, MobCategory.MISC)
+                    .sized(0.6F, 1.8F)
+                    .clientTrackingRange(10)
+                    .build("rtm_motorman"));
+
     private RTMEntities() {
     }
 }

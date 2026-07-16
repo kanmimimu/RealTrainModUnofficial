@@ -36,7 +36,35 @@ public class Config {
             .comment("Do not evict cached polygon models that were used within this number of seconds.")
             .defineInRange("modelCacheProtectSeconds", 10, 0, 600);
 
+    //マーカー接続 (レール敷設) の探索範囲 = 一度に敷設できるレール長の上限。
+    public static final ModConfigSpec.IntValue RAIL_MARKER_SEARCH_RANGE = BUILDER
+            .comment("Horizontal search range (blocks) when connecting markers with a rail item.",
+                     "This is the maximum rail length you can place at once. (default 50)")
+            .defineInRange("railMarkerSearchRange", 50, 10, 1024);
+
+    public static final ModConfigSpec.IntValue RAIL_MARKER_SEARCH_HEIGHT = BUILDER
+            .comment("Vertical search range (blocks) when connecting markers. (default 10)")
+            .defineInRange("railMarkerSearchHeight", 10, 4, 256);
+
     static final ModConfigSpec SPEC = BUILDER.build();
+
+    /** マーカー探索の水平範囲 (コンフィグ未ロード時は既定 50)。 */
+    public static int railMarkerSearchRange() {
+        try {
+            return RAIL_MARKER_SEARCH_RANGE.get();
+        } catch (Exception e) {
+            return 50;
+        }
+    }
+
+    /** マーカー探索の垂直範囲 (コンフィグ未ロード時は既定 10)。 */
+    public static int railMarkerSearchHeight() {
+        try {
+            return RAIL_MARKER_SEARCH_HEIGHT.get();
+        } catch (Exception e) {
+            return 10;
+        }
+    }
 
     private static boolean validateItemName(final Object obj) {
         return obj instanceof String itemName && BuiltInRegistries.ITEM.containsKey(ResourceLocation.parse(itemName));

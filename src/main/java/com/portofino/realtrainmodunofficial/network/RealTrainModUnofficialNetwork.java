@@ -43,5 +43,11 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(BuyTicketPayload.TYPE, BuyTicketPayload.STREAM_CODEC, BuyTicketPayload::handleOnServer);
         //本家 guiIdSelectTileEntityTexture (標識のテクスチャ変更)
         registrar.playToServer(SetObjectModelPayload.TYPE, SetObjectModelPayload.STREAM_CODEC, SetObjectModelPayload::handleOnServer);
+        //本家 運転士 (EntityMotorman) のマクロ設定
+        registrar.playToServer(MotormanMacroPayload.TYPE, MotormanMacroPayload.STREAM_CODEC, MotormanMacroPayload::handleOnServer);
+        //運転士のスキン変更
+        registrar.playToServer(MotormanSkinPayload.TYPE, MotormanSkinPayload.STREAM_CODEC, MotormanSkinPayload::handleOnServer);
+        //本家系列車 (EntityVehicleBase) の DataMap 同期 (ATSA HUD 等が使用)
+        registrar.playToClient(DataMapSyncPayload.TYPE, DataMapSyncPayload.STREAM_CODEC, DataMapSyncPayload::handleOnClient);
     }
 }
