@@ -19,17 +19,18 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class LegacyScriptSoundManager {
-    private static final Map<String, LoopingTrainSound> ACTIVE = new ConcurrentHashMap<>();
+    //本家 SoundUpdaterVehicle.playingSounds の移植:
+    //  (列車UUID|サウンドID) → 追跡中サウンド。playSound は「リストに居れば音量/ピッチ更新のみ、
+    //  居なければ新規再生して登録」。一発音 (repeat=false) は鳴り終わっても登録が残り続け、
+    //  stopSound されるまで再発火しない (= 本家のラッチ)。ループも一発音も同じ 1 本の仕組み。
+    //  毎 tick playSound し続ける MugenLib 等のコンプレッサ音が 1 回で済み、
+    //  OpenAL ソースも (列車×サウンド名) につき最大 1 個しか使わない。
+    private static final Map<String, TrainScriptSound> ACTIVE = new ConcurrentHashMap<>();
     private static final Map<UUID, AutoRunningSoundState> AUTO_RUNNING = new ConcurrentHashMap<>();
-    private static final Map<String, Long> ONE_SHOT_LAST_PLAY_TICK = new ConcurrentHashMap<>();
-    //本家 SoundUpdater 互換: 前回鳴らした一発音がまだ鳴っている間は鳴らし直さないための保持。
-    //MugenLib 等のスクリプトは一発音 (コンプレッサ CPActive/CPEnd 等) を毎 tick playSound する。
-    //固定間隔デバウンスだけだと 180ms ごとに鳴り直して「てんてんてん」とスタッターするため、
-    //まだ再生中 (isActive) の一発音は鳴らし直さないようにする。
-    private static final Map<String, SimpleSoundInstance> ONE_SHOT_ACTIVE = new ConcurrentHashMap<>();
     // スピーカー等 playAt の在世界音を位置キーで保持(ブロック破壊時に stopAt で停止するため)。
     private static final Map<String, SimpleSoundInstance> SPEAKER_SOUNDS = new ConcurrentHashMap<>();
-    private static final long ONE_SHOT_DEBOUNCE_MS = 180L;
+    //消えた列車の登録を掃除する頻度 (play 呼び出し回数)
+    private static int pruneCounter;
 
     private LegacyScriptSoundManager() {
     }
@@ -123,16 +124,12 @@ public final class LegacyScriptSoundManager {
         if (soundId == null) {
             return;
         }
-        if (volume <= 0.001F) {
-            if (looping) {
-                stop(train, soundId);
-            }
-            return;
-        }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.getSoundManager() == null) {
             return;
         }
+        //サーバー発の離散イベント音 (レバー音・警笛など) は追跡せず毎回そのまま鳴らす
+        //(本家もこれらは SoundUpdater ではなく都度 playSound)。
         if (!looping && bypassOneShotSuppression) {
             minecraft.getSoundManager().play(new SimpleSoundInstance(
                 soundId,
@@ -150,139 +147,29 @@ public final class LegacyScriptSoundManager {
             ));
             return;
         }
-        if (!looping) {
-            String oneShotKey = key(train.getUUID(), soundId);
-            long now = System.currentTimeMillis();
-            //サウンドスクリプト tick 内 (begin/endScriptTick で挟まれている) の一発音は
-            //エッジトリガー: 「呼ばれ続けている間は最初の 1 回だけ」鳴らす (本家 SoundUpdater 互換)。
-            //MugenTrainSoundLib / MhnElecSoundlib 等はコンプレッサ音 (CPActive/CPEnd) を
-            //毎 tick playSound し続ける設計で、再生終了のたびに鳴らし直すと短い音が
-            //無限リピートする (車両設置直後の「プシュー」が延々鳴る不具合)。
-            //呼ばれなくなった tick でラッチが解除され、次に呼ばれた時にまた 1 回鳴る。
-            java.util.Set<ResourceLocation> requestedOneShot = REQUESTED_ONE_SHOT.get(train.getUUID());
-            if (requestedOneShot != null) {
-                requestedOneShot.add(soundId);
-                java.util.Set<ResourceLocation> latch = ONE_SHOT_LATCH.computeIfAbsent(
-                    train.getUUID(), k -> ConcurrentHashMap.newKeySet());
-                if (!latch.add(soundId)) {
-                    return; //ラッチ済み = 前 tick から呼ばれ続けている → 再発火しない
-                }
-            }
-            //本家 SoundUpdater と同じ: まだ鳴っている同一の一発音は鳴らし直さない。
-            //(毎 tick playSound される一発音が 180ms 間隔で連打され「てんてんてん」と
-            // スタッターする不具合の対策。209 系のコンプレッサ音 CPActive/CPEnd 等。)
-            SimpleSoundInstance prevInstance = ONE_SHOT_ACTIVE.get(oneShotKey);
-            if (prevInstance != null && minecraft.getSoundManager().isActive(prevInstance)) {
-                return;
-            }
-            //キュー反映ラグで isActive が一瞬 false を返す場合の二重再生を防ぐ最小間隔。
-            Long lastPlay = ONE_SHOT_LAST_PLAY_TICK.get(oneShotKey);
-            if (lastPlay != null && now - lastPlay < ONE_SHOT_DEBOUNCE_MS) {
-                return;
-            }
-            ONE_SHOT_LAST_PLAY_TICK.put(oneShotKey, now);
-            SimpleSoundInstance instance = new SimpleSoundInstance(
-                soundId,
-                SoundSource.NEUTRAL,
-                Mth.clamp(volume, 0.0F, 8.0F),
-                Mth.clamp(pitch, 0.05F, 4.0F),
-                SoundInstance.createUnseededRandom(),
-                false,
-                0,
-                SoundInstance.Attenuation.LINEAR,
-                train.getX(),
-                train.getY(),
-                train.getZ(),
-                false
-            );
-            ONE_SHOT_ACTIVE.put(oneShotKey, instance);
-            minecraft.getSoundManager().play(instance);
-            return;
-        }
+        //---- 本家 SoundUpdaterVehicle.playSound の忠実移植 ----
+        //既に登録済み (playingSounds 相当) なら、ループ/一発音を問わず音量・ピッチ更新のみ。
+        //一発音は鳴り終わっても登録が残るので、毎 tick 呼ばれても再発火しない (= 本家のラッチ)。
+        //stopSound で登録が外れると、次の playSound でまた 1 回鳴る。
         String key = key(train.getUUID(), soundId);
-        LoopingTrainSound sound = ACTIVE.get(key);
-        if (sound == null || sound.isStopped()) {
-            if (sound != null) {
-                ACTIVE.remove(key, sound);
-            }
-            sound = new LoopingTrainSound(train, soundId);
+        TrainScriptSound sound = ACTIVE.get(key);
+        if (sound != null && !sound.isStopped()) {
             sound.update(volume, pitch);
-            ACTIVE.put(key, sound);
-            minecraft.getSoundManager().play(sound);
-        } else {
-            sound.update(volume, pitch);
-        }
-        //本家 SoundUpdater 互換: 今 tick この列車で鳴らしたループ音を記録しておき、
-        //endScriptTick で「今 tick 鳴らされなかったループ音」を止める (= 無限ループ防止)。
-        //サウンドスクリプト tick 内で開始/更新されたループだけを管理対象にする
-        //(描画スクリプト起点のループ音を誤って止めないため)。
-        java.util.Set<ResourceLocation> requested = REQUESTED_LOOP.get(train.getUUID());
-        if (requested != null) {
-            requested.add(soundId);
-            MANAGED_LOOP_KEYS.add(key);
-        }
-    }
-
-    //--- 本家 SoundUpdater の「呼ばれなかったループ音を止める」機構 -----------------------
-    //RTM のサウンドスクリプトは、鳴らし続けたいループ音を毎 tick playSound し、鳴り止めたい音は
-    //「呼ばない」ことで止める設計 (本家 SoundUpdater が未更新のループ音を停止する)。RTMU には
-    //この自動停止が無く、明示 stopSound しないスクリプト (パトカー等) のループ音が無限に鳴り続けた。
-    //サウンドスクリプト onUpdate を beginScriptTick / endScriptTick で挟むことで本家挙動を再現する。
-    private static final Map<java.util.UUID, java.util.Set<ResourceLocation>> REQUESTED_LOOP =
-        new ConcurrentHashMap<>();
-    /** 今 tick に要求された一発音 (エッジトリガー判定用)。 */
-    private static final Map<java.util.UUID, java.util.Set<ResourceLocation>> REQUESTED_ONE_SHOT =
-        new ConcurrentHashMap<>();
-    /** 呼ばれ続けている一発音のラッチ。呼ばれなくなった tick で解除される。 */
-    private static final Map<java.util.UUID, java.util.Set<ResourceLocation>> ONE_SHOT_LATCH =
-        new ConcurrentHashMap<>();
-    /** サウンドスクリプト tick 内で開始されたループ音のキー (endScriptTick の自動停止対象)。 */
-    private static final java.util.Set<String> MANAGED_LOOP_KEYS = ConcurrentHashMap.newKeySet();
-
-    /** サウンドスクリプト onUpdate の直前に呼ぶ。今 tick の playSound 記録を開始する。 */
-    public static void beginScriptTick(Entity train) {
-        if (train == null) {
             return;
         }
-        REQUESTED_LOOP.put(train.getUUID(), ConcurrentHashMap.newKeySet());
-        REQUESTED_ONE_SHOT.put(train.getUUID(), ConcurrentHashMap.newKeySet());
-    }
-
-    /** サウンドスクリプト onUpdate の直後に呼ぶ。今 tick 鳴らされなかったループ音を止める。 */
-    public static void endScriptTick(Entity train) {
-        if (train == null) {
-            return;
+        if (sound != null) {
+            //明示 stop 済み / 列車消滅で止まった残骸 → 作り直す
+            ACTIVE.remove(key, sound);
         }
-        java.util.Set<ResourceLocation> requested = REQUESTED_LOOP.remove(train.getUUID());
-        //一発音のラッチ整理: 今 tick 呼ばれなかった音はラッチ解除 (次に呼ばれたら 1 回鳴る)
-        java.util.Set<ResourceLocation> requestedOneShot = REQUESTED_ONE_SHOT.remove(train.getUUID());
-        java.util.Set<ResourceLocation> latch = ONE_SHOT_LATCH.get(train.getUUID());
-        if (latch != null) {
-            if (requestedOneShot == null || requestedOneShot.isEmpty()) {
-                ONE_SHOT_LATCH.remove(train.getUUID());
-            } else {
-                latch.retainAll(requestedOneShot);
-            }
+        sound = new TrainScriptSound(train, soundId, looping);
+        sound.update(volume, pitch);
+        ACTIVE.put(key, sound);
+        minecraft.getSoundManager().play(sound);
+        //消えた列車の登録をたまに掃除 (ラッチは isStopped=false なので消えない)
+        if (++pruneCounter >= 256) {
+            pruneCounter = 0;
+            ACTIVE.entrySet().removeIf(entry -> !entry.getValue().train.isAlive());
         }
-        if (requested == null) {
-            return;
-        }
-        String prefix = train.getUUID() + "|";
-        ACTIVE.entrySet().removeIf(entry -> {
-            if (!entry.getKey().startsWith(prefix)) {
-                return false;
-            }
-            //サウンドスクリプト起点のループだけ自動停止 (描画スクリプトのループは対象外)
-            if (!MANAGED_LOOP_KEYS.contains(entry.getKey())) {
-                return false;
-            }
-            if (requested.contains(entry.getValue().getLocation())) {
-                return false;
-            }
-            entry.getValue().requestStop();
-            MANAGED_LOOP_KEYS.remove(entry.getKey());
-            return true;
-        });
     }
 
     /**
@@ -423,40 +310,28 @@ public final class LegacyScriptSoundManager {
         return "";
     }
 
+    /**
+     * 本家 SoundUpdaterVehicle.stopSound: 登録から外して停止。
+     * 一発音の場合はラッチ解除でもあり、次の playSound でまた 1 回鳴らせるようになる。
+     */
     public static void stop(Entity train, String namespace, String soundName) {
         if (train == null) {
             return;
         }
-        ResourceLocation soundId = toSoundId(namespace, soundName);
-        if (soundId == null) {
-            return;
-        }
-        String key = key(train.getUUID(), soundId);
-        LoopingTrainSound sound = ACTIVE.remove(key);
-        if (sound != null) {
-            sound.requestStop();
-        }
-        MANAGED_LOOP_KEYS.remove(key);
-        //明示 stopSound された一発音はラッチ解除 (次の playSound でまた 1 回鳴らせる)
-        java.util.Set<ResourceLocation> latch = ONE_SHOT_LATCH.get(train.getUUID());
-        if (latch != null) {
-            latch.remove(soundId);
-        }
+        stop(train, toSoundId(namespace, soundName));
     }
 
     private static void stop(Entity train, ResourceLocation soundId) {
         if (train == null || soundId == null) {
             return;
         }
-        String key = key(train.getUUID(), soundId);
-        LoopingTrainSound sound = ACTIVE.remove(key);
+        TrainScriptSound sound = ACTIVE.remove(key(train.getUUID(), soundId));
         if (sound != null) {
             sound.requestStop();
         }
-        MANAGED_LOOP_KEYS.remove(key);
     }
 
-    /** その列車が鳴らしているループ音を全部止める (本家 SoundUpdater.stopAllSounds 相当)。 */
+    /** その列車が鳴らしている音を全部止める (本家 SoundUpdater.stopAllSounds 相当)。 */
     public static void stopAll(Entity train) {
         if (train == null) {
             return;
@@ -467,10 +342,8 @@ public final class LegacyScriptSoundManager {
                 return false;
             }
             entry.getValue().requestStop();
-            MANAGED_LOOP_KEYS.remove(entry.getKey());
             return true;
         });
-        ONE_SHOT_LATCH.remove(train.getUUID());
         stopAutoRunningSound(train);
     }
 
@@ -550,13 +423,18 @@ public final class LegacyScriptSoundManager {
         private float previousSpeed;
     }
 
-    private static final class LoopingTrainSound extends AbstractTickableSoundInstance {
+    /**
+     * 本家 MovingSoundEntity の移植: 列車に追従する MovingSound。
+     * repeat=true でループ、false で一発音 (鳴り終わっても isStopped は false のままなので
+     * ACTIVE の登録が残り続け、stopSound されるまで再発火しない = 本家のラッチ)。
+     */
+    private static final class TrainScriptSound extends AbstractTickableSoundInstance {
         private final Entity train;
 
-        private LoopingTrainSound(Entity train, ResourceLocation soundId) {
+        private TrainScriptSound(Entity train, ResourceLocation soundId, boolean repeat) {
             super(SoundEvent.createVariableRangeEvent(soundId), SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
             this.train = train;
-            this.looping = true;
+            this.looping = repeat;
             this.delay = 0;
             this.volume = 0.0F;
             this.pitch = 1.0F;
@@ -580,6 +458,7 @@ public final class LegacyScriptSoundManager {
 
         @Override
         public void tick() {
+            //本家 MovingSoundEntity.update: 列車が消えたら停止、生きていれば追従
             if (!train.isAlive()) {
                 ACTIVE.remove(key(train.getUUID(), this.getLocation()), this);
                 AUTO_RUNNING.remove(train.getUUID());

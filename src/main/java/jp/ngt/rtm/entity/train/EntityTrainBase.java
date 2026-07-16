@@ -463,14 +463,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         if (this.soundScriptEngine != null) {
             //スクリプトが鳴らす音と JSON 定義の自動走行音が二重に鳴らないようにする
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAutoRunningSound(this);
-            //本家 SoundUpdater 互換: onUpdate を挟み、今 tick 鳴らさなかったループ音を止める
-            //(明示 stopSound しないスクリプトのループ音が無限に鳴り続ける不具合の対策)。
-            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.beginScriptTick(this);
-            try {
-                com.portofino.realtrainmodunofficial.script.TrainScriptSystem.invokeSoundScript(this.soundScriptEngine, this);
-            } finally {
-                com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.endScriptTick(this);
-            }
+            //サウンド管理は本家 SoundUpdaterVehicle 方式 (登録制)。playSound は
+            //「登録済みなら音量/ピッチ更新のみ」なので前後処理は不要。
+            com.portofino.realtrainmodunofficial.script.TrainScriptSystem.invokeSoundScript(this.soundScriptEngine, this);
         } else {
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
         }
