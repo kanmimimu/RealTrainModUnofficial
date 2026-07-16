@@ -25,6 +25,8 @@ public final class WebCTCEventHandler {
     }
 
     public static void onServerStarted(ServerStartedEvent event) {
+        //シングル/LAN ホストなら /webctc auth のリンクを localhost にする
+        WebCTCConfig.setDedicatedServer(event.getServer().isDedicatedServer());
         RailGroupData.onServerStarted(event.getServer());
         TeConData.onServerStarted(event.getServer());
         TeConRuntimeManager.setServer(event.getServer());

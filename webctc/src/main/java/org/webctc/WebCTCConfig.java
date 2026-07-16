@@ -31,8 +31,15 @@ public final class WebCTCConfig {
     public static String accessUrl = "";
     public static int accessPort = 0;
 
+    /** 専用サーバーかどうか (サーバー起動時に設定)。シングル/LAN ホストなら localhost を使う。 */
+    private static boolean dedicatedServer;
+
     private static String detectedIp;
     private static boolean loaded;
+
+    public static void setDedicatedServer(boolean dedicated) {
+        dedicatedServer = dedicated;
+    }
 
     private WebCTCConfig() {
     }
@@ -100,15 +107,16 @@ public final class WebCTCConfig {
     }
 
     /**
-     * チャットに表示するリンクの origin (本家と同じ組み立て):
-     * accessUrl が空ならグローバル IP (取得失敗時 127.0.0.1)、
+     * チャットに表示するリンクの origin:
+     * accessUrl が空なら自動 — シングル/LAN ホストは localhost (ブラウザは同じ PC)、
+     * 専用サーバーはグローバル IP (取得失敗時 127.0.0.1)。
      * ポートは accessPort (0 なら portNumber)、80/443 は省略。
      */
     public static String origin() {
         load();
         String base = accessUrl;
         if (base == null || base.isBlank()) {
-            base = "http://" + detectGlobalIp();
+            base = dedicatedServer ? "http://" + detectGlobalIp() : "http://localhost";
         }
         boolean isHttps = base.startsWith("https://");
         int port = accessPort == 0 ? portNumber : accessPort;

@@ -1430,30 +1430,38 @@ public class TrainScriptSystem {
         if (!(scriptEngine instanceof Invocable invocable)) {
             return;
         }
+        //本家 SoundUpdater 互換: この tick に playSound されなかったループ音の自動停止と、
+        //毎 tick 呼ばれ続ける一発音 (コンプレッサ CPActive/CPEnd 等) のエッジトリガー化のため
+        //begin/endScriptTick で挟む (MugenTrainSoundLib 等の短い一発音が無限リピートする対策)。
+        com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.beginScriptTick(train);
         try {
-            invocable.invokeFunction("onUpdate", su);
-            return;
-        } catch (NoSuchMethodException ignored) {
-            // onUpdate を持たないサウンドスクリプト → 下の形式を試す
-        } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "onUpdate(su) [sound]", e);
-            return;
-        }
-        try {
-            invocable.invokeFunction("update", su, 1.0F);
-            return;
-        } catch (NoSuchMethodException ignored) {
-            // update も無い
-        } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "update(su) [sound]", e);
-            return;
-        }
-        try {
-            invocable.invokeFunction("tick", su);
-        } catch (NoSuchMethodException ignored) {
-            // tick も無い → このスクリプトには回すものが無い
-        } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "tick(su) [sound]", e);
+            try {
+                invocable.invokeFunction("onUpdate", su);
+                return;
+            } catch (NoSuchMethodException ignored) {
+                // onUpdate を持たないサウンドスクリプト → 下の形式を試す
+            } catch (ScriptException e) {
+                disableBrokenScript(scriptEngine, "onUpdate(su) [sound]", e);
+                return;
+            }
+            try {
+                invocable.invokeFunction("update", su, 1.0F);
+                return;
+            } catch (NoSuchMethodException ignored) {
+                // update も無い
+            } catch (ScriptException e) {
+                disableBrokenScript(scriptEngine, "update(su) [sound]", e);
+                return;
+            }
+            try {
+                invocable.invokeFunction("tick", su);
+            } catch (NoSuchMethodException ignored) {
+                // tick も無い → このスクリプトには回すものが無い
+            } catch (ScriptException e) {
+                disableBrokenScript(scriptEngine, "tick(su) [sound]", e);
+            }
+        } finally {
+            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.endScriptTick(train);
         }
     }
 
