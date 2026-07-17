@@ -1,6 +1,7 @@
 package com.portofino.realtrainmodunofficial.client.screen;
 
 import com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload;
+import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import jp.ngt.rtm.rail.TileEntityMarker;
 import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.client.gui.GuiGraphics;
@@ -8,7 +9,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * レールのカント設定 (レンチでマーカーをシフト右クリック)。

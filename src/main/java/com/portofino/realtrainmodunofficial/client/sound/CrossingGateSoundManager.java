@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class CrossingGateSoundManager {
-    private static final ResourceLocation CROSSING_SOUND_ID = ResourceLocation.fromNamespaceAndPath("rtm", "block.crossing_gate");
+    private static final ResourceLocation CROSSING_SOUND_ID = new ResourceLocation("rtm", "block.crossing_gate");
     private static final Map<String, LoopingCrossingSound> ACTIVE = new ConcurrentHashMap<>();
     /** 踏切音が聞こえる最大距離(ブロック)。これより遠いと鳴らさない/停止する(=どこでも聞こえる不具合対策)。 */
     private static final double MAX_AUDIBLE_DISTANCE = 48.0D;
@@ -152,13 +152,13 @@ public final class CrossingGateSoundManager {
                 if ("rtm".equals(namespace) && path.indexOf('/') >= 0) {
                     path = path.replace('/', '.');
                 }
-                return ResourceLocation.fromNamespaceAndPath(namespace, path);
+                return new ResourceLocation(namespace, path);
             }
             String path = ExternalSoundPackBridge.sanitizeSoundPath(normalized);
             if (path.indexOf('/') >= 0) {
                 path = path.replace('/', '.');
             }
-            return ResourceLocation.fromNamespaceAndPath("rtm", path);
+            return new ResourceLocation("rtm", path);
         } catch (Exception ignored) {
             return CROSSING_SOUND_ID;
         }

@@ -2,12 +2,12 @@ package com.portofino.realtrainmodunofficial.client.screen;
 
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.network.ChangeOffsetPayload;
+import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 本家 GuiChangeOffset の 1.21.1 移植。バールで設置物を右クリックすると開く。

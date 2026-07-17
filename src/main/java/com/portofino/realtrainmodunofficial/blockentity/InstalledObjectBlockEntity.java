@@ -774,7 +774,7 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
             for (net.minecraft.server.level.ServerPlayer p : serverLevel.players()) {
                 if (p.distanceToSqr(cx, cy, cz) <= rangeSq * 1.44D) {
-                    net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, payload);
+                    com.portofino.realtrainmodunofficial.network.compat.PacketDistributor.sendToPlayer(p, payload);
                 }
             }
         }

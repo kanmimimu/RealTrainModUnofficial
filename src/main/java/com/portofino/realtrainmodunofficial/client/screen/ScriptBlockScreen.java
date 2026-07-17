@@ -2,6 +2,7 @@ package com.portofino.realtrainmodunofficial.client.screen;
 
 import com.portofino.realtrainmodunofficial.blockentity.ScriptBlockEntity;
 import com.portofino.realtrainmodunofficial.network.UpdateScriptBlockPayload;
+import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -10,7 +11,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;

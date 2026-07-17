@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class MotormanSkinLoader {
 
     private static final Map<String, ResourceLocation> CACHE = new ConcurrentHashMap<>();
-    private static final ResourceLocation MISSING = ResourceLocation.fromNamespaceAndPath("rtm", "textures/motorman.png");
+    private static final ResourceLocation MISSING = new ResourceLocation("rtm", "textures/motorman.png");
 
     private MotormanSkinLoader() {
     }
@@ -95,7 +95,7 @@ public final class MotormanSkinLoader {
                 mirrorCopy(img, 40, 16, 32, 48, 16, 16, s);  //右腕 → 左腕位置 (左右反転)
             }
             String key = "motorman_skin/" + fileName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.-]", "_");
-            ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, key);
+            ResourceLocation rl = new ResourceLocation(RealTrainModUnofficial.MODID, key);
             Minecraft.getInstance().getTextureManager().register(rl, new DynamicTexture(img));
             return rl;
         } catch (Exception e) {

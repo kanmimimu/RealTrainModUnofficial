@@ -4,6 +4,7 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.client.renderer.MotormanSkinLoader;
 import com.portofino.realtrainmodunofficial.network.MotormanMacroPayload;
 import com.portofino.realtrainmodunofficial.network.MotormanSkinPayload;
+import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import jp.ngt.rtm.entity.npc.EntityMotorman;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -11,7 +12,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.fml.loading.FMLPaths;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

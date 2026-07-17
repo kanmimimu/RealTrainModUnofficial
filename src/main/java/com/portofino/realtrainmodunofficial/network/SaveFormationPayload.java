@@ -4,21 +4,21 @@ import com.portofino.realtrainmodunofficial.formation.TrainFormation;
 import com.portofino.realtrainmodunofficial.formation.TrainFormationData;
 import com.portofino.realtrainmodunofficial.item.TrainVehicleItem;
 import com.portofino.realtrainmodunofficial.item.VehicleFormationItem;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public record SaveFormationPayload(String name, List<String> vehicleIds, List<Boolean> reversedFlags) implements CustomPacketPayload {
-   public static final CustomPacketPayload.Type<SaveFormationPayload> TYPE = new CustomPacketPayload.Type(ResourceLocation.fromNamespaceAndPath("realtrainmodunofficial", "save_formation"));
+   public static final CustomPacketPayload.Type<SaveFormationPayload> TYPE = new CustomPacketPayload.Type(new ResourceLocation("realtrainmodunofficial", "save_formation"));
    public static final StreamCodec<ByteBuf, SaveFormationPayload> STREAM_CODEC;
 
    public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {

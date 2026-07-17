@@ -5,15 +5,15 @@ import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEnti
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import com.portofino.realtrainmodunofficial.signboard.SignboardAnimeType;
 import com.portofino.realtrainmodunofficial.signboard.SignboardText;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,9 +37,9 @@ public record SaveSignboardPayload(BlockPos pos, String definitionId, String ttS
     private static final double MAX_REACH_SQ = 64.0D * 64.0D;
 
     public static final Type<SaveSignboardPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "save_signboard"));
+            new ResourceLocation(RealTrainModUnofficial.MODID, "save_signboard"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, SaveSignboardPayload> STREAM_CODEC = StreamCodec.of(
+    public static final StreamCodec<FriendlyByteBuf, SaveSignboardPayload> STREAM_CODEC = StreamCodec.of(
             (buf, payload) -> {
                 buf.writeBlockPos(payload.pos());
                 buf.writeUtf(payload.definitionId());

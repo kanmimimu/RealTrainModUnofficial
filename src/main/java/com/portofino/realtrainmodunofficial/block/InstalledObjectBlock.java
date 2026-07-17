@@ -281,7 +281,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         double cx = pos.getX() + 0.5D, cy = pos.getY() + 0.5D, cz = pos.getZ() + 0.5D;
         var stop = new com.portofino.realtrainmodunofficial.network.SpeakerStopPayload(cx, cy, cz);
         for (net.minecraft.server.level.ServerPlayer p : serverLevel.players()) {
-            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, stop);
+            com.portofino.realtrainmodunofficial.network.compat.PacketDistributor.sendToPlayer(p, stop);
         }
     }
 
@@ -367,7 +367,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
                 // 立ち下がり(レバーOFF): 再生中の音を止める。範囲外プレイヤーにも送って取りこぼしを防ぐ。
                 var stop = new com.portofino.realtrainmodunofficial.network.SpeakerStopPayload(cx, cy, cz);
                 for (net.minecraft.server.level.ServerPlayer p : serverLevel.players()) {
-                    net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, stop);
+                    com.portofino.realtrainmodunofficial.network.compat.PacketDistributor.sendToPlayer(p, stop);
                 }
             }
         }

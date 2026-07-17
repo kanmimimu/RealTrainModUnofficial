@@ -2,27 +2,27 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.MarkerBlockEntity;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /** レンチ設定GUI → サーバ: マーカーのアンカー(曲線)・カント(傾き)を更新する。 */
 public record ConfigureMarkerPayload(BlockPos pos, float anchorYaw, float anchorPitch,
                                      float anchorLengthHorizontal, float anchorLengthVertical,
                                      float cantCenter, float cantEdge, float cantRandom) implements CustomPacketPayload {
     public static final Type<ConfigureMarkerPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "configure_marker")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "configure_marker")
     );
 
     // composite は最大6要素のため手動コーデックにする (フィールドが8個)。
     public static final StreamCodec<ByteBuf, ConfigureMarkerPayload> STREAM_CODEC = StreamCodec.of(
         (buf, p) -> {
-            BlockPos.STREAM_CODEC.encode(buf, p.pos);
+            com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs.BLOCK_POS.encode(buf, p.pos);
             buf.writeFloat(p.anchorYaw);
             buf.writeFloat(p.anchorPitch);
             buf.writeFloat(p.anchorLengthHorizontal);
@@ -32,7 +32,7 @@ public record ConfigureMarkerPayload(BlockPos pos, float anchorYaw, float anchor
             buf.writeFloat(p.cantRandom);
         },
         buf -> new ConfigureMarkerPayload(
-            BlockPos.STREAM_CODEC.decode(buf),
+            com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs.BLOCK_POS.decode(buf),
             buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat(),
             buf.readFloat(), buf.readFloat(), buf.readFloat()
         )

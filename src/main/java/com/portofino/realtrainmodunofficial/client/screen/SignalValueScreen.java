@@ -3,6 +3,7 @@ package com.portofino.realtrainmodunofficial.client.screen;
 import com.portofino.realtrainmodunofficial.blockentity.SignalRemoteBlockEntity;
 import com.portofino.realtrainmodunofficial.network.BindSignalReceiverPayload;
 import com.portofino.realtrainmodunofficial.network.SetSignalValuePayload;
+import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -10,7 +11,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 public class SignalValueScreen extends Screen {
     private final BlockPos pos;

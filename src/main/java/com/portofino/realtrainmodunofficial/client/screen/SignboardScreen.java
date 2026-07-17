@@ -8,6 +8,7 @@ import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCateg
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
 import com.portofino.realtrainmodunofficial.network.SaveSignboardPayload;
+import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import com.portofino.realtrainmodunofficial.signboard.SignboardAnimeType;
 import com.portofino.realtrainmodunofficial.signboard.SignboardText;
 import net.minecraft.client.Minecraft;
@@ -17,7 +18,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;

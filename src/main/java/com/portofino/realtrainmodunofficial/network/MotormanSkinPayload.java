@@ -1,14 +1,14 @@
 package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
 import jp.ngt.rtm.entity.npc.EntityMotorman;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 運転士のスキン変更 (GUI で選択 → サーバーで entityData に設定 → 全クライアントへ同期)。
@@ -16,7 +16,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public record MotormanSkinPayload(int entityId, String skin) implements CustomPacketPayload {
 
     public static final Type<MotormanSkinPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "motorman_skin")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "motorman_skin")
     );
 
     public static final StreamCodec<ByteBuf, MotormanSkinPayload> STREAM_CODEC = StreamCodec.composite(

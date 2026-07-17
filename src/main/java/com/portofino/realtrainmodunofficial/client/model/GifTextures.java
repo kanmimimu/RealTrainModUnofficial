@@ -184,7 +184,7 @@ public final class GifTextures {
         NativeImage first = new NativeImage(entry.frames[0].getWidth(), entry.frames[0].getHeight(), false);
         first.copyFrom(entry.frames[0]);
         entry.texture = new DynamicTexture(first);
-        entry.location = ResourceLocation.fromNamespaceAndPath(
+        entry.location = new ResourceLocation(
                 RealTrainModUnofficial.MODID, "gif/" + safeKey(cacheKey));
         Minecraft.getInstance().getTextureManager().register(entry.location, entry.texture);
         entry.shownFrame = 0;

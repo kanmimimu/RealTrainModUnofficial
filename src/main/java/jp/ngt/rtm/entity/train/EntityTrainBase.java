@@ -375,7 +375,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
         java.util.Map<String, String> encoded = new java.util.HashMap<>(pending.size());
         pending.forEach((k, v) -> encoded.put(k, jp.ngt.rtm.modelpack.state.DataMap.encodeSyncedValue(v)));
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntity(this,
+        com.portofino.realtrainmodunofficial.network.compat.PacketDistributor.sendToPlayersTrackingEntity(this,
                 new com.portofino.realtrainmodunofficial.network.DataMapSyncPayload(this.getId(), encoded));
     }
 

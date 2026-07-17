@@ -3,16 +3,16 @@ package com.portofino.realtrainmodunofficial.network;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.item.RailItem;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * Sends a small rail preview endpoint offset from the client to the server.
@@ -22,7 +22,7 @@ public record RailPreviewAdjustPayload(int dx, int dy, int dz) implements Custom
      * Payload type used by the network channel.
      */
     public static final Type<RailPreviewAdjustPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "rail_preview_adjust")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "rail_preview_adjust")
     );
 
     /**

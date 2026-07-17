@@ -4,25 +4,25 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * Requests a server-side clone of a placed rail so middle-click works in multiplayer too.
  */
 public record CopyRailPayload(BlockPos pos) implements CustomPacketPayload {
     public static final Type<CopyRailPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "copy_rail")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "copy_rail")
     );
 
     public static final StreamCodec<ByteBuf, CopyRailPayload> STREAM_CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+        com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs.BLOCK_POS,
         CopyRailPayload::pos,
         CopyRailPayload::new
     );

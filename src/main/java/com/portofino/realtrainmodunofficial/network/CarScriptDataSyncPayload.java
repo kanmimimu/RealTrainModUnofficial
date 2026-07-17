@@ -2,13 +2,13 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.entity.CarEntity;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -22,7 +22,7 @@ import java.util.Map;
  */
 public record CarScriptDataSyncPayload(int entityId, Map<String, String> data) implements CustomPacketPayload {
     public static final Type<CarScriptDataSyncPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "car_script_data_sync")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "car_script_data_sync")
     );
 
     public static final StreamCodec<ByteBuf, CarScriptDataSyncPayload> STREAM_CODEC = StreamCodec.of(

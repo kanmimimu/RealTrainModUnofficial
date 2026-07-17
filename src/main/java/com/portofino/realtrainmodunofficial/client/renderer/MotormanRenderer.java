@@ -22,11 +22,11 @@ import java.util.Calendar;
 public class MotormanRenderer extends MobRenderer<EntityMotorman, PlayerModel<EntityMotorman>> {
 
     private static final ResourceLocation TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("rtm", "textures/motorman.png");
+            new ResourceLocation("rtm", "textures/motorman.png");
     private static final ResourceLocation TEX_SANTA =
-            ResourceLocation.fromNamespaceAndPath("rtm", "textures/motorman_santa.png");
+            new ResourceLocation("rtm", "textures/motorman_santa.png");
     private static final ResourceLocation TEX_SHISHI =
-            ResourceLocation.fromNamespaceAndPath("rtm", "textures/motorman_shishi.png");
+            new ResourceLocation("rtm", "textures/motorman_shishi.png");
 
     private static final ResourceLocation ACTIVE_TEXTURE = pickSeasonalTexture();
 

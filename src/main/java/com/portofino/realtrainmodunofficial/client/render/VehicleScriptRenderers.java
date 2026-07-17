@@ -550,7 +550,7 @@ public final class VehicleScriptRenderers {
             //ここを ResourceLocation と誤判定して null を返していたため、方向幕がテクスチャ無し=空白だった。
             if (tex instanceof MqoModelLoader.ScriptTexture st) {
                 try {
-                    return ResourceLocation.fromNamespaceAndPath(st.namespace, st.path);
+                    return new ResourceLocation(st.namespace, st.path);
                 } catch (Exception e) {
                     return null;
                 }

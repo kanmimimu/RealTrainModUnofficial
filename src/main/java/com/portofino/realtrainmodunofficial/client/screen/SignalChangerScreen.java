@@ -1,6 +1,7 @@
 package com.portofino.realtrainmodunofficial.client.screen;
 
 import com.portofino.realtrainmodunofficial.network.SetSignalAspectPayload;
+import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import com.portofino.realtrainmodunofficial.signal.SignalAspect;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -8,7 +9,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 public class SignalChangerScreen extends Screen {
     private static final int TITLE_TOP = 18;

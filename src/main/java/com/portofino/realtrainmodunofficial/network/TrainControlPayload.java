@@ -3,23 +3,19 @@ package com.portofino.realtrainmodunofficial.network;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainSeatEntity;
+import com.portofino.realtrainmodunofficial.network.compat.*;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.List;
 
 public record TrainControlPayload(int trainEntityId, String action, int value) implements CustomPacketPayload {
 
     public static final Type<TrainControlPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "train_control")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "train_control")
     );
 
     public static final StreamCodec<ByteBuf, TrainControlPayload> STREAM_CODEC = StreamCodec.composite(

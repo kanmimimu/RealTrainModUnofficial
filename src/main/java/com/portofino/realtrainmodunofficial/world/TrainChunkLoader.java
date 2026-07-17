@@ -15,7 +15,7 @@ import net.neoforged.neoforge.common.world.chunk.TicketController;
 public final class TrainChunkLoader {
 
     public static final TicketController CONTROLLER = new TicketController(
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "train_chunk_loader"),
+            new ResourceLocation(RealTrainModUnofficial.MODID, "train_chunk_loader"),
             (level, ticketHelper) -> {
                 //ワールドロード時の残チケット掃除: 所有エンティティが復元されなければ
                 //列車側の tick で再登録されるため、一旦すべて破棄して良い

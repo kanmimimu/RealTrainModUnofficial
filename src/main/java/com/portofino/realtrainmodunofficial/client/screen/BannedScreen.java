@@ -20,7 +20,7 @@ import net.minecraft.resources.ResourceLocation;
 public final class BannedScreen extends Screen {
 
     private static final ResourceLocation BACKGROUND =
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "textures/gui/ban_background.png");
+            new ResourceLocation(RealTrainModUnofficial.MODID, "textures/gui/ban_background.png");
 
     //背景テクスチャの有無とサイズ (初回だけ調べてキャッシュ)
     private static Boolean backgroundExists;

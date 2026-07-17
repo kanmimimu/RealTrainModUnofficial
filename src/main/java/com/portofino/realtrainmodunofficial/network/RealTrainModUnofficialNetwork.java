@@ -1,53 +1,90 @@
 package com.portofino.realtrainmodunofficial.network;
 
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.network.NetworkEvent;
+import net.minecraftforge.network.NetworkRegistry;
+import net.minecraftforge.network.simple.SimpleChannel;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
+
+/**
+ * Central Forge {@link SimpleChannel} for the mod. Replaces the NeoForge {@code PayloadRegistrar};
+ * each payload keeps its original {@code STREAM_CODEC} and {@code handleOn*} method, which this
+ * adapter bridges onto {@code registerMessage}. Call {@link #register()} once from the mod constructor.
+ */
 public final class RealTrainModUnofficialNetwork {
+    private static final String PROTOCOL = "1";
+
+    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
+            new ResourceLocation(RealTrainModUnofficial.MODID, "main"),
+            () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
+
+    private static int nextId;
+
     private RealTrainModUnofficialNetwork() {
     }
 
-    /**
-     * Registers custom payload handlers used by the mod.
-     */
-    public static void registerPayloadHandlers(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("1");
-        registrar.playToServer(SelectModelPayload.TYPE, SelectModelPayload.STREAM_CODEC, SelectModelPayload::handleOnServer);
-        registrar.playToServer(TrainControlPayload.TYPE, TrainControlPayload.STREAM_CODEC, TrainControlPayload::handleOnServer);
-        registrar.playToClient(TrainSoundPayload.TYPE, TrainSoundPayload.STREAM_CODEC, TrainSoundPayload::handleOnClient);
-        registrar.playToServer(MountTrainPayload.TYPE, MountTrainPayload.STREAM_CODEC, MountTrainPayload::handleOnServer);
-        registrar.playToServer(RailPreviewAdjustPayload.TYPE, RailPreviewAdjustPayload.STREAM_CODEC, RailPreviewAdjustPayload::handleOnServer);
-        registrar.playToServer(BindSignalReceiverPayload.TYPE, BindSignalReceiverPayload.STREAM_CODEC, BindSignalReceiverPayload::handleOnServer);
-        registrar.playToServer(SetSignalAspectPayload.TYPE, SetSignalAspectPayload.STREAM_CODEC, SetSignalAspectPayload::handleOnServer);
-        registrar.playToServer(SetSignalValuePayload.TYPE, SetSignalValuePayload.STREAM_CODEC, SetSignalValuePayload::handleOnServer);
-        registrar.playToServer(ConfigureTrainDetectorPayload.TYPE, ConfigureTrainDetectorPayload.STREAM_CODEC, ConfigureTrainDetectorPayload::handleOnServer);
-        registrar.playToServer(ConfigureMarkerPayload.TYPE, ConfigureMarkerPayload.STREAM_CODEC, ConfigureMarkerPayload::handleOnServer);
-        registrar.playToServer(MarkerAnchorPayload.TYPE, MarkerAnchorPayload.STREAM_CODEC, MarkerAnchorPayload::handleOnServer);
-        registrar.playToServer(UpdateScriptBlockPayload.TYPE, UpdateScriptBlockPayload.STREAM_CODEC, UpdateScriptBlockPayload::handleOnServer);
-        registrar.playToClient(TrainScriptDataPayload.TYPE, TrainScriptDataPayload.STREAM_CODEC, TrainScriptDataPayload::handleOnClient);
-        registrar.playToServer(CarScriptDataPayload.TYPE, CarScriptDataPayload.STREAM_CODEC, CarScriptDataPayload::handleOnServer);
-        registrar.playToClient(CarScriptDataSyncPayload.TYPE, CarScriptDataSyncPayload.STREAM_CODEC, CarScriptDataSyncPayload::handleOnClient);
-        registrar.playToClient(SpeakerPlayPayload.TYPE, SpeakerPlayPayload.STREAM_CODEC, SpeakerPlayPayload::handleOnClient);
-        registrar.playToClient(SpeakerStopPayload.TYPE, SpeakerStopPayload.STREAM_CODEC, SpeakerStopPayload::handleOnClient);
-        registrar.playToServer(ConfigureSpeakerPayload.TYPE, ConfigureSpeakerPayload.STREAM_CODEC, ConfigureSpeakerPayload::handleOnServer);
-        registrar.playToClient(SyncSpeakerSoundsPayload.TYPE, SyncSpeakerSoundsPayload.STREAM_CODEC, SyncSpeakerSoundsPayload::handleOnClient);
-        //SignalControllerMod (masa300) 移植
-        registrar.playToServer(SignalControllerPayload.TYPE, SignalControllerPayload.STREAM_CODEC, SignalControllerPayload::handleOnServer);
-        //本家 GuiChangeOffset (設置物の微調整)
-        registrar.playToServer(ChangeOffsetPayload.TYPE, ChangeOffsetPayload.STREAM_CODEC, ChangeOffsetPayload::handleOnServer);
-        //本家 GuiSignboard (看板の文字)
-        registrar.playToServer(SaveSignboardPayload.TYPE, SaveSignboardPayload.STREAM_CODEC, SaveSignboardPayload::handleOnServer);
-        //本家 列車検知器 (出力先の座標と 置く/消す)
-        registrar.playToServer(ConfigureDetectorPayload.TYPE, ConfigureDetectorPayload.STREAM_CODEC, ConfigureDetectorPayload::handleOnServer);
-        //本家 GuiTicketVendor (券売機で切符/回数券を買う)
-        registrar.playToServer(BuyTicketPayload.TYPE, BuyTicketPayload.STREAM_CODEC, BuyTicketPayload::handleOnServer);
-        //本家 guiIdSelectTileEntityTexture (標識のテクスチャ変更)
-        registrar.playToServer(SetObjectModelPayload.TYPE, SetObjectModelPayload.STREAM_CODEC, SetObjectModelPayload::handleOnServer);
-        //本家 運転士 (EntityMotorman) のマクロ設定
-        registrar.playToServer(MotormanMacroPayload.TYPE, MotormanMacroPayload.STREAM_CODEC, MotormanMacroPayload::handleOnServer);
-        //運転士のスキン変更
-        registrar.playToServer(MotormanSkinPayload.TYPE, MotormanSkinPayload.STREAM_CODEC, MotormanSkinPayload::handleOnServer);
-        //本家系列車 (EntityVehicleBase) の DataMap 同期 (ATSA HUD 等が使用)
-        registrar.playToClient(DataMapSyncPayload.TYPE, DataMapSyncPayload.STREAM_CODEC, DataMapSyncPayload::handleOnClient);
+    public static void register() {
+        reg(SelectModelPayload.class, SelectModelPayload.STREAM_CODEC, SelectModelPayload::handleOnServer);
+        reg(TrainControlPayload.class, TrainControlPayload.STREAM_CODEC, TrainControlPayload::handleOnServer);
+        reg(TrainSoundPayload.class, TrainSoundPayload.STREAM_CODEC, TrainSoundPayload::handleOnClient);
+        reg(MountTrainPayload.class, MountTrainPayload.STREAM_CODEC, MountTrainPayload::handleOnServer);
+        reg(RailPreviewAdjustPayload.class, RailPreviewAdjustPayload.STREAM_CODEC, RailPreviewAdjustPayload::handleOnServer);
+        reg(BindSignalReceiverPayload.class, BindSignalReceiverPayload.STREAM_CODEC, BindSignalReceiverPayload::handleOnServer);
+        reg(SetSignalAspectPayload.class, SetSignalAspectPayload.STREAM_CODEC, SetSignalAspectPayload::handleOnServer);
+        reg(SetSignalValuePayload.class, SetSignalValuePayload.STREAM_CODEC, SetSignalValuePayload::handleOnServer);
+        reg(ConfigureTrainDetectorPayload.class, ConfigureTrainDetectorPayload.STREAM_CODEC, ConfigureTrainDetectorPayload::handleOnServer);
+        reg(ConfigureMarkerPayload.class, ConfigureMarkerPayload.STREAM_CODEC, ConfigureMarkerPayload::handleOnServer);
+        reg(MarkerAnchorPayload.class, MarkerAnchorPayload.STREAM_CODEC, MarkerAnchorPayload::handleOnServer);
+        reg(UpdateScriptBlockPayload.class, UpdateScriptBlockPayload.STREAM_CODEC, UpdateScriptBlockPayload::handleOnServer);
+        reg(TrainScriptDataPayload.class, TrainScriptDataPayload.STREAM_CODEC, TrainScriptDataPayload::handleOnClient);
+        reg(CarScriptDataPayload.class, CarScriptDataPayload.STREAM_CODEC, CarScriptDataPayload::handleOnServer);
+        reg(CarScriptDataSyncPayload.class, CarScriptDataSyncPayload.STREAM_CODEC, CarScriptDataSyncPayload::handleOnClient);
+        reg(SpeakerPlayPayload.class, SpeakerPlayPayload.STREAM_CODEC, SpeakerPlayPayload::handleOnClient);
+        reg(SpeakerStopPayload.class, SpeakerStopPayload.STREAM_CODEC, SpeakerStopPayload::handleOnClient);
+        reg(ConfigureSpeakerPayload.class, ConfigureSpeakerPayload.STREAM_CODEC, ConfigureSpeakerPayload::handleOnServer);
+        reg(SyncSpeakerSoundsPayload.class, SyncSpeakerSoundsPayload.STREAM_CODEC, SyncSpeakerSoundsPayload::handleOnClient);
+        reg(SignalControllerPayload.class, SignalControllerPayload.STREAM_CODEC, SignalControllerPayload::handleOnServer);
+        reg(ChangeOffsetPayload.class, ChangeOffsetPayload.STREAM_CODEC, ChangeOffsetPayload::handleOnServer);
+        reg(SaveSignboardPayload.class, SaveSignboardPayload.STREAM_CODEC, SaveSignboardPayload::handleOnServer);
+        reg(ConfigureDetectorPayload.class, ConfigureDetectorPayload.STREAM_CODEC, ConfigureDetectorPayload::handleOnServer);
+        reg(BuyTicketPayload.class, BuyTicketPayload.STREAM_CODEC, BuyTicketPayload::handleOnServer);
+        reg(SetObjectModelPayload.class, SetObjectModelPayload.STREAM_CODEC, SetObjectModelPayload::handleOnServer);
+        reg(MotormanMacroPayload.class, MotormanMacroPayload.STREAM_CODEC, MotormanMacroPayload::handleOnServer);
+        reg(MotormanSkinPayload.class, MotormanSkinPayload.STREAM_CODEC, MotormanSkinPayload::handleOnServer);
+        reg(DataMapSyncPayload.class, DataMapSyncPayload.STREAM_CODEC, DataMapSyncPayload::handleOnClient);
+    }
+
+    private static <MSG extends CustomPacketPayload> void reg(
+            Class<MSG> type,
+            StreamCodec<? super FriendlyByteBuf, MSG> codec,
+            BiConsumer<MSG, IPayloadContext> handler) {
+        CHANNEL.registerMessage(nextId++, type,
+                (message, buffer) -> codec.encode(buffer, message),
+                codec::decode,
+                (message, contextSupplier) -> {
+                    NetworkEvent.Context context = contextSupplier.get();
+                    handler.accept(message, new ForgePayloadContext(context));
+                    context.setPacketHandled(true);
+                });
+    }
+
+    private record ForgePayloadContext(NetworkEvent.Context context) implements IPayloadContext {
+        @Override
+        public Player player() {
+            return context.getSender();
+        }
+
+        @Override
+        public CompletableFuture<Void> enqueueWork(Runnable work) {
+            return context.enqueueWork(work);
+        }
     }
 }

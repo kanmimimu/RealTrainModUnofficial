@@ -2,25 +2,25 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.SignalRemoteBlockEntity;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import com.portofino.realtrainmodunofficial.signal.SignalAspect;
 import com.portofino.realtrainmodunofficial.signal.SignalNetworkSavedData;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record SetSignalAspectPayload(BlockPos pos, int aspectId) implements CustomPacketPayload {
     public static final Type<SetSignalAspectPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "set_signal_aspect")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "set_signal_aspect")
     );
 
     public static final StreamCodec<ByteBuf, SetSignalAspectPayload> STREAM_CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+        com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs.BLOCK_POS,
         SetSignalAspectPayload::pos,
         ByteBufCodecs.INT,
         SetSignalAspectPayload::aspectId,

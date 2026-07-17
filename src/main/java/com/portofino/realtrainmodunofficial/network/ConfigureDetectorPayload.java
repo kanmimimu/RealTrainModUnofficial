@@ -3,13 +3,13 @@ package com.portofino.realtrainmodunofficial.network;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 列車検知器の設定 (出力先の座標 + 検知時に置くか消すか)。
@@ -30,9 +30,9 @@ public record ConfigureDetectorPayload(BlockPos pos, boolean hasTarget, BlockPos
     private static final double MAX_REACH_SQ = 64.0D * 64.0D;
 
     public static final Type<ConfigureDetectorPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "configure_detector"));
+            new ResourceLocation(RealTrainModUnofficial.MODID, "configure_detector"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, ConfigureDetectorPayload> STREAM_CODEC = StreamCodec.of(
+    public static final StreamCodec<FriendlyByteBuf, ConfigureDetectorPayload> STREAM_CODEC = StreamCodec.of(
             (buf, payload) -> {
                 buf.writeBlockPos(payload.pos());
                 buf.writeBoolean(payload.hasTarget());

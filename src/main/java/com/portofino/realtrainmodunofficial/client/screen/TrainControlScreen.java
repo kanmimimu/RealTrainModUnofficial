@@ -5,6 +5,7 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
 import com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.network.TrainControlPayload;
+import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import net.minecraft.client.gui.GuiGraphics;
@@ -15,18 +16,17 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class TrainControlScreen extends Screen {
     private static final ResourceLocation TAB_INVENTORY_TEXTURE =
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "textures/gui/tab_inventory.png");
+        new ResourceLocation(RealTrainModUnofficial.MODID, "textures/gui/tab_inventory.png");
     private static final ResourceLocation TAB_SETTING_TEXTURE =
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "textures/gui/tab_setting.png");
+        new ResourceLocation(RealTrainModUnofficial.MODID, "textures/gui/tab_setting.png");
     private static final ResourceLocation TAB_FORMATION_TEXTURE =
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "textures/gui/tab_formation.png");
+        new ResourceLocation(RealTrainModUnofficial.MODID, "textures/gui/tab_formation.png");
 
     private static final int PANEL_W = 176;
     private static final int PANEL_H = 166;

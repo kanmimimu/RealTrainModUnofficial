@@ -2,23 +2,23 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.TrainDetectorBlockEntity;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record ConfigureTrainDetectorPayload(BlockPos pos, int channel, int range) implements CustomPacketPayload {
     public static final Type<ConfigureTrainDetectorPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "configure_train_detector")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "configure_train_detector")
     );
 
     public static final StreamCodec<ByteBuf, ConfigureTrainDetectorPayload> STREAM_CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+        com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs.BLOCK_POS,
         ConfigureTrainDetectorPayload::pos,
         ByteBufCodecs.INT,
         ConfigureTrainDetectorPayload::channel,

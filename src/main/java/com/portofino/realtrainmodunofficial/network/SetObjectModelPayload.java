@@ -4,13 +4,13 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 設置済みの設置物のモデル/テクスチャを差し替える。
@@ -21,9 +21,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public record SetObjectModelPayload(BlockPos pos, String definitionId) implements CustomPacketPayload {
 
     public static final Type<SetObjectModelPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "set_object_model"));
+            new ResourceLocation(RealTrainModUnofficial.MODID, "set_object_model"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, SetObjectModelPayload> STREAM_CODEC = StreamCodec.of(
+    public static final StreamCodec<FriendlyByteBuf, SetObjectModelPayload> STREAM_CODEC = StreamCodec.of(
             (buf, p) -> {
                 buf.writeBlockPos(p.pos());
                 buf.writeUtf(p.definitionId(), 256);

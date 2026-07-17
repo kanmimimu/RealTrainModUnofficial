@@ -3,17 +3,17 @@ package com.portofino.realtrainmodunofficial.network;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record MountTrainPayload() implements CustomPacketPayload {
     public static final MountTrainPayload INSTANCE = new MountTrainPayload();
     public static final Type<MountTrainPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "mount_train")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "mount_train")
     );
     public static final StreamCodec<ByteBuf, MountTrainPayload> STREAM_CODEC = StreamCodec.unit(INSTANCE);
 

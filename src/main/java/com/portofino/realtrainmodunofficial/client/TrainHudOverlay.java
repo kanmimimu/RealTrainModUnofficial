@@ -21,7 +21,7 @@ import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class TrainHudOverlay {
     private static final ResourceLocation CAB_TEXTURE =
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "textures/gui/rtm_cab.png");
+        new ResourceLocation(RealTrainModUnofficial.MODID, "textures/gui/rtm_cab.png");
     private static final int TEX_SIZE = 512;
     private static final int CAB_W = 416;
     private static final int CAB_H = 48;

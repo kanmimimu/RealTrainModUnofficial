@@ -48,7 +48,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     }
 
     private static ResourceLocation buildGlowTexture() {
-        ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
+        ResourceLocation loc = new ResourceLocation(
             RealTrainModUnofficial.MODID, "dynamic/effect/train_light_glow");
         NativeImage img = new NativeImage(64, 64, false);
         for (int y = 0; y < 64; y++) {

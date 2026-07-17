@@ -14,7 +14,6 @@ import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.RegistryObject;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import org.slf4j.Logger;
 
 @Mod(RealTrainModUnofficial.MODID)
@@ -108,8 +107,8 @@ public class RealTrainModUnofficial {
         }
 
         modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(this::registerNetwork);
         modEventBus.addListener(this::buildCreativeTabContents);
+        com.portofino.realtrainmodunofficial.network.RealTrainModUnofficialNetwork.register();
         //本家 RTM のチャンクローダー (列車の State_ChunkLoader) 用チケットコントローラ
         modEventBus.addListener((net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent event) ->
             event.register(com.portofino.realtrainmodunofficial.world.TrainChunkLoader.CONTROLLER));
@@ -138,7 +137,7 @@ public class RealTrainModUnofficial {
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(
             (net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent e) -> {
                 if (e.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp) {
-                    net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(sp,
+                    com.portofino.realtrainmodunofficial.network.compat.PacketDistributor.sendToPlayer(sp,
                         new com.portofino.realtrainmodunofficial.network.SyncSpeakerSoundsPayload(
                             java.util.Arrays.asList(
                                 com.portofino.realtrainmodunofficial.installedobject.SpeakerSoundConfig.snapshot())));
@@ -156,10 +155,6 @@ public class RealTrainModUnofficial {
             com.portofino.realtrainmodunofficial.installedobject.InstalledObjectPackLoader.load();
             com.portofino.realtrainmodunofficial.script.TrainScriptSystem.getInstance().initialize();
         });
-    }
-
-    private void registerNetwork(RegisterPayloadHandlersEvent event) {
-        com.portofino.realtrainmodunofficial.network.RealTrainModUnofficialNetwork.registerPayloadHandlers(event);
     }
 
     private void buildCreativeTabContents(BuildCreativeModeTabContentsEvent event) {

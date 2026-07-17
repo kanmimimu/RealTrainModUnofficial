@@ -263,7 +263,7 @@ public final class CarEntity extends Entity {
             car.setScriptDataValue(key, value);
             if (syncType != 0 && car.level().isClientSide()) {
                 try {
-                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                    com.portofino.realtrainmodunofficial.network.compat.PacketDistributor.sendToServer(
                         new com.portofino.realtrainmodunofficial.network.CarScriptDataPayload(car.getId(), key, value));
                 } catch (Throwable ignored) {
                     // サーバ未接続/送信失敗時は無視(ローカルには書けている)。
@@ -512,7 +512,7 @@ public final class CarEntity extends Entity {
             // hostPlayerEntityId 等のサーバ設定値を読んで GUI を起動するため必須。
             if (scriptDataDirty && !scriptData.isEmpty()) {
                 scriptDataDirty = false;
-                net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+                com.portofino.realtrainmodunofficial.network.compat.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
                     this, new com.portofino.realtrainmodunofficial.network.CarScriptDataSyncPayload(
                         this.getId(), new java.util.HashMap<>(scriptData)));
             }

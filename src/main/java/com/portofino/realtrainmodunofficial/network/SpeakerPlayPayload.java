@@ -2,12 +2,12 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * スピーカーがレッドストーン信号を受けて鳴るとき、サーバーが範囲内プレイヤーへ送る再生パケット。
@@ -18,7 +18,7 @@ public record SpeakerPlayPayload(double x, double y, double z, String soundId, f
         implements CustomPacketPayload {
 
     public static final Type<SpeakerPlayPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "speaker_play")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "speaker_play")
     );
 
     public static final StreamCodec<ByteBuf, SpeakerPlayPayload> STREAM_CODEC = StreamCodec.composite(

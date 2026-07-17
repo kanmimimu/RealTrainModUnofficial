@@ -716,7 +716,7 @@ public class TrainEntity extends Entity {
 
         if (scriptDataDirty && !scriptData.isEmpty()) {
             scriptDataDirty = false;
-            net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+            com.portofino.realtrainmodunofficial.network.compat.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
                 this, new com.portofino.realtrainmodunofficial.network.TrainScriptDataPayload(
                     this.getId(), new java.util.HashMap<>(scriptData)
                 )

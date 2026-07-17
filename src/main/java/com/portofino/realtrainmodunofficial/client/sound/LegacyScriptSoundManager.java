@@ -385,7 +385,7 @@ public final class LegacyScriptSoundManager {
             return;
         }
         lastLeverClickMs = now;
-        ResourceLocation soundId = ResourceLocation.fromNamespaceAndPath("rtm", "train.lever");
+        ResourceLocation soundId = new ResourceLocation("rtm", "train.lever");
         minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvent.createVariableRangeEvent(soundId), 1.0F, 0.55F));
     }
 
@@ -410,7 +410,7 @@ public final class LegacyScriptSoundManager {
             resolvedPath = resolvedPath.replace('/', '.');
         }
         try {
-            return ResourceLocation.fromNamespaceAndPath(resolvedNamespace, resolvedPath);
+            return new ResourceLocation(resolvedNamespace, resolvedPath);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Invalid legacy sound id {}:{}", resolvedNamespace, soundName);
             return null;

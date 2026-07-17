@@ -1,10 +1,10 @@
 package com.portofino.realtrainmodunofficial;
 
 import com.mojang.serialization.Codec;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.RegistryObject;
 

@@ -54,7 +54,7 @@ public class ResourceLocation {
     public net.minecraft.resources.ResourceLocation toReal() {
         String d = this.domain.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_.\\-]", "_");
         String p = this.path.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_.\\-/]", "_");
-        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(d, p);
+        return new net.minecraft.resources.ResourceLocation(d, p);
     }
 
     @Override

@@ -24,7 +24,7 @@ import static com.portofino.realtrainmodunofficial.RealTrainModUnofficial.MODID;
 @OnlyIn(Dist.CLIENT)
 public final class CarRenderer extends EntityRenderer<CarEntity> {
     private static final ResourceLocation FALLBACK_TEXTURE =
-        ResourceLocation.fromNamespaceAndPath(MODID, "textures/car/toyota_prius-phv.png");
+        new ResourceLocation(MODID, "textures/car/toyota_prius-phv.png");
 
     public CarRenderer(EntityRendererProvider.Context context) {
         super(context);

@@ -2045,7 +2045,7 @@ public final class MqoModelLoader {
             }
         }
         DynamicTexture tex = new DynamicTexture(img);
-        loc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "dynamic/white");
+        loc = new ResourceLocation(RealTrainModUnofficial.MODID, "dynamic/white");
         Minecraft.getInstance().getTextureManager().register(loc, tex);
         whiteTextureLoc = loc;
         return loc;
@@ -2140,7 +2140,7 @@ public final class MqoModelLoader {
                 boolean glassBand = hasGlassBand(img);
                 int key = Math.abs(binding.cacheKey().hashCode());
                 DynamicTexture tex = new DynamicTexture(img);
-                ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
+                ResourceLocation loc = new ResourceLocation(RealTrainModUnofficial.MODID,
                     "dynamic/mqo/" + Integer.toHexString(key));
                 Minecraft.getInstance().getTextureManager().register(loc, tex);
                 ResourceLocation baseLoc = loc;
@@ -2149,7 +2149,7 @@ public final class MqoModelLoader {
                 if (alphaBlendOption || partialAlpha || glassBand) {
                     com.mojang.blaze3d.platform.NativeImage opaqueImg = copyOpaqueOnlyAlpha(img);
                     DynamicTexture opaqueTex = new DynamicTexture(opaqueImg);
-                    opaqueLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
+                    opaqueLoc = new ResourceLocation(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_opq");
                     Minecraft.getInstance().getTextureManager().register(opaqueLoc, opaqueTex);
                     windowLoc = loc;
@@ -2204,7 +2204,7 @@ public final class MqoModelLoader {
             byte[] data = in.readAllBytes();
             com.mojang.blaze3d.platform.NativeImage img = com.mojang.blaze3d.platform.NativeImage.read(new ByteArrayInputStream(data));
             DynamicTexture tex = new DynamicTexture(img);
-            ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
+            ResourceLocation loc = new ResourceLocation(
                 RealTrainModUnofficial.MODID,
                 "dynamic/mqo/" + Integer.toHexString(cacheKeySuffix.hashCode())
             );
@@ -2223,7 +2223,7 @@ public final class MqoModelLoader {
             byte[] data = in.readAllBytes();
             com.mojang.blaze3d.platform.NativeImage img = com.mojang.blaze3d.platform.NativeImage.read(new ByteArrayInputStream(data));
             DynamicTexture tex = new DynamicTexture(img);
-            ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
+            ResourceLocation loc = new ResourceLocation(
                 RealTrainModUnofficial.MODID,
                 "dynamic/mqo/" + Integer.toHexString(cacheKeySuffix.hashCode())
             );
@@ -2287,7 +2287,7 @@ public final class MqoModelLoader {
                 }
             }
             DynamicTexture tex = new DynamicTexture(img);
-            fallbackWhite = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "dynamic/mqo/_white");
+            fallbackWhite = new ResourceLocation(RealTrainModUnofficial.MODID, "dynamic/mqo/_white");
             Minecraft.getInstance().getTextureManager().register(fallbackWhite, tex);
         } catch (Exception e) {
             fallbackWhite = TextureManager.INTENTIONAL_MISSING_TEXTURE;
@@ -2565,7 +2565,7 @@ public final class MqoModelLoader {
             }
         }
         String safe = Integer.toHexString((domain + ":" + path + "#" + frame).hashCode());
-        ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "dynamic/script/" + safe);
+        ResourceLocation loc = new ResourceLocation(RealTrainModUnofficial.MODID, "dynamic/script/" + safe);
         Minecraft.getInstance().getTextureManager().register(loc, new DynamicTexture(nativeImage));
         return loc;
     }

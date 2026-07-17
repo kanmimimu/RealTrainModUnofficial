@@ -2,17 +2,17 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record TrainSoundPayload(int trainEntityId, String soundId, float volume, float pitch) implements CustomPacketPayload {
     public static final Type<TrainSoundPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "train_sound")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "train_sound")
     );
 
     public static final StreamCodec<ByteBuf, TrainSoundPayload> STREAM_CODEC = StreamCodec.composite(
@@ -40,7 +40,7 @@ public record TrainSoundPayload(int trainEntityId, String soundId, float volume,
         if (train == null || train.level().isClientSide() || legacySoundId == null || legacySoundId.isBlank()) {
             return;
         }
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+        com.portofino.realtrainmodunofficial.network.compat.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
             train, new TrainSoundPayload(train.getId(), legacySoundId, volume, pitch));
     }
 

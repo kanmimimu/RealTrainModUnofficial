@@ -2,12 +2,12 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.installedobject.SpeakerSoundConfig;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.List;
 
@@ -17,7 +17,7 @@ import java.util.List;
  */
 public record SyncSpeakerSoundsPayload(List<String> sounds) implements CustomPacketPayload {
     public static final Type<SyncSpeakerSoundsPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "sync_speaker_sounds")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "sync_speaker_sounds")
     );
 
     public static final StreamCodec<ByteBuf, SyncSpeakerSoundsPayload> STREAM_CODEC = StreamCodec.composite(

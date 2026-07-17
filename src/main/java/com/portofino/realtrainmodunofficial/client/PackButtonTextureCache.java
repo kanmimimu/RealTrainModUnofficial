@@ -69,7 +69,7 @@ public final class PackButtonTextureCache {
     }
 
     private static ButtonTextureInfo registerDynamicTexture(String packName, String texturePath, NativeImage image) {
-        ResourceLocation location = ResourceLocation.fromNamespaceAndPath(
+        ResourceLocation location = new ResourceLocation(
             RealTrainModUnofficial.MODID,
             "dynamic/button/" + sanitize(packName) + "/" + sanitize(texturePath)
         );

@@ -2,13 +2,13 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 本家 GuiChangeOffset (バール右クリックの微調整 GUI) のサーバー反映。
@@ -19,9 +19,9 @@ public record ChangeOffsetPayload(BlockPos pos, float offX, float offY, float of
         implements CustomPacketPayload {
 
     public static final Type<ChangeOffsetPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "change_offset"));
+            new ResourceLocation(RealTrainModUnofficial.MODID, "change_offset"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, ChangeOffsetPayload> STREAM_CODEC = StreamCodec.of(
+    public static final StreamCodec<FriendlyByteBuf, ChangeOffsetPayload> STREAM_CODEC = StreamCodec.of(
             (buf, p) -> {
                 buf.writeBlockPos(p.pos());
                 buf.writeFloat(p.offX());

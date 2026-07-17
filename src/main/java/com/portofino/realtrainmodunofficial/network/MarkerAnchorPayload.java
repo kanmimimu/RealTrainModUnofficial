@@ -1,16 +1,16 @@
 package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import jp.ngt.rtm.rail.TileEntityMarker;
 import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 本家 PacketMarkerRPClient 相当: レンチのアンカー移動 (レール形状編集) で
@@ -19,12 +19,12 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public record MarkerAnchorPayload(BlockPos markerPos, CompoundTag railPositionTag) implements CustomPacketPayload {
 
     public static final Type<MarkerAnchorPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "marker_anchor"));
+            new ResourceLocation(RealTrainModUnofficial.MODID, "marker_anchor"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, MarkerAnchorPayload> STREAM_CODEC = StreamCodec.composite(
-            BlockPos.STREAM_CODEC,
+    public static final StreamCodec<FriendlyByteBuf, MarkerAnchorPayload> STREAM_CODEC = StreamCodec.composite(
+            com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs.BLOCK_POS,
             MarkerAnchorPayload::markerPos,
-            net.minecraft.network.codec.ByteBufCodecs.COMPOUND_TAG,
+            com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs.COMPOUND_TAG,
             MarkerAnchorPayload::railPositionTag,
             MarkerAnchorPayload::new);
 

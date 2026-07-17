@@ -2,24 +2,24 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.ScriptBlockEntity;
+import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
+import com.portofino.realtrainmodunofficial.network.compat.CustomPacketPayload;
+import com.portofino.realtrainmodunofficial.network.compat.IPayloadContext;
+import com.portofino.realtrainmodunofficial.network.compat.StreamCodec;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record UpdateScriptBlockPayload(BlockPos pos, String script, boolean runOnRedstone, boolean executeNow) implements CustomPacketPayload {
     public static final Type<UpdateScriptBlockPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "update_script_block")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "update_script_block")
     );
 
     public static final StreamCodec<ByteBuf, UpdateScriptBlockPayload> STREAM_CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+        com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs.BLOCK_POS,
         UpdateScriptBlockPayload::pos,
         ByteBufCodecs.STRING_UTF8,
         UpdateScriptBlockPayload::script,

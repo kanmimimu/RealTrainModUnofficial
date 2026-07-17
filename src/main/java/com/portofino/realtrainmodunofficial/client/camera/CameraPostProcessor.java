@@ -54,13 +54,13 @@ public final class CameraPostProcessor {
 
     public static void registerShaders(RegisterShadersEvent event) throws java.io.IOException {
         event.registerShader(new ShaderInstance(event.getResourceProvider(),
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "rtm_dof"),
+            new ResourceLocation(RealTrainModUnofficial.MODID, "rtm_dof"),
             DefaultVertexFormat.POSITION_TEX), s -> dofShader = s);
         event.registerShader(new ShaderInstance(event.getResourceProvider(),
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "rtm_accum"),
+            new ResourceLocation(RealTrainModUnofficial.MODID, "rtm_accum"),
             DefaultVertexFormat.POSITION_TEX), s -> accumShader = s);
         event.registerShader(new ShaderInstance(event.getResourceProvider(),
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "rtm_blit"),
+            new ResourceLocation(RealTrainModUnofficial.MODID, "rtm_blit"),
             DefaultVertexFormat.POSITION_TEX), s -> blitShader = s);
     }
 

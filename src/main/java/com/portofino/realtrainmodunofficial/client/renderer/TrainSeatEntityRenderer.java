@@ -11,7 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public final class TrainSeatEntityRenderer extends EntityRenderer<TrainSeatEntity> {
     private static final ResourceLocation EMPTY_TEXTURE =
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "textures/misc/empty.png");
+        new ResourceLocation(RealTrainModUnofficial.MODID, "textures/misc/empty.png");
 
     public TrainSeatEntityRenderer(EntityRendererProvider.Context context) {
         super(context);

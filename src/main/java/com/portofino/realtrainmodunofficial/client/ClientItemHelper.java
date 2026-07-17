@@ -7,6 +7,7 @@ import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCateg
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
 import com.portofino.realtrainmodunofficial.item.TrainItem;
 import com.portofino.realtrainmodunofficial.network.SelectModelPayload;
+import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import com.portofino.realtrainmodunofficial.rail.RailRegistry;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
@@ -16,7 +17,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Comparator;
 import java.util.List;

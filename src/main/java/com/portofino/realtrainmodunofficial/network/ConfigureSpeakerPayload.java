@@ -3,15 +3,11 @@ package com.portofino.realtrainmodunofficial.network;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.installedobject.SpeakerSoundConfig;
+import com.portofino.realtrainmodunofficial.network.compat.*;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.Arrays;
 
@@ -28,11 +24,11 @@ public record ConfigureSpeakerPayload(BlockPos pos, int soundSlot, String soundN
         implements CustomPacketPayload {
 
     public static final Type<ConfigureSpeakerPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "configure_speaker")
+        new ResourceLocation(RealTrainModUnofficial.MODID, "configure_speaker")
     );
 
     public static final StreamCodec<ByteBuf, ConfigureSpeakerPayload> STREAM_CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+        com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs.BLOCK_POS,
         ConfigureSpeakerPayload::pos,
         ByteBufCodecs.INT,
         ConfigureSpeakerPayload::soundSlot,
