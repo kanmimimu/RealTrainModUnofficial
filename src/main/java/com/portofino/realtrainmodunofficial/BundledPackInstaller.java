@@ -1,6 +1,6 @@
 package com.portofino.realtrainmodunofficial;
 
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.nio.file.Files;

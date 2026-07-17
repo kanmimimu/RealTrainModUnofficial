@@ -1,6 +1,6 @@
 package jp.ngt.ngtlib.util;
 
-import net.neoforged.fml.util.thread.EffectiveSide;
+import net.minecraftforge.fml.util.thread.EffectiveSide;
 
 /**
  * 本家 NGTLib jp.ngt.ngtlib.util.NGTUtil の段階的移植。
@@ -65,7 +65,7 @@ public final class NGTUtil {
      * ため。クラス名を文字列で持てば、専用サーバーでは NGTUtilClient がロードされない。
      */
     private static Object invokeClientOnly(String methodName) {
-        if (net.neoforged.fml.loading.FMLEnvironment.dist != net.neoforged.api.distmarker.Dist.CLIENT) {
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist != net.minecraftforge.api.distmarker.Dist.CLIENT) {
             return null;
         }
         try {

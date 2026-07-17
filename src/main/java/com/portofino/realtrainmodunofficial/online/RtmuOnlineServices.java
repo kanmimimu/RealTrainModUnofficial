@@ -4,7 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import net.minecraft.client.Minecraft;
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 
 import java.net.URI;
 import java.net.http.HttpClient;

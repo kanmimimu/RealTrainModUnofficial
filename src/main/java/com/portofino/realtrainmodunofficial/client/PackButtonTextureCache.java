@@ -7,7 +7,7 @@ import com.portofino.realtrainmodunofficial.rail.RailPackLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.InputStream;
 import java.nio.file.Files;

@@ -9,8 +9,8 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.rail.RailPackLoader;
 import com.portofino.realtrainmodunofficial.util.PackTextDecoder;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.fml.ModList;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.io.InputStream;

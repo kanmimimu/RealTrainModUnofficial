@@ -6,7 +6,7 @@ import jp.ngt.rtm.entity.train.util.TrainState;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

@@ -6,8 +6,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.loading.FMLEnvironment;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 
 public final class ClientHooks {
     private static final String CLIENT_HOOKS_CLASS = "com.portofino.realtrainmodunofficial.client.ClientHooksClient";

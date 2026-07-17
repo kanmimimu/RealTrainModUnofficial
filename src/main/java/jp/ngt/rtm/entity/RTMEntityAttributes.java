@@ -2,8 +2,8 @@ package jp.ngt.rtm.entity;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import jp.ngt.rtm.entity.npc.EntityMotorman;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 
 /**

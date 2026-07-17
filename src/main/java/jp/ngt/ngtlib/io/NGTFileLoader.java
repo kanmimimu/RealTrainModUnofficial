@@ -1,6 +1,6 @@
 package jp.ngt.ngtlib.io;
 
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

@@ -5,12 +5,12 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModContainer;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -132,10 +132,10 @@ public class RealTrainModUnofficial {
         RealTrainModUnofficialComponents.REGISTRAR.register(modEventBus);
         //WebCTC は別 mod (RTMU-WebCTC_1.21.1, webctc サブプロジェクト) へ分離した。
         // スピーカー音源マッピングをサーバー起動時にロードし、プレイヤー接続時に同期する。
-        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(
             (net.neoforged.neoforge.event.server.ServerStartingEvent e) ->
                 com.portofino.realtrainmodunofficial.installedobject.SpeakerSoundConfig.load());
-        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(
             (net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent e) -> {
                 if (e.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp) {
                     net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(sp,

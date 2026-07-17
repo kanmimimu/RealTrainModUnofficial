@@ -4,7 +4,7 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.BufferedReader;
 import java.io.IOException;

@@ -1,0 +1,27 @@
+# Forge mods.toml — TOML v0.5.0
+# modLoader stays javafml for Phase 0/1 (Java @Mod entry). Phase 2 switches this to
+# "kotlinforforge" once the entrypoint becomes a Kotlin object.
+modLoader="javafml" #mandatory
+loaderVersion="${loader_version_range}" #mandatory
+license="${mod_license}"
+
+[[mods]] #mandatory
+modId="${mod_id}" #mandatory
+version="${mod_version}" #mandatory
+displayName="${mod_name}" #mandatory
+authors="${mod_authors}" #optional
+description='''${mod_description}'''
+
+[[dependencies.${mod_id}]] #optional
+    modId="forge" #mandatory
+    mandatory=true
+    versionRange="${loader_version_range}" #mandatory
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"

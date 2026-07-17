@@ -8,7 +8,7 @@ import com.portofino.realtrainmodunofficial.BundledPackStore;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.util.PackTextDecoder;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,7 +57,7 @@ public class RailPackLoader {
      */
     private static void loadBuiltinRailsFromModJar() {
         try {
-            var modFileEntry = net.neoforged.fml.ModList.get().getModFileById(RealTrainModUnofficial.MODID);
+            var modFileEntry = net.minecraftforge.fml.ModList.get().getModFileById(RealTrainModUnofficial.MODID);
             if (modFileEntry == null) {
                 return;
             }

@@ -5,9 +5,9 @@ import com.portofino.realtrainmodunofficial.client.camera.RtmCamera;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.CalculateDetachedCameraDistanceEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 

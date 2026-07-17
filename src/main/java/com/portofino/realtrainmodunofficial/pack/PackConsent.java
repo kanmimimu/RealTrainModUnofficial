@@ -1,7 +1,7 @@
 package com.portofino.realtrainmodunofficial.pack;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.BufferedReader;
 import java.io.InputStream;

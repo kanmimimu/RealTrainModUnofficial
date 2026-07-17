@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.client;
 
 import com.portofino.realtrainmodunofficial.BundledPackStore;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
