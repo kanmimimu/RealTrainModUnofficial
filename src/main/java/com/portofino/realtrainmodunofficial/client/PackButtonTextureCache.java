@@ -1,23 +1,18 @@
 package com.portofino.realtrainmodunofficial.client;
 
-import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import com.portofino.realtrainmodunofficial.BundledPackStore;
-import com.portofino.realtrainmodunofficial.rail.RailPackLoader;
 import com.mojang.blaze3d.platform.NativeImage;
+import com.portofino.realtrainmodunofficial.BundledPackStore;
+import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
+import com.portofino.realtrainmodunofficial.rail.RailPackLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.neoforged.fml.loading.FMLPaths;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.fml.loading.FMLPaths;
 
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;

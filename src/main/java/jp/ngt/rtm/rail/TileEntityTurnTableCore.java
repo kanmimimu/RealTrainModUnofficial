@@ -1,7 +1,7 @@
 package jp.ngt.rtm.rail;
 
-import jp.ngt.rtm.rail.util.RailMapTurntable;
 import jp.ngt.rtm.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailMapTurntable;
 import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;

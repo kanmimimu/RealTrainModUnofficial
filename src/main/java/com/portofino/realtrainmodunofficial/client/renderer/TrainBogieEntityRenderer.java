@@ -4,10 +4,10 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.portofino.realtrainmodunofficial.entity.TrainBogieEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.client.renderer.culling.Frustum;
 
 public final class TrainBogieEntityRenderer extends EntityRenderer<TrainBogieEntity> {
     public TrainBogieEntityRenderer(EntityRendererProvider.Context context) {

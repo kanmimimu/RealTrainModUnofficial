@@ -1,15 +1,6 @@
 package com.portofino.realtrainmodunofficial;
 
-import com.portofino.realtrainmodunofficial.block.BallastBlock;
-import com.portofino.realtrainmodunofficial.block.CrossingGateBlock;
-import com.portofino.realtrainmodunofficial.block.InstalledObjectBlock;
-import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
-import com.portofino.realtrainmodunofficial.block.MarkerBlock;
-import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
-import com.portofino.realtrainmodunofficial.block.ScriptBlock;
-import com.portofino.realtrainmodunofficial.block.SignalRemoteBlock;
-import com.portofino.realtrainmodunofficial.block.SignalStateBlock;
-import com.portofino.realtrainmodunofficial.block.TrainDetectorBlock;
+import com.portofino.realtrainmodunofficial.block.*;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 

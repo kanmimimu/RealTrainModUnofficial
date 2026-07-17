@@ -4,6 +4,8 @@ import com.myname.legacyloader.bridge.block.LegacyBlock;
 import com.myname.legacyloader.bridge.tileentity.LegacyTileEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
@@ -11,8 +13,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.item.ItemStack;
 
 public class LegacyWorldHelper {
     public static LegacyWorldProvider getDimensionProvider(Level world) {

@@ -1,11 +1,6 @@
 package com.myname.legacyloader.bridge.config;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 public class LegacyConfigCategory {
     public final LegacyConfigCategory parent;

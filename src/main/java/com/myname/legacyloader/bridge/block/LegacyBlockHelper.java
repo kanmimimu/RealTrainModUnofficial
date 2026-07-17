@@ -1,7 +1,7 @@
 package com.myname.legacyloader.bridge.block;
 
-import com.myname.legacyloader.bridge.item.LegacyCreativeTab;
 import com.myname.legacyloader.bridge.client.LegacyIcon;
+import com.myname.legacyloader.bridge.item.LegacyCreativeTab;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.BlockGetter;

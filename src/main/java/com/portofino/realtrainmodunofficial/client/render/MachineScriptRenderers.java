@@ -12,8 +12,8 @@ import jp.ngt.ngtlib.renderer.model.Material;
 import jp.ngt.ngtlib.renderer.model.ModelLoader;
 import jp.ngt.ngtlib.renderer.model.PolygonModel;
 import jp.ngt.ngtlib.renderer.model.TextureSet;
-import jp.ngt.rtm.render.TileEntityPartsRenderer;
 import jp.ngt.rtm.render.ModelObject;
+import jp.ngt.rtm.render.TileEntityPartsRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 
 import javax.script.ScriptEngine;

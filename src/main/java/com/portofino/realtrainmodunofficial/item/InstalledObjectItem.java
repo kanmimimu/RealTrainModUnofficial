@@ -1,12 +1,11 @@
 package com.portofino.realtrainmodunofficial.item;
 
-import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks;
-import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.ClientHooks;
+import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks;
+import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
-import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;

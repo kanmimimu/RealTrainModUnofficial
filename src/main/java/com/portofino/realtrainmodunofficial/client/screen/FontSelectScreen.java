@@ -7,7 +7,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-import java.awt.GraphicsEnvironment;
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

@@ -1,8 +1,8 @@
 package com.portofino.realtrainmodunofficial.client.screen;
 
-import com.portofino.realtrainmodunofficial.network.BindSignalReceiverPayload;
 import com.portofino.realtrainmodunofficial.blockentity.SignalRemoteBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.SignalStateBlockEntity;
+import com.portofino.realtrainmodunofficial.network.BindSignalReceiverPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

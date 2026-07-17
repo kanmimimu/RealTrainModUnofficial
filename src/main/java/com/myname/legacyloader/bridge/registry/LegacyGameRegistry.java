@@ -1,11 +1,7 @@
 package com.myname.legacyloader.bridge.registry;
 
 import com.myname.legacyloader.LegacyLoaderMod;
-import com.myname.legacyloader.bridge.block.ILegacyBlock;
-import com.myname.legacyloader.bridge.block.LegacyBlock;
-import com.myname.legacyloader.bridge.block.LegacyBlockSlab;
-import com.myname.legacyloader.bridge.block.LegacyBlockStairs;
-import com.myname.legacyloader.bridge.block.LegacyMetadataBlock;
+import com.myname.legacyloader.bridge.block.*;
 import com.myname.legacyloader.bridge.core.RegistryNameHelper;
 import com.myname.legacyloader.bridge.fml.IWorldGenerator;
 import com.myname.legacyloader.bridge.item.*;

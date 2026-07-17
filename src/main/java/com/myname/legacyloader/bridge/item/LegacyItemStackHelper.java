@@ -4,11 +4,11 @@ import com.myname.legacyloader.LegacyLoaderMod;
 import com.myname.legacyloader.bridge.init.LegacyItems;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.item.component.CustomData;
-import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.block.Block;
 

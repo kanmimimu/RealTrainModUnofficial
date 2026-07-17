@@ -2,12 +2,7 @@ package jp.ngt.rtm.entity.train;
 
 import jp.ngt.ngtlib.math.NGTMath;
 import jp.ngt.ngtlib.math.Vec3;
-import jp.ngt.rtm.entity.train.util.BogieController;
-import jp.ngt.rtm.entity.train.util.Formation;
-import jp.ngt.rtm.entity.train.util.FormationEntry;
-import jp.ngt.rtm.entity.train.util.FormationManager;
-import jp.ngt.rtm.entity.train.util.TrainSpeedManager;
-import jp.ngt.rtm.entity.train.util.TrainState;
+import jp.ngt.rtm.entity.train.util.*;
 import jp.ngt.rtm.entity.train.util.TrainState.TrainStateType;
 import jp.ngt.rtm.entity.vehicle.EntityVehicleBase;
 import jp.ngt.rtm.modelpack.cfg.TrainConfig;

@@ -1,6 +1,5 @@
 package jp.ngt.rtm.render;
 
-import jp.ngt.ngtlib.io.ScriptUtil;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 /**

@@ -2,11 +2,10 @@ package com.portofino.realtrainmodunofficial.block;
 
 import com.mojang.serialization.MapCodec;
 import com.portofino.realtrainmodunofficial.ClientHooks;
-import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import com.portofino.realtrainmodunofficial.blockentity.SignalRemoteBlockEntity;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;

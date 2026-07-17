@@ -1,13 +1,13 @@
 package jp.ngt.rtm.entity.train;
 
 import jp.ngt.ngtlib.math.NGTMath;
+import jp.ngt.ngtlib.math.Vec3;
 import jp.ngt.rtm.entity.train.util.BogieController;
 import jp.ngt.rtm.modelpack.cfg.TrainConfig;
 import jp.ngt.rtm.rail.TileEntityLargeRailBase;
 import jp.ngt.rtm.rail.TileEntityLargeRailCore;
 import jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore;
 import jp.ngt.rtm.rail.util.RailMap;
-import jp.ngt.ngtlib.math.Vec3;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;

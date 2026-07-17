@@ -1,7 +1,7 @@
 package com.myname.legacyloader.bridge.block;
 
-import com.myname.legacyloader.bridge.client.LegacyIconRegister;
 import com.myname.legacyloader.bridge.client.LegacyIcon;
+import com.myname.legacyloader.bridge.client.LegacyIconRegister;
 import com.myname.legacyloader.bridge.item.LegacyCreativeTab;
 import com.myname.legacyloader.bridge.registry.LegacyGameRegistry;
 import net.minecraft.world.level.block.Block;

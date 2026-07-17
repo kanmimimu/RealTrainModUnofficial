@@ -1,6 +1,5 @@
 package jp.ngt.rtm.render;
 
-import jp.ngt.ngtlib.io.ScriptUtil;
 import jp.ngt.rtm.entity.train.EntityBogie;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
 import jp.ngt.rtm.entity.vehicle.EntityVehicleBase;

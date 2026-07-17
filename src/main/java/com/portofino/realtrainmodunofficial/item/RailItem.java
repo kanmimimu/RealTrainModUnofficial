@@ -1,7 +1,7 @@
 package com.portofino.realtrainmodunofficial.item;
 
-import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.ClientHooks;
+import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.block.MarkerBlock;
 import com.portofino.realtrainmodunofficial.rail.RailDefinition;
 import com.portofino.realtrainmodunofficial.rail.RailRegistry;
@@ -11,14 +11,14 @@ import jp.ngt.rtm.rail.util.RailProperty;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 
 import java.util.List;

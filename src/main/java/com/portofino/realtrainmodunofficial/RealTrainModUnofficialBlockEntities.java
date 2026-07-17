@@ -1,13 +1,6 @@
 package com.portofino.realtrainmodunofficial;
 
-import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.MarkerBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.ScriptBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.SignalRemoteBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.SignalStateBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.TrainDetectorBlockEntity;
+import com.portofino.realtrainmodunofficial.blockentity.*;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredHolder;

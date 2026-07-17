@@ -1,9 +1,9 @@
 package com.myname.legacyloader.bridge.item.crafting;
 
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.item.Item;
 
 public class LegacyShapedOreRecipe implements LegacyRecipe {
     public final ItemStack output;

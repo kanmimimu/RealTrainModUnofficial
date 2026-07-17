@@ -1,7 +1,7 @@
 package com.myname.legacyloader.bridge.item;
 
-import net.minecraft.world.item.Item;
 import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.item.Item;
 
 public class LegacyItemProperties {
     // 譛ｬ迚ｩ縺ｮ繝励Ο繝代ユ繧｣繧剃ｿ晄戟

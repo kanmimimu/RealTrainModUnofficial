@@ -1,18 +1,7 @@
 package com.portofino.realtrainmodunofficial;
 
-import com.portofino.realtrainmodunofficial.item.CarItem;
-import com.portofino.realtrainmodunofficial.item.CrowbarItem;
-import com.portofino.realtrainmodunofficial.item.IcCardItem;
-import com.portofino.realtrainmodunofficial.item.MiniatureItem;
-import com.portofino.realtrainmodunofficial.item.MarkerItem;
-import com.portofino.realtrainmodunofficial.item.RailItem;
-import com.portofino.realtrainmodunofficial.item.TrainItem;
-import com.portofino.realtrainmodunofficial.item.InstalledObjectItem;
-import com.portofino.realtrainmodunofficial.item.TrainVehicleItem;
-import com.portofino.realtrainmodunofficial.item.WireItem;
-import com.portofino.realtrainmodunofficial.item.WrenchItem;
-import com.portofino.realtrainmodunofficial.item.RtmWrenchItem;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
+import com.portofino.realtrainmodunofficial.item.*;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 

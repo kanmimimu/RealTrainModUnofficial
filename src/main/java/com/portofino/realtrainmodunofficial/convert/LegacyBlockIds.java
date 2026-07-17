@@ -1,18 +1,10 @@
 package com.portofino.realtrainmodunofficial.convert;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.*;
 
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 旧ワールドの level.dat にある Forge (FML) のレジストリ表を読む。

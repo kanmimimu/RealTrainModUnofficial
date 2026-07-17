@@ -1,11 +1,7 @@
 package com.portofino.realtrainmodunofficial.client;
 
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
-import com.portofino.realtrainmodunofficial.client.screen.ScriptBlockScreen;
-import com.portofino.realtrainmodunofficial.client.screen.SignalChangerScreen;
-import com.portofino.realtrainmodunofficial.client.screen.SignalReceiverScreen;
-import com.portofino.realtrainmodunofficial.client.screen.SignalValueScreen;
-import com.portofino.realtrainmodunofficial.client.screen.TrainDetectorScreen;
+import com.portofino.realtrainmodunofficial.client.screen.*;
 import com.portofino.realtrainmodunofficial.client.sound.CrossingGateSoundManager;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import com.portofino.realtrainmodunofficial.item.TrainItem;

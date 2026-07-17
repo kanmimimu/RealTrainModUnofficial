@@ -1,7 +1,7 @@
 package com.myname.legacyloader.bridge.client.renderer.entity;
 
-import net.minecraft.client.Minecraft;
 import com.myname.legacyloader.bridge.client.renderer.LegacyRenderBlocks;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;

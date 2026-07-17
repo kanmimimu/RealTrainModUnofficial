@@ -2,11 +2,7 @@ package jp.ngt.rtm.rail;
 
 import net.minecraft.world.level.Level;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.WeakHashMap;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.Collectors;
 

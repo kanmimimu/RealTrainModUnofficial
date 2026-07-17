@@ -1,8 +1,8 @@
 package com.myname.legacyloader.bridge.registry;
 
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.item.Item;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
 
 // ForgeRegistries 縺ｮ蛛ｽ迚ｩ
 public class BridgeForgeRegistries {

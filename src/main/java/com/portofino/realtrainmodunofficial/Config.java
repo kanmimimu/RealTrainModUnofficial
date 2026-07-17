@@ -1,10 +1,10 @@
 package com.portofino.realtrainmodunofficial;
 
-import java.util.List;
-
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.common.ModConfigSpec;
+
+import java.util.List;
 
 // コンフィグ・クラスの例。これは必須ではありませんが、コンフィグを整理しておくためにあるとよいでしょう。
 // NeoのコンフィグAPIの使い方を説明します。

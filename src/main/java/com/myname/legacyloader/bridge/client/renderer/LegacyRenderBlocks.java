@@ -1,18 +1,14 @@
 package com.myname.legacyloader.bridge.client.renderer;
 
-import com.myname.legacyloader.bridge.block.LegacyBlockHelper;
 import com.myname.legacyloader.bridge.block.LegacyBlock;
+import com.myname.legacyloader.bridge.block.LegacyBlockHelper;
 import com.myname.legacyloader.bridge.block.LegacyBlockStairs;
 import com.myname.legacyloader.bridge.client.LegacyIcon;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 public class LegacyRenderBlocks {
     public int field_147875_q;

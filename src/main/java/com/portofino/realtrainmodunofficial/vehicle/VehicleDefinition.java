@@ -1,9 +1,10 @@
 package com.portofino.realtrainmodunofficial.vehicle;
 
 import net.minecraft.world.phys.Vec3;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 
 public class VehicleDefinition {
     public static final int SEAT_TYPE_DISABLED = 0;

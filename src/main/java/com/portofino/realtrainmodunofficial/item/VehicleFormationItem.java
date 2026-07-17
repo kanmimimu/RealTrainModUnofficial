@@ -1,12 +1,15 @@
 package com.portofino.realtrainmodunofficial.item;
 
-import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.ClientHooks;
+import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
-import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -17,12 +20,9 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 public class VehicleFormationItem extends Item {
     private static final double FORMATION_CLEARANCE = 0.25D;

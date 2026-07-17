@@ -1,6 +1,8 @@
 package com.myname.legacyloader.bridge.nbt;
 
-import net.minecraft.nbt.*;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 
 /**
  * 1.7.10 SRG method names for NBTTagCompound (mapped to CompoundTag) and NBTTagList (ListTag).

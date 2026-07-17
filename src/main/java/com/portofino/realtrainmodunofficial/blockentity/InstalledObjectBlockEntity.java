@@ -2,8 +2,8 @@ package com.portofino.realtrainmodunofficial.blockentity;
 
 import com.portofino.realtrainmodunofficial.ClientHooks;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
-import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
+import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
 import com.portofino.realtrainmodunofficial.signal.SignalAspect;
 import com.portofino.realtrainmodunofficial.signal.SignalNetworkSavedData;
@@ -22,11 +22,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rtm.electric.TileEntityInsulator {
     private static final int TICKET_GATE_OPEN_TICKS = 60;

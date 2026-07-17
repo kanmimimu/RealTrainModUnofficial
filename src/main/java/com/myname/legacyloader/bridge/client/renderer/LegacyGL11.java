@@ -1,10 +1,11 @@
 package com.myname.legacyloader.bridge.client.renderer;
 
+import org.joml.Matrix4d;
+import org.joml.Vector4d;
+
 import java.nio.Buffer;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import org.joml.Matrix4d;
-import org.joml.Vector4d;
 
 public final class LegacyGL11 {
     public static final int GL_QUADS = 7;

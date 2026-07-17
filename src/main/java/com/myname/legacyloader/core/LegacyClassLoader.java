@@ -2,16 +2,17 @@ package com.myname.legacyloader.core;
 
 import com.myname.legacyloader.bridge.Mappings;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.net.URL;
-import java.net.URLClassLoader;
 
 public class LegacyClassLoader extends URLClassLoader {
 

@@ -5,8 +5,6 @@ import com.portofino.realtrainmodunofficial.formation.TrainFormationData;
 import com.portofino.realtrainmodunofficial.item.TrainVehicleItem;
 import com.portofino.realtrainmodunofficial.item.VehicleFormationItem;
 import io.netty.buffer.ByteBuf;
-import java.util.ArrayList;
-import java.util.List;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -15,6 +13,9 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public record SaveFormationPayload(String name, List<String> vehicleIds, List<Boolean> reversedFlags) implements CustomPacketPayload {
    public static final CustomPacketPayload.Type<SaveFormationPayload> TYPE = new CustomPacketPayload.Type(ResourceLocation.fromNamespaceAndPath("realtrainmodunofficial", "save_formation"));

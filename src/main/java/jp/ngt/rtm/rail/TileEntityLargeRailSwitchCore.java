@@ -1,10 +1,6 @@
 package jp.ngt.rtm.rail;
 
-import jp.ngt.rtm.rail.util.RailMaker;
-import jp.ngt.rtm.rail.util.RailMap;
-import jp.ngt.rtm.rail.util.RailMapSwitch;
-import jp.ngt.rtm.rail.util.RailPosition;
-import jp.ngt.rtm.rail.util.SwitchType;
+import jp.ngt.rtm.rail.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;

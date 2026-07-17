@@ -3,7 +3,6 @@ package com.myname.legacyloader.bridge.world;
 import com.myname.legacyloader.bridge.block.LegacyBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;

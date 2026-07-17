@@ -16,12 +16,9 @@ import jp.ngt.rtm.render.ModelObject;
 import jp.ngt.rtm.render.RailPartsRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import org.joml.Vector3f;
 
 import javax.script.ScriptEngine;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;

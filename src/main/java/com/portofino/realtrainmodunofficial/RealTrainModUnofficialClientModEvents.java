@@ -1,14 +1,7 @@
 package com.portofino.realtrainmodunofficial;
 
-import com.portofino.realtrainmodunofficial.client.renderer.RailCoreBlockEntityRenderer;
-import com.portofino.realtrainmodunofficial.client.renderer.RtmBogieRenderer;
-import com.portofino.realtrainmodunofficial.client.renderer.RtmTrainRenderer;
-import com.portofino.realtrainmodunofficial.client.renderer.TrainBogieEntityRenderer;
-import com.portofino.realtrainmodunofficial.client.renderer.TrainEntityRenderer;
-import com.portofino.realtrainmodunofficial.client.renderer.TrainSeatEntityRenderer;
 import com.portofino.realtrainmodunofficial.client.TrainControlKeyMappings;
-import com.portofino.realtrainmodunofficial.client.renderer.CarRenderer;
-import com.portofino.realtrainmodunofficial.client.renderer.InstalledObjectBlockEntityRenderer;
+import com.portofino.realtrainmodunofficial.client.renderer.*;
 import com.portofino.realtrainmodunofficial.client.sound.ExternalSoundPackBridge;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;

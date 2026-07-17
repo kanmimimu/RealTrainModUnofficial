@@ -1,7 +1,7 @@
 package com.myname.legacyloader.bridge.fluids;
 
-import net.minecraft.nbt.CompoundTag;
 import com.myname.legacyloader.bridge.tileentity.LegacyTileEntity;
+import net.minecraft.nbt.CompoundTag;
 
 public class LegacyFluidTankImpl implements LegacyFluidTank {
     protected LegacyFluidStack fluid;

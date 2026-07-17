@@ -1,11 +1,11 @@
 package com.myname.legacyloader.bridge.item;
 
-import net.minecraft.world.item.ItemStack; // 霑ｽ蜉
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.ItemStack; // 霑ｽ蜉
 import net.minecraft.world.item.Tier;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.block.Block;
 
 public class LegacyTier implements Tier {
     private final int level;

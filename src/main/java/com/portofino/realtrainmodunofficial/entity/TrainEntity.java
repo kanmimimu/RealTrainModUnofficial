@@ -1,47 +1,38 @@
 package com.portofino.realtrainmodunofficial.entity;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialEntities;
+import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
 import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
 import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
-import jp.ngt.rtm.rail.util.RailMap;
-import jp.ngt.rtm.rail.util.RailPosition;
 import com.portofino.realtrainmodunofficial.script.TrainScriptSystem;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
+import jp.ngt.rtm.rail.util.RailMap;
+import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
-import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityDimensions;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.MoverType;
-import net.minecraft.world.entity.Pose;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+
 import javax.script.ScriptEngine;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class TrainEntity extends Entity {

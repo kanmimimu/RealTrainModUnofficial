@@ -2,7 +2,6 @@ package com.portofino.realtrainmodunofficial.client.sound;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
-import net.minecraft.world.entity.Entity;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import net.minecraft.client.Minecraft;
@@ -13,6 +12,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 
 import java.util.Map;
 import java.util.UUID;

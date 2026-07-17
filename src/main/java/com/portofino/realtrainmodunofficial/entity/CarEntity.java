@@ -12,7 +12,6 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import javax.script.ScriptEngine;
 import net.minecraft.server.level.ServerEntity;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;

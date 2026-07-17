@@ -1,7 +1,7 @@
 package com.myname.legacyloader.bridge.forge.chunk;
 
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 
 public class LegacyForgeChunkManager {
 

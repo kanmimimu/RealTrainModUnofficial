@@ -2,7 +2,6 @@ package com.portofino.realtrainmodunofficial.client;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
-import com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager;
 import com.portofino.realtrainmodunofficial.client.screen.TrainControlScreen;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainSeatEntity;
@@ -10,15 +9,15 @@ import com.portofino.realtrainmodunofficial.network.MountTrainPayload;
 import com.portofino.realtrainmodunofficial.network.TrainControlPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.EntityHitResult;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)

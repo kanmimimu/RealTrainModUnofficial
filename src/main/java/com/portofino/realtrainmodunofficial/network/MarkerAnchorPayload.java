@@ -1,7 +1,6 @@
 package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import jp.ngt.rtm.rail.BlockMarker;
 import jp.ngt.rtm.rail.TileEntityMarker;
 import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.core.BlockPos;

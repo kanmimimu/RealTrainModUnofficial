@@ -1,11 +1,6 @@
 package com.portofino.realtrainmodunofficial.installedobject;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public final class InstalledObjectRegistry {
     private static final List<InstalledObjectDefinition> ALL = new ArrayList<>();

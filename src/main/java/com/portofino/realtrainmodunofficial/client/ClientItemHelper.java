@@ -1,13 +1,12 @@
 package com.portofino.realtrainmodunofficial.client;
 
-import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.client.screen.ModelSelectScreen;
 import com.portofino.realtrainmodunofficial.client.screen.TrainFormationScreen;
 import com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
-import com.portofino.realtrainmodunofficial.network.SelectModelPayload;
 import com.portofino.realtrainmodunofficial.item.TrainItem;
+import com.portofino.realtrainmodunofficial.network.SelectModelPayload;
 import com.portofino.realtrainmodunofficial.rail.RailRegistry;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
@@ -19,8 +18,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-import java.util.List;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 
 @OnlyIn(Dist.CLIENT)

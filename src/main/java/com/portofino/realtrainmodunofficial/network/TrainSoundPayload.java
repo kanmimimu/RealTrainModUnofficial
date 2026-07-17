@@ -2,7 +2,6 @@ package com.portofino.realtrainmodunofficial.network;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager;
-import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.codec.ByteBufCodecs;

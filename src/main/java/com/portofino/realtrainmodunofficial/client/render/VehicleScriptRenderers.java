@@ -9,13 +9,7 @@ import com.portofino.realtrainmodunofficial.vehicle.VehiclePackLoader;
 import jp.ngt.ngtlib.io.NGTFileLoader;
 import jp.ngt.ngtlib.io.ScriptUtil;
 import jp.ngt.ngtlib.renderer.GLRecorder;
-import jp.ngt.ngtlib.renderer.model.Face;
-import jp.ngt.ngtlib.renderer.model.GroupObject;
-import jp.ngt.ngtlib.renderer.model.Material;
-import jp.ngt.ngtlib.renderer.model.ModelLoader;
-import jp.ngt.ngtlib.renderer.model.PolygonModel;
-import jp.ngt.ngtlib.renderer.model.TextureSet;
-import jp.ngt.ngtlib.renderer.model.Vertex;
+import jp.ngt.ngtlib.renderer.model.*;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
 import jp.ngt.rtm.entity.train.util.TrainState;
 import jp.ngt.rtm.render.ModelObject;
@@ -23,22 +17,16 @@ import jp.ngt.rtm.render.RenderPass;
 import jp.ngt.rtm.render.VehiclePartsRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import javax.script.ScriptEngine;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 本家式の車両スクリプト描画 (Phase 3 車両編)。

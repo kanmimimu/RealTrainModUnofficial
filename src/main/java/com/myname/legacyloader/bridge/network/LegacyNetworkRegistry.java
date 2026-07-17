@@ -1,11 +1,10 @@
 package com.myname.legacyloader.bridge.network;
 
-import net.minecraft.resources.ResourceLocation;
+import io.netty.channel.ChannelHandler;
+import io.netty.util.AttributeKey;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import io.netty.channel.ChannelHandler;
-import io.netty.util.AttributeKey;
 
 import java.util.EnumMap;
 import java.util.HashMap;

@@ -1,9 +1,12 @@
 package com.myname.legacyloader.bridge.network;
+
+import com.myname.legacyloader.bridge.item.LegacyItemStackHelper;
 import io.netty.buffer.ByteBuf;
-import java.nio.charset.StandardCharsets;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
-import com.myname.legacyloader.bridge.item.LegacyItemStackHelper;
+
+import java.nio.charset.StandardCharsets;
+
 public class LegacyByteBufUtils {
  public static void writeUTF8String(ByteBuf buf, String s){ byte[] b=(s==null?"":s).getBytes(StandardCharsets.UTF_8); writeVarInt(buf,b.length,5); buf.writeBytes(b);}
  public static String readUTF8String(ByteBuf buf){ int l=readVarInt(buf,5); byte[] b=new byte[Math.max(0,l)]; buf.readBytes(b); return new String(b,StandardCharsets.UTF_8);}
