@@ -133,7 +133,7 @@ public class TrainVehicleItem extends Item {
     }
 
     private boolean trySpawnTrainAtTarget(Level level, Player player, ItemStack stack, BlockPos targetPos, Vec3 targetPoint) {
-        String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String selectedId = RealTrainModUnofficialComponents.getString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID);
         VehicleDefinition def = VehicleRegistry.getById(selectedId);
         if (def == null) {
             def = VehicleRegistry.getSelected();
@@ -506,7 +506,7 @@ public class TrainVehicleItem extends Item {
             tooltip.add(net.minecraft.network.chat.Component.translatable("tooltip.realtrainmodunofficial.train_formation.empty"));
         }
 
-        String selectedModel = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String selectedModel = RealTrainModUnofficialComponents.getString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID);
         if (selectedModel != null && !selectedModel.isBlank()) {
             tooltip.add(net.minecraft.network.chat.Component.translatable("tooltip.realtrainmodunofficial.selected_model", selectedModel)
                 .withStyle(net.minecraft.ChatFormatting.GREEN));

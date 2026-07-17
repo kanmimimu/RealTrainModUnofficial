@@ -3,14 +3,12 @@ package jp.masa.signalcontrollermod;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -74,11 +72,11 @@ public class ItemPosSettingTool extends Item {
     }
 
     private static CompoundTag getTag(ItemStack stack) {
-        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-        return data != null ? data.copyTag() : new CompoundTag();
+        CompoundTag data = stack.getTag();
+        return data != null ? data.copy() : new CompoundTag();
     }
 
     private static void setTag(ItemStack stack, CompoundTag tag) {
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        stack.setTag(tag);
     }
 }

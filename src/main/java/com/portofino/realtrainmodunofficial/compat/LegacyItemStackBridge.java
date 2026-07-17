@@ -1,12 +1,10 @@
 package com.portofino.realtrainmodunofficial.compat;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 
 import java.util.Locale;
 
@@ -25,7 +23,7 @@ public final class LegacyItemStackBridge {
         if (stack == null || stack.isEmpty()) {
             return "";
         }
-        String modern = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String modern = RealTrainModUnofficialComponents.getString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID);
         if (!isBlank(modern)) {
             return modern;
         }
@@ -37,7 +35,7 @@ public final class LegacyItemStackBridge {
         if (stack == null || stack.isEmpty()) {
             return "";
         }
-        String modern = stack.getOrDefault(RealTrainModUnofficialComponents.SELECTED_MODEL_DATA_MAP.get(), "");
+        String modern = RealTrainModUnofficialComponents.getStringOrDefault(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_DATA_MAP, "");
         if (!isBlank(modern)) {
             return modern;
         }
@@ -54,8 +52,8 @@ public final class LegacyItemStackBridge {
         }
         String safeModelId = modelId == null ? "" : modelId;
         String safeDataMap = dataMapValue == null ? "" : dataMapValue;
-        stack.set(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get(), safeModelId);
-        stack.set(RealTrainModUnofficialComponents.SELECTED_MODEL_DATA_MAP.get(), safeDataMap);
+        RealTrainModUnofficialComponents.setString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID, safeModelId);
+        RealTrainModUnofficialComponents.setString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_DATA_MAP, safeDataMap);
 
         CompoundTag tag = getLegacyCustomData(stack);
         if (!safeModelId.isBlank()) {
@@ -65,11 +63,12 @@ public final class LegacyItemStackBridge {
             tag.putString(LEGACY_DATA_MAP_ARG, safeDataMap);
             writeLegacyStateArg(tag, safeDataMap);
         }
-        CustomData.set(DataComponents.CUSTOM_DATA, stack, tag);
+        stack.setTag(tag);
     }
 
     private static CompoundTag getLegacyCustomData(ItemStack stack) {
-        return stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        CompoundTag tag = stack.getTag();
+        return tag != null ? tag.copy() : new CompoundTag();
     }
 
     private static String extractLegacyDataMapArg(CompoundTag tag) {

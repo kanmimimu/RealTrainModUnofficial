@@ -71,7 +71,7 @@ public class TrainItem extends Item {
             return InteractionResult.PASS;
         }
         ItemStack stack = context.getItemInHand();
-        String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String selectedId = RealTrainModUnofficialComponents.getString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID);
         VehicleDefinition def = VehicleRegistry.getById(selectedId);
         if (def == null || !accepts(def)) {
             def = VehicleRegistry.getAll().stream()
@@ -153,7 +153,7 @@ public class TrainItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String selectedId = RealTrainModUnofficialComponents.getString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID);
         if (selectedId != null && !selectedId.isBlank()) {
             VehicleDefinition def = VehicleRegistry.getById(selectedId);
             String name = def != null ? def.getDisplayName() : selectedId;

@@ -11,7 +11,7 @@ public class TrainFormationData {
     public static final String TAG_NAME = "name";
     
     public static TrainFormation getFormation(ItemStack stack) {
-        CompoundTag tag = stack.get(RealTrainModUnofficialComponents.TRAIN_FORMATION.get());
+        CompoundTag tag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.TRAIN_FORMATION);
         if (tag == null) {
             return null;
         }
@@ -32,7 +32,7 @@ public class TrainFormationData {
     
     public static void setFormation(ItemStack stack, TrainFormation formation) {
         if (formation == null || formation.isEmpty()) {
-            stack.set(RealTrainModUnofficialComponents.TRAIN_FORMATION.get(), null);
+            RealTrainModUnofficialComponents.setTag(stack, RealTrainModUnofficialComponents.TRAIN_FORMATION, null);
             return;
         }
         
@@ -45,14 +45,14 @@ public class TrainFormationData {
         }
         tag.put(TAG_VEHICLES, vehiclesList);
         
-        stack.set(RealTrainModUnofficialComponents.TRAIN_FORMATION.get(), tag);
+        RealTrainModUnofficialComponents.setTag(stack, RealTrainModUnofficialComponents.TRAIN_FORMATION, tag);
     }
     
     public static boolean hasFormation(ItemStack stack) {
-        return stack.get(RealTrainModUnofficialComponents.TRAIN_FORMATION.get()) != null;
+        return RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.TRAIN_FORMATION) != null;
     }
     
     public static void clearFormation(ItemStack stack) {
-        stack.set(RealTrainModUnofficialComponents.TRAIN_FORMATION.get(), null);
+        RealTrainModUnofficialComponents.setTag(stack, RealTrainModUnofficialComponents.TRAIN_FORMATION, null);
     }
 }

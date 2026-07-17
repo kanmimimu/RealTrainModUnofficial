@@ -9,7 +9,6 @@ import jp.ngt.rtm.rail.util.RailPosition;
 import jp.ngt.rtm.rail.util.RailProperty;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -18,7 +17,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -96,12 +94,12 @@ public class ItemRail extends Item {
     // ===== NBT (CustomData) ヘルパー: 本家キー互換 =====
 
     private static CompoundTag getTag(ItemStack stack) {
-        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-        return data != null ? data.copyTag() : new CompoundTag();
+        CompoundTag data = stack.getTag();
+        return data != null ? data.copy() : new CompoundTag();
     }
 
     private static void setTag(ItemStack stack, CompoundTag nbt) {
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(nbt));
+        stack.setTag(nbt);
     }
 
     public static RailProperty getDefaultProperty() {

@@ -72,7 +72,7 @@ public final class RailPreviewRenderer {
 
             ItemStack stack = findPreviewStack(mc);
             if (!stack.isEmpty()) {
-                CompoundTag startTag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+                CompoundTag startTag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
                 if (startTag != null && startTag.contains("X") && startTag.contains("Y") && startTag.contains("Z")) {
                     BlockPos startPos = new BlockPos(startTag.getInt("X"), startTag.getInt("Y"), startTag.getInt("Z"));
                     BlockEntity startBe = mc.level.getBlockEntity(startPos);
@@ -222,7 +222,7 @@ public final class RailPreviewRenderer {
         for (InteractionHand hand : InteractionHand.values()) {
             ItemStack stack = mc.player.getItemInHand(hand);
             if (stack.getItem() instanceof RailItem || stack.getItem() instanceof WrenchItem) {
-                if (stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get()) != null) {
+                if (RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START) != null) {
                     return stack;
                 }
             }

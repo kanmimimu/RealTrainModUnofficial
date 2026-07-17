@@ -3,7 +3,6 @@ package jp.ngt.rtm.entity.npc;
 import jp.ngt.rtm.entity.ai.DriveWithMacroGoal;
 import jp.ngt.rtm.entity.ai.DrivingWithDiagramGoal;
 import jp.ngt.rtm.entity.ai.DrivingWithSignalGoal;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -149,7 +148,7 @@ public class EntityMotorman extends PathfinderMob {
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
         ItemStack held = player.getItemInHand(hand);
         //本家: 「本と羽根ペン」を渡すとダイヤとしてセット
-        if (held.is(Items.WRITABLE_BOOK) && held.has(DataComponents.WRITABLE_BOOK_CONTENT)) {
+        if (held.is(Items.WRITABLE_BOOK) && held.hasTag() && held.getTag().contains("pages", net.minecraft.nbt.Tag.TAG_LIST)) {
             if (!this.level().isClientSide) {
                 this.setDiagram(held.copyWithCount(1));
             }

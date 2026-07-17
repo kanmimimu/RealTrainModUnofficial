@@ -8,7 +8,6 @@ import jp.ngt.rtm.rail.TileEntityMarker;
 import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
@@ -18,7 +17,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -53,21 +51,21 @@ public class RtmWrenchItem extends Item {
     //---- モード管理 (本家はダメージ値 + NBT ModeLocked) ----
 
     public static int getMode(ItemStack stack) {
-        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-        return data != null ? data.copyTag().getInt("WrenchMode") : 0;
+        CompoundTag data = stack.getTag();
+        return data != null ? data.copy().getInt("WrenchMode") : 0;
     }
 
     private static void setMode(ItemStack stack, int mode) {
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, tag -> tag.putInt("WrenchMode", mode));
+        stack.getOrCreateTag().putInt("WrenchMode", mode);
     }
 
     public static boolean isModeLocked(ItemStack stack) {
-        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-        return data != null && data.copyTag().getBoolean("ModeLocked");
+        CompoundTag data = stack.getTag();
+        return data != null && data.copy().getBoolean("ModeLocked");
     }
 
     private static void setModeLocked(ItemStack stack, boolean locked) {
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, tag -> tag.putBoolean("ModeLocked", locked));
+        stack.getOrCreateTag().putBoolean("ModeLocked", locked);
     }
 
     private static String modeName(int mode) {

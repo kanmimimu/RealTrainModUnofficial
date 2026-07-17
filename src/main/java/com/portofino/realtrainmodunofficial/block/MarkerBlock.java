@@ -154,7 +154,7 @@ public class MarkerBlock extends BaseEntityBlock {
         }
         if (stack.getItem() instanceof RailItem) {
             if (!level.isClientSide() && state.getBlock() instanceof MarkerBlock block) {
-                String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+                String selectedId = RealTrainModUnofficialComponents.getString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID);
                 int markerCount = block.searchAllMarkers(level, pos).size();
                 if (markerCount < 2) {
                     player.displayClientMessage(Component.literal("接続できるマーカーが不足しています(2個以上必要)"), true);
@@ -177,12 +177,12 @@ public class MarkerBlock extends BaseEntityBlock {
 
     public static boolean placeRailFromItem(Level level, BlockPos pos, Player player, ItemStack stack, @Nullable String selectedModelId) {
         ItemStack previewStack = stack;
-        CompoundTag startTag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+        CompoundTag startTag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
         if (startTag == null) {
             ItemStack alternatePreviewStack = WrenchItem.findPlayerPreviewStack(player);
             CompoundTag alternateTag = alternatePreviewStack.isEmpty()
                 ? null
-                : alternatePreviewStack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+                : RealTrainModUnofficialComponents.getTag(alternatePreviewStack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
             if (alternateTag != null && alternateTag.getBoolean("WrenchMode")) {
                 previewStack = alternatePreviewStack;
                 startTag = alternateTag;
@@ -207,7 +207,7 @@ public class MarkerBlock extends BaseEntityBlock {
         boolean wrenchMode = startTag.getBoolean("WrenchMode")
             && (startTag.contains("EndRP") || startTag.contains("RailSegments"));
         if (startPos.equals(pos) && !wrenchMode) {
-            previewStack.remove(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+            RealTrainModUnofficialComponents.removeKey(previewStack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
             player.displayClientMessage(Component.literal("レールプレビューを解除しました"), true);
             return false;
         }
@@ -249,14 +249,14 @@ public class MarkerBlock extends BaseEntityBlock {
                 nextTag.remove("OffsetX");
                 nextTag.remove("OffsetY");
                 nextTag.remove("OffsetZ");
-                previewStack.set(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get(), nextTag);
+                RealTrainModUnofficialComponents.setTag(previewStack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START, nextTag);
                 player.displayClientMessage(Component.literal("分岐レールを追加しました"), true);
             } else {
-                previewStack.remove(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+                RealTrainModUnofficialComponents.removeKey(previewStack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
                 player.displayClientMessage(Component.literal("レールを接続しました"), true);
             }
         } else if (!branchMode || wrenchMode) {
-            previewStack.remove(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+            RealTrainModUnofficialComponents.removeKey(previewStack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
         }
         return created;
     }
@@ -294,7 +294,7 @@ public class MarkerBlock extends BaseEntityBlock {
      */
     public static boolean placeCopiedRailAt(Level level, BlockPos targetPos, Player player, ItemStack stack,
                                             @Nullable String selectedModelId) {
-        CompoundTag startTag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+        CompoundTag startTag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
         if (startTag == null || !startTag.getBoolean("WrenchMode") || !startTag.contains("StartRP")) {
             return false;
         }

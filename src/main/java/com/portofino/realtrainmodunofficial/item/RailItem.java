@@ -31,7 +31,7 @@ public class RailItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get()) != null) {
+        if (RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START) != null) {
             // コピー済み/調整済みレールは、空振り右クリックで選択UIへ戻さず、そのまま保持する。
             return InteractionResultHolder.pass(stack);
         }
@@ -63,12 +63,12 @@ public class RailItem extends Item {
             }
         }
 
-        if (stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get()) == null) {
+        if (RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START) == null) {
             return InteractionResult.PASS;
         }
 
         if (!level.isClientSide) {
-            String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+            String selectedId = RealTrainModUnofficialComponents.getString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID);
             // バニラのブロック設置と同様、クリックした面の隣(地面の上)を基準位置にする。
             // クリックした地面ブロックそのものを渡すとレールが1ブロック低く=地面にめり込んで
             // 削れて見えるため。コピー元レールのコアも地面の1つ上にあったので +1 で高さが合う。
@@ -135,7 +135,7 @@ public class RailItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
-        String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        String selectedId = RealTrainModUnofficialComponents.getString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID);
         if (selectedId != null && !selectedId.isBlank()) {
             RailDefinition def = RailRegistry.getById(selectedId);
             String name = def != null ? def.getDisplayName() : selectedId;

@@ -73,14 +73,14 @@ public class WireItem extends Item implements ModelSelectableItem {
             return InteractionResult.FAIL;
         }
 
-        CompoundTag startTag = stack.get(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get());
+        CompoundTag startTag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.WIRE_PLACEMENT_START);
         if (startTag == null || !startTag.contains("X")) {
             if (!level.isClientSide) {
                 CompoundTag tag = new CompoundTag();
                 tag.putInt("X", clickedPos.getX());
                 tag.putInt("Y", clickedPos.getY());
                 tag.putInt("Z", clickedPos.getZ());
-                stack.set(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get(), tag);
+                RealTrainModUnofficialComponents.setTag(stack, RealTrainModUnofficialComponents.WIRE_PLACEMENT_START, tag);
                 player.displayClientMessage(Component.literal("始点の碍子を記録しました"), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
@@ -89,7 +89,7 @@ public class WireItem extends Item implements ModelSelectableItem {
         BlockPos startPos = new BlockPos(startTag.getInt("X"), startTag.getInt("Y"), startTag.getInt("Z"));
         if (startPos.equals(clickedPos)) {
             if (!level.isClientSide) {
-                stack.remove(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get());
+                RealTrainModUnofficialComponents.removeKey(stack, RealTrainModUnofficialComponents.WIRE_PLACEMENT_START);
                 player.displayClientMessage(Component.literal("ワイヤー設置を解除しました"), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
@@ -111,7 +111,7 @@ public class WireItem extends Item implements ModelSelectableItem {
                 blockEntity.setWireEndpoints(startPos, clickedPos);
                 level.sendBlockUpdated(mid, blockEntity.getBlockState(), blockEntity.getBlockState(), 3);
             }
-            stack.remove(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get());
+            RealTrainModUnofficialComponents.removeKey(stack, RealTrainModUnofficialComponents.WIRE_PLACEMENT_START);
             if (!player.getAbilities().instabuild) {
                 stack.shrink(1);
             }

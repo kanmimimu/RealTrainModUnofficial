@@ -1,62 +1,62 @@
 package com.portofino.realtrainmodunofficial;
 
-import com.mojang.serialization.Codec;
-import com.portofino.realtrainmodunofficial.network.compat.ByteBufCodecs;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.RegistryObject;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.item.ItemStack;
 
 /**
- * DataComponentsを追加するクラス<br>
- * DataComponentsは、1.20.5よりNBTタグの代替としてItemStackに導入された状態管理手段。<br>
- * 今後のアップデートでアイテムだけでなくNBTを使用するあらゆる要素に拡大していくと予測されており、<br>
- * これからはNBTタグではなくこちらを利用することが推奨されている。
+ * 1.20.1 には DataComponents が無いため、旧 1.20.5+ DataComponent 相当のデータを ItemStack の NBT に
+ * 保存する compat レイヤ。キー定数と型付きアクセサ (String / CompoundTag) を提供する。
+ * {@code null} 値の set は該当キーの削除として扱う。
  */
-public class RealTrainModUnofficialComponents {
-    public static final DeferredRegister.DataComponents REGISTRAR = DeferredRegister.createDataComponents(
-        Registries.DATA_COMPONENT_TYPE,
-        RealTrainModUnofficial.MODID
-    );
+public final class RealTrainModUnofficialComponents {
+    public static final String SELECTED_MODEL_ID = "selected_model_id";
+    public static final String SELECTED_MODEL_DATA_MAP = "selected_model_data_map";
+    public static final String RAIL_PREVIEW_START = "rail_preview_start";
+    public static final String TRAIN_FORMATION = "train_formation";
+    public static final String WIRE_PLACEMENT_START = "wire_placement_start";
 
-    /**
-     * 列車・レールアイテムで選択中のモデルID
-     */
-    public static final RegistryObject<DataComponentType<String>> SELECTED_MODEL_ID
-        = REGISTRAR.registerComponentType(
-        "selected_model_id",
-        builder -> builder.persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8)
-    );
+    private RealTrainModUnofficialComponents() {
+    }
 
-    /**
-     * モデル選択画面で指定した datamap 引数
-     */
-    public static final RegistryObject<DataComponentType<String>> SELECTED_MODEL_DATA_MAP
-        = REGISTRAR.registerComponentType(
-        "selected_model_data_map",
-        builder -> builder.persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8)
-    );
+    public static String getString(ItemStack stack, String key) {
+        CompoundTag tag = stack.getTag();
+        return tag != null && tag.contains(key, Tag.TAG_STRING) ? tag.getString(key) : null;
+    }
 
-    public static final RegistryObject<DataComponentType<CompoundTag>> RAIL_PREVIEW_START
-        = REGISTRAR.registerComponentType(
-        "rail_preview_start",
-        builder -> builder.persistent(CompoundTag.CODEC).networkSynchronized(ByteBufCodecs.COMPOUND_TAG)
-    );
+    public static String getStringOrDefault(ItemStack stack, String key, String fallback) {
+        String value = getString(stack, key);
+        return value != null ? value : fallback;
+    }
 
-    /**
-     * 1.20.5+ DataComponent: TRAIN_FORMATION
-     * Stores train formation data including vehicle IDs and formation name
-     */
-    public static final RegistryObject<DataComponentType<CompoundTag>> TRAIN_FORMATION
-        = REGISTRAR.registerComponentType(
-        "train_formation",
-        builder -> builder.persistent(CompoundTag.CODEC).networkSynchronized(ByteBufCodecs.COMPOUND_TAG)
-    );
+    public static void setString(ItemStack stack, String key, String value) {
+        if (value == null) {
+            removeKey(stack, key);
+        } else {
+            stack.getOrCreateTag().putString(key, value);
+        }
+    }
 
-    public static final RegistryObject<DataComponentType<CompoundTag>> WIRE_PLACEMENT_START
-        = REGISTRAR.registerComponentType(
-        "wire_placement_start",
-        builder -> builder.persistent(CompoundTag.CODEC).networkSynchronized(ByteBufCodecs.COMPOUND_TAG)
-    );
+    public static CompoundTag getTag(ItemStack stack, String key) {
+        CompoundTag tag = stack.getTag();
+        return tag != null && tag.contains(key, Tag.TAG_COMPOUND) ? tag.getCompound(key) : null;
+    }
+
+    public static void setTag(ItemStack stack, String key, CompoundTag value) {
+        if (value == null) {
+            removeKey(stack, key);
+        } else {
+            stack.getOrCreateTag().put(key, value);
+        }
+    }
+
+    public static void removeKey(ItemStack stack, String key) {
+        CompoundTag tag = stack.getTag();
+        if (tag != null) {
+            tag.remove(key);
+            if (tag.isEmpty()) {
+                stack.setTag(null);
+            }
+        }
+    }
 }

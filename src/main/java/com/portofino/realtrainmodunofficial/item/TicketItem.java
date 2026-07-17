@@ -1,13 +1,11 @@
 package com.portofino.realtrainmodunofficial.item;
 
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.CustomData;
 
 import java.util.List;
 
@@ -97,14 +95,14 @@ public class TicketItem extends Item {
     }
 
     private static CompoundTag read(ItemStack stack) {
-        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-        return data == null ? new CompoundTag() : data.copyTag();
+        CompoundTag data = stack.getTag();
+        return data == null ? new CompoundTag() : data.copy();
     }
 
     private static void write(ItemStack stack, int rides, boolean entered) {
         CompoundTag tag = new CompoundTag();
         tag.putInt(KEY_RIDES, Math.max(0, rides));
         tag.putBoolean(KEY_ENTERED, entered);
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        stack.setTag(tag);
     }
 }

@@ -128,7 +128,6 @@ public class RealTrainModUnofficial {
         com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.ENTITY_TYPES.register(modEventBus);
         RealTrainModUnofficialBlockEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
-        RealTrainModUnofficialComponents.REGISTRAR.register(modEventBus);
         //WebCTC は別 mod (RTMU-WebCTC_1.21.1, webctc サブプロジェクト) へ分離した。
         // スピーカー音源マッピングをサーバー起動時にロードし、プレイヤー接続時に同期する。
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(

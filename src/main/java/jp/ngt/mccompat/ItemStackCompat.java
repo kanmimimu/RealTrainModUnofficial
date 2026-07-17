@@ -48,8 +48,7 @@ public final class ItemStackCompat {
     public void func_77982_d(Object tag) {
         net.minecraft.nbt.CompoundTag real = jp.ngt.mccompat.nbt.NBTTagCompound.unwrap(tag);
         if (real != null) {
-            stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
-                    net.minecraft.world.item.component.CustomData.of(real));
+            stack.setTag(real);
         }
     }
 
@@ -59,12 +58,11 @@ public final class ItemStackCompat {
     }
 
     private jp.ngt.mccompat.nbt.NBTTagCompound getTagCompat() {
-        net.minecraft.world.item.component.CustomData data =
-                stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA);
+        net.minecraft.nbt.CompoundTag data = stack.getTag();
         if (data == null || data.isEmpty()) {
             return null;
         }
-        return new jp.ngt.mccompat.nbt.NBTTagCompound(data.copyTag());
+        return new jp.ngt.mccompat.nbt.NBTTagCompound(data.copy());
     }
 
     @Override

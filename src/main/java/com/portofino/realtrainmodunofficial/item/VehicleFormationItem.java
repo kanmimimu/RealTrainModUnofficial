@@ -86,7 +86,7 @@ public class VehicleFormationItem extends Item {
 
     public static TrainFormation getFormation(ItemStack stack) {
         TrainFormation formation = new TrainFormation();
-        CompoundTag tag = stack.get(RealTrainModUnofficialComponents.TRAIN_FORMATION.get());
+        CompoundTag tag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.TRAIN_FORMATION);
         if (tag != null && tag.contains("vehicles", 9)) { // 9 = ListTag
             ListTag vehiclesList = tag.getList("vehicles", 8); // 8 = StringTag
             for (int i = 0; i < vehiclesList.size() && i < 30; i++) {
@@ -107,7 +107,7 @@ public class VehicleFormationItem extends Item {
             vehiclesList.add(StringTag.valueOf(vehicle.id));
         }
         tag.put("vehicles", vehiclesList);
-        stack.set(RealTrainModUnofficialComponents.TRAIN_FORMATION.get(), tag);
+        RealTrainModUnofficialComponents.setTag(stack, RealTrainModUnofficialComponents.TRAIN_FORMATION, tag);
     }
 
     private void spawnFormation(Level level, Player player, TrainFormation formation, RailSpawnData spawnData) {

@@ -2,15 +2,12 @@ package jp.ngt.rtm.entity.ai;
 
 import jp.ngt.rtm.entity.npc.EntityMotorman;
 import jp.ngt.rtm.entity.train.util.EnumNotch;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.WritableBookContent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 本家 jp.ngt.rtm.entity.ai.EntityAIDrivingWithDiagram の移植。
@@ -81,12 +78,16 @@ public class DrivingWithDiagramGoal extends DrivingWithSignalGoal {
 
     /** 本家 ItemUtil.bookToStrings 相当: 本の全ページを行に分解。 */
     private static String[] bookToStrings(ItemStack book) {
-        WritableBookContent content = book.get(DataComponents.WRITABLE_BOOK_CONTENT);
-        if (content == null) {
+        net.minecraft.nbt.CompoundTag tag = book.getTag();
+        if (tag == null || !tag.contains("pages", net.minecraft.nbt.Tag.TAG_LIST)) {
             return new String[0];
         }
-        String joined = content.getPages(false).collect(Collectors.joining("\n"));
-        return joined.split("\n");
+        net.minecraft.nbt.ListTag pages = tag.getList("pages", net.minecraft.nbt.Tag.TAG_STRING);
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        for (int i = 0; i < pages.size(); i++) {
+            lines.add(pages.getString(i));
+        }
+        return String.join("\n", lines).split("\n");
     }
 
     @Override

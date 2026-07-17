@@ -65,7 +65,7 @@ public record RailPreviewAdjustPayload(int dx, int dy, int dz) implements Custom
      * Applies the preview adjustment to an item stack.
      */
     public static boolean apply(ItemStack stack, int dx, int dy, int dz) {
-        CompoundTag tag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+        CompoundTag tag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
         if (tag == null || !tag.contains("X") || !tag.contains("Y") || !tag.contains("Z")) {
             return false;
         }
@@ -73,7 +73,7 @@ public record RailPreviewAdjustPayload(int dx, int dy, int dz) implements Custom
         copy.putInt("OffsetX", clampOffset(copy.getInt("OffsetX") + dx));
         copy.putInt("OffsetY", clampOffset(copy.getInt("OffsetY") + dy));
         copy.putInt("OffsetZ", clampOffset(copy.getInt("OffsetZ") + dz));
-        stack.set(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get(), copy);
+        RealTrainModUnofficialComponents.setTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START, copy);
         return true;
     }
 

@@ -192,7 +192,7 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
         ItemStack stack = new ItemStack(RealTrainModUnofficialItems.RAIL_ITEM.get());
         String railDefinitionId = core.getRailDefinitionId();
         if (railDefinitionId != null && !railDefinitionId.isBlank()) {
-            stack.set(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get(), railDefinitionId);
+            RealTrainModUnofficialComponents.setString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID, railDefinitionId);
         }
 
         RailPosition[] positions = core.getRailPositions();
@@ -223,7 +223,7 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
             preview.putBoolean("BranchMode", segments.size() > 1);
             preview.put("RailSegments", segments);
             preview.put("EndRP", segments.getCompound(0).getCompound("EndRP"));
-            stack.set(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get(), preview);
+            RealTrainModUnofficialComponents.setTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START, preview);
         }
         return stack;
     }

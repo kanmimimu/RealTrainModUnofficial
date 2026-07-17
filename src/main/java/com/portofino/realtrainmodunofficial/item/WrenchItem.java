@@ -191,7 +191,7 @@ public class WrenchItem extends Item {
         tag.put("RailSegments", segments);
         tag.put("EndRP", ends.get(0).writeToNBT());
         copySegmentAnchorsToRoot(tag, segments.getCompound(0));
-        targetStack.set(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get(), tag);
+        RealTrainModUnofficialComponents.setTag(targetStack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START, tag);
         return true;
     }
 
@@ -207,7 +207,7 @@ public class WrenchItem extends Item {
         clearInvalidPreviewTags(player, level);
         ItemStack previewStack = findPreviewStack(player);
         if (!previewStack.isEmpty()) {
-            previewStack.remove(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+            RealTrainModUnofficialComponents.removeKey(previewStack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
             if (level.isClientSide()) {
                 player.displayClientMessage(Component.literal("レンチ選択を解除しました"), true);
             }
@@ -220,7 +220,7 @@ public class WrenchItem extends Item {
      * Moves the nearest rail preview control handle to a world-space point.
      */
     public static boolean moveControlTo(ItemStack stack, Vec3 hit) {
-        CompoundTag tag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+        CompoundTag tag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
         if (tag == null || !tag.contains("StartRP")) return false;
         RailPosition start = RailPosition.readFromNBT(tag.getCompound("StartRP"));
         if (start == null) return false;
@@ -250,7 +250,7 @@ public class WrenchItem extends Item {
         copy.put("RailSegments", segments);
         copy.put("EndRP", segments.getCompound(0).getCompound("EndRP"));
         copySegmentAnchorsToRoot(copy, segments.getCompound(0));
-        stack.set(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get(), copy);
+        RealTrainModUnofficialComponents.setTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START, copy);
         return true;
     }
 
@@ -309,7 +309,7 @@ public class WrenchItem extends Item {
         for (InteractionHand hand : InteractionHand.values()) {
             ItemStack stack = player.getItemInHand(hand);
             if ((stack.getItem() instanceof RailItem || stack.getItem() instanceof WrenchItem)
-                    && stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get()) != null) {
+                    && RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START) != null) {
                 return stack;
             }
         }
@@ -327,9 +327,9 @@ public class WrenchItem extends Item {
     public static void clearInvalidPreviewTags(Player player, Level level) {
         for (InteractionHand hand : InteractionHand.values()) {
             ItemStack stack = player.getItemInHand(hand);
-            CompoundTag tag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+            CompoundTag tag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
             if (tag != null && !isPreviewTagValid(level, tag)) {
-                stack.remove(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+                RealTrainModUnofficialComponents.removeKey(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
             }
         }
     }
@@ -413,7 +413,7 @@ public class WrenchItem extends Item {
 
     private static void showOffsetMessage(Level level, Player player, ItemStack stack) {
         if (!level.isClientSide()) return;
-        CompoundTag tag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
+        CompoundTag tag = RealTrainModUnofficialComponents.getTag(stack, RealTrainModUnofficialComponents.RAIL_PREVIEW_START);
         int ox = tag == null ? 0 : tag.getInt("OffsetX");
         int oy = tag == null ? 0 : tag.getInt("OffsetY");
         int oz = tag == null ? 0 : tag.getInt("OffsetZ");
