@@ -107,10 +107,6 @@ dependencies {
     // jar への同梱 (jsRuntime) は不可 (org.openjdk.nashorn モジュールと二重エクスポート衝突)。
     // コンパイル参照のみ。GraalJS は Phase 3 完了時に撤去予定。
     implementation "org.openjdk.nashorn:nashorn-core:15.4"
-    // Bundled add-on ATSAssistMod+ uses Jackson for IFTTT rule serialization.
-    implementation "com.fasterxml.jackson.core:jackson-databind:2.15.2"
-    jsRuntime "com.fasterxml.jackson.core:jackson-databind:2.15.2"
-
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
@@ -134,19 +130,8 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 }
 
-// 同梱デフォルトパック: bundled_pack_src/<PackName>/ を zip 化して jar の
-// assets/realtrainmodunofficial/bundled_packs/vehicle/ に入れる (起動時に
-// rtm_default_assets フォルダへ展開される)
-def buildE257DefaultPack = tasks.register('buildE257DefaultPack', Zip) {
-    from 'bundled_pack_src/E257_DefaultPack'
-    archiveFileName = 'E257_DefaultPack.zip'
-    destinationDirectory = layout.buildDirectory.dir('generated_bundled_packs')
-    // MQO/テクスチャは既圧縮 or テキストなので標準圧縮で十分
-}
-
 tasks.named('jar', Jar).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    dependsOn buildE257DefaultPack
     // LGPL-3.0 §4(b): 頒布物には GNU GPL と本ライセンス文書のコピーを添付すること。
     // LGPL-3.0 は GPL-3.0 の条項を取り込むライセンスなので、2 つで 1 セット。
     // ※ META-INF/LICENSE は依存ライブラリ (GraalVM 等) のもので別物。
@@ -155,15 +140,6 @@ tasks.named('jar', Jar).configure {
     }
     from('COPYING') {
         rename { 'LICENSE_GPL-3.0.txt' }
-    }
-    from(buildE257DefaultPack.flatMap { it.archiveFile }) {
-        into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
-    }
-    // パック作者の Readme は zip の中だけでなく、展開先フォルダ (rtm_default_assets) の
-    // zip と同じ場所にも置く。BundledPackInstaller が zip 以外もそこへコピーする。
-    from('bundled_pack_src/E257_DefaultPack/Readme.txt') {
-        into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
-        rename { 'E257_DefaultPack_Readme.txt' }
     }
     from {
         configurations.jsRuntime
