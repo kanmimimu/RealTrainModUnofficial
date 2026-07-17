@@ -110,6 +110,15 @@ public final class LegacyScriptSoundManager {
     }
 
     /**
+     * ノッチ (マスコン/ブレーキハンドル) 操作音か。この音だけはラッチ (登録制) の対象外で、
+     * 呼ばれた回数だけ鳴らす (連続ノッチ操作のガタガタ音は本家挙動)。
+     */
+    private static boolean isNotchSound(ResourceLocation soundId) {
+        String path = soundId.getPath().toLowerCase(java.util.Locale.ROOT);
+        return path.contains("lever") || path.contains("notch");
+    }
+
+    /**
      * @param bypassOneShotSuppression true = 一発音の「再生中は鳴らし直さない」抑制とデバウンスを無視する。
      *        サーバー発の離散イベント音 (マスコンのレバー音・警笛など) 用。スクリプトが毎tick要求する
      *        一発音 (コンプレッサ等) と違い、送られてきた回数だけ鳴ってよい
@@ -128,9 +137,13 @@ public final class LegacyScriptSoundManager {
         if (minecraft.getSoundManager() == null) {
             return;
         }
+        //ノッチ (マスコン/ブレーキハンドル) のレバー音はラッチ対象外:
+        //連続ノッチ操作で操作した回数だけガタガタ鳴るのが正 (本家挙動)。
+        //スクリプト経由 (bypass なし) で鳴らすパックでも欠落しないよう名前で許可する。
+        boolean notchSound = !looping && isNotchSound(soundId);
         //サーバー発の離散イベント音 (レバー音・警笛など) は追跡せず毎回そのまま鳴らす
         //(本家もこれらは SoundUpdater ではなく都度 playSound)。
-        if (!looping && bypassOneShotSuppression) {
+        if (!looping && (bypassOneShotSuppression || notchSound)) {
             minecraft.getSoundManager().play(new SimpleSoundInstance(
                 soundId,
                 SoundSource.NEUTRAL,

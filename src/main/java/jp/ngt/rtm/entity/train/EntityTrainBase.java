@@ -193,13 +193,15 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
                         com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
                 if (def != null) {
+                    //ドア開閉は離散イベント音: 登録制ラッチを通すと 2 回目以降が鳴らなくなるため
+                    //bypass=true で毎回そのまま鳴らす (状態変化時にしか呼ばれない)
                     if (opened && !def.getSoundDoorOpen().isBlank()) {
                         com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
-                                .playLegacyId(this, def.getSoundDoorOpen(), 1.0F, 1.0F, false);
+                                .playLegacyId(this, def.getSoundDoorOpen(), 1.0F, 1.0F, false, true);
                     }
                     if (closed && !def.getSoundDoorClose().isBlank()) {
                         com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
-                                .playLegacyId(this, def.getSoundDoorClose(), 1.0F, 1.0F, false);
+                                .playLegacyId(this, def.getSoundDoorClose(), 1.0F, 1.0F, false, true);
                     }
                 }
             }
