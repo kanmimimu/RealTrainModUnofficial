@@ -1,4 +1,0 @@
-{
-  "parent": "minecraft:block/cube_all",
-  "textures": { "all": "atsassistmod:block/ground_unit_1" }
-}
