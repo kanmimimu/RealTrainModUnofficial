@@ -6,13 +6,13 @@ import com.portofino.realtrainmodunofficial.entity.TrainSeatEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.RegistryObject;
 
 public final class RealTrainModUnofficialEntities {
     public static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(Registries.ENTITY_TYPE, RealTrainModUnofficial.MODID);
 
-    public static final DeferredHolder<EntityType<?>, EntityType<TrainEntity>> TRAIN =
+    public static final RegistryObject<EntityType<TrainEntity>> TRAIN =
         ENTITIES.register("train",
             () -> EntityType.Builder.<TrainEntity>of(TrainEntity::new, MobCategory.MISC)
                 .sized(2.0F, 2.0F)
@@ -20,7 +20,7 @@ public final class RealTrainModUnofficialEntities {
                 .clientTrackingRange(10)
                 .build("train"));
 
-    public static final DeferredHolder<EntityType<?>, EntityType<TrainBogieEntity>> TRAIN_BOGIE =
+    public static final RegistryObject<EntityType<TrainBogieEntity>> TRAIN_BOGIE =
         ENTITIES.register("train_bogie",
             () -> EntityType.Builder.<TrainBogieEntity>of(TrainBogieEntity::new, MobCategory.MISC)
                 .sized(1.4F, 1.6F)
@@ -29,7 +29,7 @@ public final class RealTrainModUnofficialEntities {
                 .updateInterval(1)
                 .build("train_bogie"));
 
-    public static final DeferredHolder<EntityType<?>, EntityType<TrainSeatEntity>> TRAIN_SEAT =
+    public static final RegistryObject<EntityType<TrainSeatEntity>> TRAIN_SEAT =
         ENTITIES.register("train_seat",
             () -> EntityType.Builder.<TrainSeatEntity>of(TrainSeatEntity::new, MobCategory.MISC)
                 .sized(0.9F, 0.25F)

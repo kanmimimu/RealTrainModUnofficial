@@ -6,15 +6,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModContainer;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.RegistryObject;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
 
 @Mod(RealTrainModUnofficial.MODID)
@@ -25,7 +25,7 @@ public class RealTrainModUnofficial {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
         DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
-    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> MAIN_TAB =
+    public static final RegistryObject<CreativeModeTab> MAIN_TAB =
         CREATIVE_MODE_TABS.register("main_tab", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.realtrainmodunofficial"))
             .withTabsBefore(CreativeModeTabs.COMBAT)
@@ -81,7 +81,7 @@ public class RealTrainModUnofficial {
      * 中身は {@link com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks#TAB_ITEMS}
      * (コンストラクタの init() で構築)。空でもタブ自体は出す (レンガアイコン)。
      */
-    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXTERNAL_BUILDING_TAB =
+    public static final RegistryObject<CreativeModeTab> EXTERNAL_BUILDING_TAB =
         CREATIVE_MODE_TABS.register("external_building_tab", () -> CreativeModeTab.builder()
             .title(Component.literal("外部建材 (1.7.10)"))
             .withTabsAfter(MAIN_TAB.getKey())
@@ -133,10 +133,10 @@ public class RealTrainModUnofficial {
         //WebCTC は別 mod (RTMU-WebCTC_1.21.1, webctc サブプロジェクト) へ分離した。
         // スピーカー音源マッピングをサーバー起動時にロードし、プレイヤー接続時に同期する。
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(
-            (net.neoforged.neoforge.event.server.ServerStartingEvent e) ->
+            (net.minecraftforge.event.server.ServerStartingEvent e) ->
                 com.portofino.realtrainmodunofficial.installedobject.SpeakerSoundConfig.load());
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(
-            (net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent e) -> {
+            (net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent e) -> {
                 if (e.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp) {
                     net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(sp,
                         new com.portofino.realtrainmodunofficial.network.SyncSpeakerSoundsPayload(

@@ -4,12 +4,12 @@ import com.portofino.realtrainmodunofficial.client.TrainControlKeyMappings;
 import com.portofino.realtrainmodunofficial.client.renderer.*;
 import com.portofino.realtrainmodunofficial.client.sound.ExternalSoundPackBridge;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.event.AddPackFindersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
-import net.neoforged.neoforge.event.AddPackFindersEvent;
 
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class RealTrainModUnofficialClientModEvents {

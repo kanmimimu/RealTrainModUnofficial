@@ -1,6 +1,7 @@
 package com.portofino.realtrainmodunofficial.building;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
@@ -8,9 +9,8 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.loading.FMLPaths;
-import net.neoforged.neoforge.registries.DeferredBlock;
-import net.neoforged.neoforge.registries.DeferredItem;
-import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.RegistryObject;
 
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -48,10 +48,10 @@ public final class ExternalBuildingBlocks {
     /** 発見した建材ブロック (スキャン順)。パック生成側とタブが参照する。 */
     public static final List<Entry> ENTRIES = new ArrayList<>();
     /** クリエイティブタブに並べる BlockItem (ENTRIES と同順)。 */
-    public static final List<DeferredItem<BlockItem>> TAB_ITEMS = new ArrayList<>();
+    public static final List<RegistryObject<BlockItem>> TAB_ITEMS = new ArrayList<>();
 
-    public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(NAMESPACE);
-    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(NAMESPACE);
+    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(Registries.BLOCK, NAMESPACE);
+    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM, NAMESPACE);
 
     private static boolean initialized;
 
@@ -73,7 +73,7 @@ public final class ExternalBuildingBlocks {
             RealTrainModUnofficial.LOGGER.warn("External building block scan failed", t);
         }
         for (Entry e : ENTRIES) {
-            DeferredBlock<Block> block = BLOCKS.register(e.blockId(), () -> {
+            RegistryObject<Block> block = BLOCKS.register(e.blockId(), () -> {
                 BlockBehaviour.Properties props = BlockBehaviour.Properties.of()
                     .strength(1.5F).sound(SoundType.STONE);
                 //アルファ持ちテクスチャ (ガラス等) は隣面カリングの見え方バグを避けるため非遮蔽に。
@@ -82,7 +82,7 @@ public final class ExternalBuildingBlocks {
                 }
                 return new Block(props);
             });
-            DeferredItem<BlockItem> item = ITEMS.register(e.blockId(),
+            RegistryObject<BlockItem> item = ITEMS.register(e.blockId(),
                 () -> new BlockItem(block.get(), new Item.Properties()));
             TAB_ITEMS.add(item);
         }
