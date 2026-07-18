@@ -4,12 +4,12 @@ import com.portofino.realtrainmodunofficial.client.TrainControlKeyMappings;
 import com.portofino.realtrainmodunofficial.client.renderer.*;
 import com.portofino.realtrainmodunofficial.client.sound.ExternalSoundPackBridge;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.EntityRenderersEvent;
+import net.minecraftforge.client.event.RegisterColorHandlersEvent;
+import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.event.AddPackFindersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.EntityRenderersEvent;
-import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
-import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class RealTrainModUnofficialClientModEvents {
@@ -95,7 +95,7 @@ public final class RealTrainModUnofficialClientModEvents {
 
     /** カメラの被写界深度 / 流し撮り用コアシェーダー */
     @SubscribeEvent
-    public static void registerShaders(net.neoforged.neoforge.client.event.RegisterShadersEvent event)
+    public static void registerShaders(net.minecraftforge.client.event.RegisterShadersEvent event)
             throws java.io.IOException {
         com.portofino.realtrainmodunofficial.client.camera.CameraPostProcessor.registerShaders(event);
     }

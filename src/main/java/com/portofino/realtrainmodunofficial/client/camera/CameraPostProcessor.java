@@ -9,7 +9,7 @@ import com.portofino.realtrainmodunofficial.client.ShaderCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.client.event.RegisterShadersEvent;
+import net.minecraftforge.client.event.RegisterShadersEvent;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
@@ -214,10 +214,10 @@ public final class CameraPostProcessor {
     private static void drawFullscreenQuad() {
         BufferBuilder buffer = Tesselator.getInstance()
             .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-        buffer.addVertex(-1.0F, -1.0F, 0.0F).setUv(0.0F, 0.0F);
-        buffer.addVertex(1.0F, -1.0F, 0.0F).setUv(1.0F, 0.0F);
-        buffer.addVertex(1.0F, 1.0F, 0.0F).setUv(1.0F, 1.0F);
-        buffer.addVertex(-1.0F, 1.0F, 0.0F).setUv(0.0F, 1.0F);
+        buffer.vertex(-1.0F, -1.0F, 0.0F).uv(0.0F, 0.0F).endVertex();
+        buffer.vertex(1.0F, -1.0F, 0.0F).uv(1.0F, 0.0F).endVertex();
+        buffer.vertex(1.0F, 1.0F, 0.0F).uv(1.0F, 1.0F).endVertex();
+        buffer.vertex(-1.0F, 1.0F, 0.0F).uv(0.0F, 1.0F).endVertex();
         MeshData mesh = buffer.build();
         if (mesh != null) {
             BufferUploader.drawWithShader(mesh);

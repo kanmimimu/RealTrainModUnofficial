@@ -6,9 +6,10 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.*;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.*;
 
 /**
  * カメラモードのフック一式。
@@ -34,7 +35,10 @@ public final class CameraClientEvents {
     // ---- 入力 ----
 
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
         Minecraft mc = Minecraft.getInstance();
         //方向幕/種別幕のアニメーション GIF のフレーム送り (毎 tick)
         com.portofino.realtrainmodunofficial.client.model.GifTextures.tick();
@@ -86,13 +90,13 @@ public final class CameraClientEvents {
     }
 
     @SubscribeEvent
-    public static void onRenderGuiLayer(RenderGuiLayerEvent.Pre event) {
+    public static void onRenderGuiLayer(net.minecraftforge.client.event.RenderGuiOverlayEvent.Pre event) {
         //ファインダー中はバニラ HUD (ホットバー/体力/十字/エフェクト) を全部消す。
         //チャットだけは残す (撮影完了メッセージを出すため)。
         if (!RtmCamera.INSTANCE.isActive()) {
             return;
         }
-        if (net.neoforged.neoforge.client.gui.VanillaGuiLayers.CHAT.equals(event.getName())) {
+        if (net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.CHAT_PANEL.id().equals(event.getOverlay().id())) {
             return;
         }
         event.setCanceled(true);

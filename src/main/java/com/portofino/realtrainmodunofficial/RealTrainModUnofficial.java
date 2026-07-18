@@ -109,9 +109,8 @@ public class RealTrainModUnofficial {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::buildCreativeTabContents);
         com.portofino.realtrainmodunofficial.network.RealTrainModUnofficialNetwork.register();
-        //本家 RTM のチャンクローダー (列車の State_ChunkLoader) 用チケットコントローラ
-        modEventBus.addListener((net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent event) ->
-            event.register(com.portofino.realtrainmodunofficial.world.TrainChunkLoader.CONTROLLER));
+        //本家 RTM のチャンクローダー (列車の State_ChunkLoader) 用チケット掃除コールバック
+        com.portofino.realtrainmodunofficial.world.TrainChunkLoader.register();
 
         RealTrainModUnofficialBlocks.BLOCKS.register(modEventBus);
         //mods フォルダの 1.7.10 建材 mod をスキャンし、ブロックテクスチャをフルキューブブロックとして

@@ -4,9 +4,9 @@ import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 /**
  * 列車の半透明バッチ (窓ガラス等) 専用の遅延描画バッファ。

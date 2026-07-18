@@ -5,24 +5,16 @@ import com.portofino.realtrainmodunofficial.modelpack.VehicleModelPackManager;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModContainer;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.neoforge.client.gui.ConfigurationScreen;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
-// このクラスは専用サーバーではロードされません。ここからクライアント側のコードにアクセスしても安全です。
-@Mod(value = RealTrainModUnofficial.MODID, dist = Dist.CLIENT)
-// EventBusSubscriber を使用すると、@SubscribeEvent でアノテーションされたクラス内のすべての静的メソッドを自動的に登録できます。
-@EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
+// このクラスは専用サーバーではロードされません。
+// TODO(Phase3): NeoForge の 第2@Mod(dist=CLIENT) + ConfigurationScreen 構造を Forge 化する。
+//   (1) config 画面は NeoForge 自動生成のため Forge 1.20.1 に相当が無く保留 (constructor 削除済)。
+//   (2) onClientSetup は MOD バス, onLoggingOut は FORGE バスなので、本来 @EventBusSubscriber を
+//       バスごとに分割する必要がある。ここでは setup(script/pack 初期化)を優先し MOD バスに固定。
+@EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public class RealTrainModUnofficialClient {
-    public RealTrainModUnofficialClient(ModContainer container) {
-        // NeoForgeがこのMODのコンフィグ画面を作成できるようにします。
-        // コンフィグ画面は、Mods画面＞自分のModをクリック＞コンフィグをクリックで表示されます。
-        // 設定オプションの翻訳をen_us.jsonファイルに追加することを忘れないでください。
-        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
-    }
 
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
@@ -44,7 +36,7 @@ public class RealTrainModUnofficialClient {
      * config/realtrainmodunofficial/timetable/ に置いた tt_*.csv を再入場で拾えるようにする。
      */
     @SubscribeEvent
-    static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
+    static void onLoggingOut(net.minecraftforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
         com.portofino.realtrainmodunofficial.client.signboard.FontImage.clearCache();
         com.portofino.realtrainmodunofficial.client.signboard.tt.TimeTableManager.INSTANCE.invalidate();
     }

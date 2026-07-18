@@ -28,7 +28,7 @@ public final class VertexWriter {
      * addVertex(Matrix4f, x, y, z) と同じ結果を確保なしで。
      */
     public static VertexConsumer addVertex(VertexConsumer consumer, Matrix4f m, float x, float y, float z) {
-        return consumer.addVertex(
+        return consumer.vertex(
             m.m00() * x + m.m10() * y + m.m20() * z + m.m30(),
             m.m01() * x + m.m11() * y + m.m21() * z + m.m31(),
             m.m02() * x + m.m12() * y + m.m22() * z + m.m32());
@@ -39,7 +39,7 @@ public final class VertexWriter {
      */
     public static VertexConsumer setNormal(VertexConsumer consumer, PoseStack.Pose pose, float x, float y, float z) {
         Matrix3f n = pose.normal();
-        return consumer.setNormal(
+        return consumer.normal(
             n.m00() * x + n.m10() * y + n.m20() * z,
             n.m01() * x + n.m11() * y + n.m21() * z,
             n.m02() * x + n.m12() * y + n.m22() * z);

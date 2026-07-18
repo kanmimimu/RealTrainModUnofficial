@@ -1,31 +1,33 @@
 package com.portofino.realtrainmodunofficial.world;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
-import net.neoforged.neoforge.common.world.chunk.TicketController;
+import net.minecraftforge.common.world.ForgeChunkManager;
 
 /**
  * 本家 RTM のチャンクローダー (TrainState State_ChunkLoader) 相当。
- * ON の列車の周囲 3×3 チャンクを NeoForge の TicketController で強制ロードする。
+ * ON の列車の周囲 3×3 チャンクを Forge の ForgeChunkManager で強制ロードする。
  * 軽量化: チャンクをまたいだ時だけチケットを付け替える。
  */
 public final class TrainChunkLoader {
-
-    public static final TicketController CONTROLLER = new TicketController(
-            new ResourceLocation(RealTrainModUnofficial.MODID, "train_chunk_loader"),
-            (level, ticketHelper) -> {
-                //ワールドロード時の残チケット掃除: 所有エンティティが復元されなければ
-                //列車側の tick で再登録されるため、一旦すべて破棄して良い
-                ticketHelper.getEntityTickets().keySet().forEach(ticketHelper::removeAllTickets);
-            });
 
     /** 半径 (1 = 3×3 チャンク) */
     private static final int RADIUS = 1;
 
     private TrainChunkLoader() {
+    }
+
+    /**
+     * mod セットアップ時に一度呼ぶ。ワールドロード時の残チケット掃除コールバックを登録する。
+     * (NeoForge の TicketController コンストラクタ第2引数 = Forge の setForcedChunkLoadingCallback)
+     */
+    public static void register() {
+        ForgeChunkManager.setForcedChunkLoadingCallback(RealTrainModUnofficial.MODID, (level, ticketHelper) -> {
+            //所有エンティティが復元されなければ列車側の tick で再登録されるため、一旦すべて破棄して良い
+            ticketHelper.getEntityTickets().keySet().forEach(ticketHelper::removeAllTickets);
+        });
     }
 
     /**
@@ -67,7 +69,7 @@ public final class TrainChunkLoader {
         int cz = ChunkPos.getZ(chunkLong);
         for (int dx = -RADIUS; dx <= RADIUS; dx++) {
             for (int dz = -RADIUS; dz <= RADIUS; dz++) {
-                CONTROLLER.forceChunk(level, train, cx + dx, cz + dz, add, true);
+                ForgeChunkManager.forceChunk(level, RealTrainModUnofficial.MODID, train, cx + dx, cz + dz, add, true);
             }
         }
     }

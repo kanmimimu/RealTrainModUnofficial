@@ -6,10 +6,9 @@ import jp.ngt.rtm.entity.train.EntityTrainBase;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.CalculateDetachedCameraDistanceEvent;
-import net.neoforged.neoforge.client.event.InputEvent;
 
 /**
  * 列車に乗っているときだけ、三人称視点の距離をホイールで遠ざけられるようにする。
@@ -55,12 +54,8 @@ public final class RideCameraEvents {
         }
     }
 
-    /** 乗車中は三人称カメラの最大距離を上書きする (壁での寄りはバニラのレイキャストに任せる)。 */
-    @SubscribeEvent
-    public static void onCameraDistance(CalculateDetachedCameraDistanceEvent event) {
-        Minecraft mc = Minecraft.getInstance();
-        if (ridingTrain(mc)) {
-            event.setDistance(distance);
-        }
-    }
+    // TODO(Phase3): 乗車中の三人称カメラ最大距離の上書き。NeoForge の
+    // CalculateDetachedCameraDistanceEvent は Forge 1.20.1 に相当イベントが無いため保留。
+    // (Forge では ViewportEvent.ComputeCameraAngles では距離を扱えず、Mixin 等で代替検討)
+    // distance フィールドはマウスホイール入力(mouseScrolled)側で維持されている。
 }

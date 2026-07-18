@@ -3124,7 +3124,7 @@ public final class MqoModelLoader {
             float tx = mat.m00()*x + mat.m10()*y + mat.m20()*z + mat.m30();
             float ty = mat.m01()*x + mat.m11()*y + mat.m21()*z + mat.m31();
             float tz = mat.m02()*x + mat.m12()*y + mat.m22()*z + mat.m32();
-            b.addVertex(tx, ty, tz).setUv(0.5F, 0.5F).setColor(255, 255, 255, 255);
+            b.vertex(tx, ty, tz).uv(0.5F, 0.5F).color(255, 255, 255, 255).endVertex();
         }
 
         /**
@@ -3152,12 +3152,12 @@ public final class MqoModelLoader {
 
         private static void capVertexBuf(VertexConsumer vc, Matrix4f mat, float x, float y, float z,
                                           int gray, int packedLight, int overlay, float nx, float ny, float nz) {
-            vc.addVertex(mat, x, y, z)
-                .setColor(gray, gray, gray, 255)
-                .setUv(0.5F, 0.5F)
-                .setOverlay(overlay)
-                .setLight(packedLight)
-                .setNormal(nx, ny, nz);
+            vc.vertex(mat, x, y, z)
+                .color(gray, gray, gray, 255)
+                .uv(0.5F, 0.5F)
+                .overlayCoords(overlay)
+                .uv2(packedLight)
+                .normal(nx, ny, nz).endVertex();
         }
 
         long estimateMemoryBytes() {
@@ -3533,12 +3533,12 @@ public final class MqoModelLoader {
                         float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
                         float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
                         normalizeNormal(tnx, tny, tnz, normalOut);
-                        vc.addVertex(mat, x, y, z)
-                            .setColor(1.0F, 1.0F, 1.0F, alpha)
-                            .setUv(u, v)
-                            .setOverlay(overlay)
-                            .setLight(light)
-                            .setNormal(normalOut[0], normalOut[1], normalOut[2]);
+                        vc.vertex(mat, x, y, z)
+                            .color(1.0F, 1.0F, 1.0F, alpha)
+                            .uv(u, v)
+                            .overlayCoords(overlay)
+                            .uv2(light)
+                            .normal(normalOut[0], normalOut[1], normalOut[2]).endVertex();
                     }
                 }
             }
@@ -3900,10 +3900,10 @@ public final class MqoModelLoader {
                                 float tny = norm.m01()*nx + norm.m11()*ny + norm.m21()*nz;
                                 float tnz = norm.m02()*nx + norm.m12()*ny + norm.m22()*nz;
                                 normalizeNormal(tnx, tny, tnz, normalOut);
-                                builder.addVertex(tx, ty, tz)
-                                    .setUv(u, v)
-                                    .setColor(255, 255, 255, 255)
-                                    .setNormal(normalOut[0], normalOut[1], normalOut[2]);
+                                builder.vertex(tx, ty, tz)
+                                    .uv(u, v)
+                                    .color(255, 255, 255, 255)
+                                    .normal(normalOut[0], normalOut[1], normalOut[2]).endVertex();
                             }
                             if (batch.vertexCount > 0) {
                                 RenderSystem.setShader(GameRenderer::getRendertypeCloudsShader);
@@ -3968,11 +3968,11 @@ public final class MqoModelLoader {
                             //流すため、これが GC を回して FPS を落とす主因だった。
                             //変換式は同一のまま、確保だけを避ける (見た目は不変)。
                             VertexWriter.addVertex(consumer, mat, x, y, z)
-                                .setColor(scriptRed, scriptGreen, scriptBlue, scriptAlpha)
-                                .setUv(u, v)
-                                .setOverlay(overlay)
-                                .setLight(packedLight)
-                                .setNormal(normalOut[0], normalOut[1], normalOut[2]);
+                                .color(scriptRed, scriptGreen, scriptBlue, scriptAlpha)
+                                .uv(u, v)
+                                .overlayCoords(overlay)
+                                .uv2(packedLight)
+                                .normal(normalOut[0], normalOut[1], normalOut[2]).endVertex();
                         }
                     }
                 } finally {
@@ -4184,11 +4184,11 @@ public final class MqoModelLoader {
                     //最大 40% 減光して「昼でも夜でも暗い」ため、上向き法線 (×1.0) で描く
                     //(本家は GL_LIGHTING 無効の全光量描画 — softenNormalForVanilla と同じ理由)
                     VertexWriter.addVertex(consumer, mat, vx, vy, vz)
-                        .setColor(red, green, blue, alpha)
-                        .setUv(batch.data[o + 6], batch.data[o + 7])
-                        .setOverlay(overlay)
-                        .setLight(0x00F000F0)
-                        .setNormal(0.0F, 1.0F, 0.0F);
+                        .color(red, green, blue, alpha)
+                        .uv(batch.data[o + 6], batch.data[o + 7])
+                        .overlayCoords(overlay)
+                        .uv2(0x00F000F0)
+                        .normal(0.0F, 1.0F, 0.0F).endVertex();
                 }
             }
         }
@@ -4757,12 +4757,12 @@ public final class MqoModelLoader {
                     com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY);
                 for (int i = 0; i < vertexCount; i++) {
                     int o = i * 8;
-                    bb.addVertex(data[o], data[o + 1], data[o + 2])
-                        .setColor(255, 255, 255, 255)
-                        .setUv(data[o + 6], data[o + 7])
-                        .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
-                        .setLight(packedLight)
-                        .setNormal(data[o + 3], data[o + 4], data[o + 5]);
+                    bb.vertex(data[o], data[o + 1], data[o + 2])
+                        .color(255, 255, 255, 255)
+                        .uv(data[o + 6], data[o + 7])
+                        .overlayCoords(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                        .uv2(packedLight)
+                        .normal(data[o + 3], data[o + 4], data[o + 5]).endVertex();
                 }
                 com.mojang.blaze3d.vertex.MeshData mesh = bb.build();
                 if (mesh == null) {
@@ -4834,10 +4834,10 @@ public final class MqoModelLoader {
                         float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, nx*nx + ny*ny + nz*nz)));
                         x += nx*il*bias; y += ny*il*bias; z += nz*il*bias;
                     }
-                    bb.addVertex(x, y, z)
-                        .setUv(u, v)
-                        .setColor(255, 255, 255, 255)
-                        .setNormal(nx, ny, nz);
+                    bb.vertex(x, y, z)
+                        .uv(u, v)
+                        .color(255, 255, 255, 255)
+                        .normal(nx, ny, nz).endVertex();
                 }
                 com.mojang.blaze3d.vertex.MeshData mesh = bb.build();
                 if (mesh == null) return null;

@@ -501,12 +501,12 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
 
     private static void putRollsignVertex(VertexConsumer consumer, Matrix4f mat, Vector3f point, Vector3f offset,
                                           float u, float v, int packedLight, float nx, float ny, float nz) {
-        consumer.addVertex(mat, point.x + offset.x, point.y + offset.y, point.z + offset.z)
-            .setColor(255, 255, 255, 255)
-            .setUv(u, v)
-            .setOverlay(OverlayTexture.NO_OVERLAY)
-            .setLight(packedLight)
-            .setNormal(nx, ny, nz);
+        consumer.vertex(mat, point.x + offset.x, point.y + offset.y, point.z + offset.z)
+            .color(255, 255, 255, 255)
+            .uv(u, v)
+            .overlayCoords(OverlayTexture.NO_OVERLAY)
+            .uv2(packedLight)
+            .normal(nx, ny, nz).endVertex();
     }
 
     /**
@@ -833,11 +833,11 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     private static void putLightVertex(VertexConsumer consumer, Matrix4f mat, float x, float y, float z,
                                        float u, float v, int red, int green, int blue, int alpha,
                                        float nx, float ny, float nz) {
-        consumer.addVertex(mat, x, y, z)
-            .setColor(red, green, blue, alpha)
-            .setUv(u, v)
-            .setOverlay(OverlayTexture.NO_OVERLAY)
-            .setLight(0x00F000F0)
-            .setNormal(nx, ny, nz);
+        consumer.vertex(mat, x, y, z)
+            .color(red, green, blue, alpha)
+            .uv(u, v)
+            .overlayCoords(OverlayTexture.NO_OVERLAY)
+            .uv2(0x00F000F0)
+            .normal(nx, ny, nz).endVertex();
     }
 }

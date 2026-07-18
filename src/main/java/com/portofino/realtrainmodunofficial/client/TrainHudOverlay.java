@@ -12,11 +12,11 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RenderGuiEvent;
+import net.minecraftforge.client.event.RenderGuiOverlayEvent;
+import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.RenderGuiEvent;
-import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
-import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class TrainHudOverlay {
@@ -58,7 +58,7 @@ public final class TrainHudOverlay {
     }
 
     @SubscribeEvent
-    public static void onRenderGuiLayer(RenderGuiLayerEvent.Pre event) {
+    public static void onRenderGuiLayer(RenderGuiOverlayEvent.Pre event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null || mc.options.hideGui) {
             return;
@@ -70,9 +70,10 @@ public final class TrainHudOverlay {
             return;
         }
 
-        ResourceLocation layer = event.getName();
-        if (VanillaGuiLayers.EXPERIENCE_BAR.equals(layer)
-            || VanillaGuiLayers.EXPERIENCE_LEVEL.equals(layer)) {
+        //Forge 1.20.1 では経験値レベル数字は EXPERIENCE_BAR overlay に統合されている
+        //(NeoForge の EXPERIENCE_LEVEL 相当は無い)。バーを消せば数字も消える。
+        ResourceLocation layer = event.getOverlay().id();
+        if (VanillaGuiOverlay.EXPERIENCE_BAR.id().equals(layer)) {
             event.setCanceled(true);
         }
     }

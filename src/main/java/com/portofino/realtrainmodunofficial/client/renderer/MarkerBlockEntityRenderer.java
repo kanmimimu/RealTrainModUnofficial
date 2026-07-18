@@ -591,8 +591,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         dy /= len;
         dz /= len;
         //LINES (POSITION_COLOR_NORMAL): 法線 = 線の方向 (lines シェーダが太さ展開に使用)
-        lines.addVertex(m, x0, y0, z0).setColor(r, g, b, 1.0F).setNormal(pose, dx, dy, dz);
-        lines.addVertex(m, x1, y1, z1).setColor(r, g, b, 1.0F).setNormal(pose, dx, dy, dz);
+        lines.vertex(m, x0, y0, z0).color(r, g, b, 1.0F).normal(pose, dx, dy, dz).endVertex();
+        lines.vertex(m, x1, y1, z1).color(r, g, b, 1.0F).normal(pose, dx, dy, dz).endVertex();
     }
 
     private void renderDistanceMark(TileEntityMarker marker, BlockMarker block, BlockState state,
@@ -616,10 +616,10 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             float moveZ = i * 10.0F;
             for (int k = -1; k <= 1; k++) {
                 float moveX = moveZ * k;
-                quads.addVertex(m, -size + moveX, 0.01F, size + moveZ).setColor(r, g, b, 1.0F);
-                quads.addVertex(m, -size + moveX, 0.01F, -size + moveZ).setColor(r, g, b, 1.0F);
-                quads.addVertex(m, size + moveX, 0.01F, -size + moveZ).setColor(r, g, b, 1.0F);
-                quads.addVertex(m, size + moveX, 0.01F, size + moveZ).setColor(r, g, b, 1.0F);
+                quads.vertex(m, -size + moveX, 0.01F, size + moveZ).color(r, g, b, 1.0F).endVertex();
+                quads.vertex(m, -size + moveX, 0.01F, -size + moveZ).color(r, g, b, 1.0F).endVertex();
+                quads.vertex(m, size + moveX, 0.01F, -size + moveZ).color(r, g, b, 1.0F).endVertex();
+                quads.vertex(m, size + moveX, 0.01F, size + moveZ).color(r, g, b, 1.0F).endVertex();
             }
         }
 
@@ -677,8 +677,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 double h2 = rm.getRailHeight(max, 0);
                 for (int i = 0; i < max + 1; ++i) {
                     double[] p1 = rm.getRailPos(max, i);
-                    lines.addVertex(m, (float) (p1[1] - p2[1]), (float) (rm.getRailHeight(max, i) - h2), (float) (p1[0] - p2[0]))
-                            .setColor(0.0F, 0.75F, 0.0F, 1.0F);
+                    lines.vertex(m, (float) (p1[1] - p2[1]), (float) (rm.getRailHeight(max, i) - h2), (float) (p1[0] - p2[0]))
+                            .color(0.0F, 0.75F, 0.0F, 1.0F).endVertex();
                 }
                 poseStack.popPose();
             }

@@ -644,24 +644,24 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             double f2 = (j - 8.0) / split;
             double fh = (f2 * f2 - 0.25) * 1.5;
             double px = from.x + x * ft, py = from.y + y * ft + fh, pz = from.z + z * ft;
-            c.addVertex(mat, (float) (px - w * z1), (float) py, (float) (pz + w * x1))
-                .setColor(xr, xg, xb, 255).setLight(packedLight);
+            c.vertex(mat, (float) (px - w * z1), (float) py, (float) (pz + w * x1))
+                .color(xr, xg, xb, 255).uv2(packedLight).endVertex();
             lastX = (float) (px + w * z1); lastY = (float) py; lastZ = (float) (pz - w * x1);
-            c.addVertex(mat, lastX, lastY, lastZ).setColor(xr, xg, xb, 255).setLight(packedLight);
+            c.vertex(mat, lastX, lastY, lastZ).color(xr, xg, xb, 255).uv2(packedLight).endVertex();
         }
         // --- 縮退ブリッジ(XZ最後の頂点 → Y最初の頂点)で strip を分離 ---
         double fh0 = (((0 - 8.0) / split) * ((0 - 8.0) / split) - 0.25) * 1.5;
         float firstYx = (float) from.x, firstYy = (float) (from.y + fh0 + w), firstYz = (float) from.z;
-        c.addVertex(mat, lastX, lastY, lastZ).setColor(yr, yg, yb, 255).setLight(packedLight);
-        c.addVertex(mat, firstYx, firstYy, firstYz).setColor(yr, yg, yb, 255).setLight(packedLight);
+        c.vertex(mat, lastX, lastY, lastZ).color(yr, yg, yb, 255).uv2(packedLight).endVertex();
+        c.vertex(mat, firstYx, firstYy, firstYz).color(yr, yg, yb, 255).uv2(packedLight).endVertex();
         // --- Y 面リボン ---
         for (int j = 0; j <= split; j++) {
             double ft = j / (double) split;
             double f2 = (j - 8.0) / split;
             double fh = (f2 * f2 - 0.25) * 1.5;
             double px = from.x + x * ft, py = from.y + y * ft + fh, pz = from.z + z * ft;
-            c.addVertex(mat, (float) px, (float) (py + w), (float) pz).setColor(yr, yg, yb, 255).setLight(packedLight);
-            c.addVertex(mat, (float) px, (float) (py - w), (float) pz).setColor(yr, yg, yb, 255).setLight(packedLight);
+            c.vertex(mat, (float) px, (float) (py + w), (float) pz).color(yr, yg, yb, 255).uv2(packedLight).endVertex();
+            c.vertex(mat, (float) px, (float) (py - w), (float) pz).color(yr, yg, yb, 255).uv2(packedLight).endVertex();
         }
     }
 
@@ -1257,12 +1257,12 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                                    float x, float y, float z, float u, float v,
                                    int packedLight, int packedOverlay, int color,
                                    float nx, float ny, float nz) {
-        consumer.addVertex(pose.pose(), x, y, z)
-            .setColor((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, 255)
-            .setUv(u, v)
-            .setOverlay(packedOverlay)
-            .setLight(packedLight)
-            .setNormal(pose, nx, ny, nz);
+        consumer.vertex(pose.pose(), x, y, z)
+            .color((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, 255)
+            .uv(u, v)
+            .overlayCoords(packedOverlay)
+            .uv2(packedLight)
+            .normal(pose, nx, ny, nz).endVertex();
     }
 
     private void renderActiveLights(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,

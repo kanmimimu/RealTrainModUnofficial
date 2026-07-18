@@ -14,10 +14,10 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.InputEvent;
 import org.lwjgl.glfw.GLFW;
 
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
@@ -126,7 +126,7 @@ public final class TrainControlKeyHandler {
      * 本家: 運転席乗車中にインベントリキー → 運転台 GUI (通常インベントリを差し替え)。
      */
     @SubscribeEvent
-    public static void onScreenOpening(net.neoforged.neoforge.client.event.ScreenEvent.Opening event) {
+    public static void onScreenOpening(net.minecraftforge.client.event.ScreenEvent.Opening event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             return;
@@ -195,7 +195,10 @@ public final class TrainControlKeyHandler {
     //引っ張られてがくがくする副作用もあった)。
 
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             shiftWasDown = false;

@@ -58,21 +58,23 @@ public final class MeshCapture {
                 //RenderType 自身の format/mode で BufferBuilder を作る。
                 //シェーダー MOD (Iris) は RenderType の頂点フォーマットを拡張し、
                 //BufferBuilder 経由で接線などを補完するため、この経路なら追従できる。
-                BufferBuilder builder = Tesselator.getInstance().begin(type.mode(), type.format());
+                BufferBuilder builder = Tesselator.getInstance().getBuilder();
+                builder.begin(type.mode(), type.format());
                 for (int i = 0; i < sink.count; i++) {
                     int f = i * 8;
                     int m = i * 3;
                     int color = sink.meta[m];
                     int light = sink.meta[m + 1];
                     int overlay = sink.meta[m + 2];
-                    builder.addVertex(sink.data[f], sink.data[f + 1], sink.data[f + 2])
-                        .setColor((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, (color >>> 24) & 0xFF)
-                        .setUv(sink.data[f + 3], sink.data[f + 4])
-                        .setOverlay(overlay)
-                        .setLight(light)
-                        .setNormal(sink.data[f + 5], sink.data[f + 6], sink.data[f + 7]);
+                    builder.vertex(sink.data[f], sink.data[f + 1], sink.data[f + 2])
+                        .color((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, (color >>> 24) & 0xFF)
+                        .uv(sink.data[f + 3], sink.data[f + 4])
+                        .overlayCoords(overlay)
+                        .uv2(light)
+                        .normal(sink.data[f + 5], sink.data[f + 6], sink.data[f + 7])
+                        .endVertex();
                 }
-                MeshData mesh = builder.build();
+                BufferBuilder.RenderedBuffer mesh = builder.end();
                 if (mesh == null) {
                     continue;
                 }
@@ -122,13 +124,13 @@ public final class MeshCapture {
         }
 
         @Override
-        public VertexConsumer addVertex(float x, float y, float z) {
+        public VertexConsumer vertex(double x, double y, double z) {
             ensureCapacity();
             cur = count++;
             int f = cur * 8;
-            data[f] = x;
-            data[f + 1] = y;
-            data[f + 2] = z;
+            data[f] = (float) x;
+            data[f + 1] = (float) y;
+            data[f + 2] = (float) z;
             //既定値 (呼ばれなかった場合の保険)
             int m = cur * 3;
             meta[m] = 0xFFFFFFFF;
@@ -138,7 +140,7 @@ public final class MeshCapture {
         }
 
         @Override
-        public VertexConsumer setColor(int red, int green, int blue, int alpha) {
+        public VertexConsumer color(int red, int green, int blue, int alpha) {
             if (cur >= 0) {
                 meta[cur * 3] = (alpha << 24) | (red << 16) | (green << 8) | blue;
             }
@@ -146,7 +148,7 @@ public final class MeshCapture {
         }
 
         @Override
-        public VertexConsumer setUv(float u, float v) {
+        public VertexConsumer uv(float u, float v) {
             if (cur >= 0) {
                 data[cur * 8 + 3] = u;
                 data[cur * 8 + 4] = v;
@@ -155,8 +157,7 @@ public final class MeshCapture {
         }
 
         @Override
-        public VertexConsumer setUv1(int u, int v) {
-            //オーバーレイ (setOverlay の既定実装から来る)
+        public VertexConsumer overlayCoords(int u, int v) {
             if (cur >= 0) {
                 meta[cur * 3 + 2] = (v << 16) | (u & 0xFFFF);
             }
@@ -164,8 +165,7 @@ public final class MeshCapture {
         }
 
         @Override
-        public VertexConsumer setUv2(int u, int v) {
-            //ライト (setLight の既定実装から来る)
+        public VertexConsumer uv2(int u, int v) {
             if (cur >= 0) {
                 meta[cur * 3 + 1] = (v << 16) | (u & 0xFFFF);
             }
@@ -173,13 +173,26 @@ public final class MeshCapture {
         }
 
         @Override
-        public VertexConsumer setNormal(float x, float y, float z) {
+        public VertexConsumer normal(float x, float y, float z) {
             if (cur >= 0) {
                 data[cur * 8 + 5] = x;
                 data[cur * 8 + 6] = y;
                 data[cur * 8 + 7] = z;
             }
             return this;
+        }
+
+        @Override
+        public void endVertex() {
+            //vertex() で確定済み。1.20.1 VertexConsumer の要件を満たすための no-op。
+        }
+
+        @Override
+        public void defaultColor(int red, int green, int blue, int alpha) {
+        }
+
+        @Override
+        public void unsetDefaultColor() {
         }
     }
 }

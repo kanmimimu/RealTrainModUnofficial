@@ -776,11 +776,11 @@ public final class VehicleScriptRenderers {
         //確保する。スクリプト車両は 1 フレームに数万頂点を流すため GC 負荷が大きい。
         //変換式は同一のまま確保だけを避ける (見た目は不変)。
         VertexConsumer written = VertexWriter.addVertex(vc, mat, v[o], v[o + 1], v[o + 2])
-                .setColor(v[o + 5], v[o + 6], v[o + 7], v[o + 8])
-                .setUv(v[o + 3], v[o + 4])
-                .setOverlay(overlay)
-                .setLight(light);
-        VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z);
+                .color(v[o + 5], v[o + 6], v[o + 7], v[o + 8])
+                .uv(v[o + 3], v[o + 4])
+                .overlayCoords(overlay)
+                .uv2(light);
+        VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z).endVertex();
     }
 
     private static void drawModelGroup(PolygonModel pm, String groupName, PoseStack poseStack,
@@ -825,11 +825,11 @@ public final class VehicleScriptRenderers {
                         vv = face.uvs[idx[k] * 2 + 1];
                     }
                     VertexConsumer written = VertexWriter.addVertex(vc, mat, vert.x, vert.y, vert.z)
-                            .setColor(colR, colG, colB, colA)
-                            .setUv(u, vv)
-                            .setOverlay(overlay)
-                            .setLight(light);
-                    VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z);
+                            .color(colR, colG, colB, colA)
+                            .uv(u, vv)
+                            .overlayCoords(overlay)
+                            .uv2(light);
+                    VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z).endVertex();
                 }
             }
         }
