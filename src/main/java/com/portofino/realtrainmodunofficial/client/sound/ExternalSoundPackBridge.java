@@ -1,14 +1,9 @@
 package com.portofino.realtrainmodunofficial.client.sound;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packs.PackLocationInfo;
-import net.minecraft.server.packs.PackSelectionConfig;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.PathPackResources;
 import net.minecraft.server.packs.repository.Pack;
@@ -44,10 +39,13 @@ public final class ExternalSoundPackBridge {
             return;
         }
         Pack pack = Pack.readMetaAndCreate(
-            new PackLocationInfo(PACK_ID, PACK_TITLE, PackSource.BUILT_IN, Optional.empty()),
-            new PathPackResources.PathResourcesSupplier(packRoot),
+            PACK_ID,
+            PACK_TITLE,
+            true,
+            (id) -> new PathPackResources(id, packRoot, false),
             PackType.CLIENT_RESOURCES,
-            new PackSelectionConfig(true, Pack.Position.TOP, false)
+            Pack.Position.TOP,
+            PackSource.BUILT_IN
         );
         if (pack == null) {
             RealTrainModUnofficial.LOGGER.warn("Generated external sound bridge pack could not be registered");

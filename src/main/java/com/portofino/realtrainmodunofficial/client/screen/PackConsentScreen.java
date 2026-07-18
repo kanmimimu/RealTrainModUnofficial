@@ -130,7 +130,7 @@ public final class PackConsentScreen extends Screen {
      * render() 内で先に描いた README が全てぼやけていた)。不透明の暗色塗りだけに置き換える。
      */
     @Override
-    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    public void renderBackground(GuiGraphics g) {
         g.fill(0, 0, this.width, this.height, 0xFF0A0A0A);
     }
 
@@ -160,7 +160,7 @@ public final class PackConsentScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
         if (!isScrollable()) {
             return false;
         }

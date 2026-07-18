@@ -77,15 +77,28 @@ public class SignalControllerScreen extends Screen {
         }).bounds(cx - 40, cy - 82, 150, 20).build());
 
         //Option チェックボックス (原作: last / repeat / Reduced Speed 並び)
-        this.lastBox = addRenderableWidget(Checkbox.builder(Component.literal("last"), this.font)
-                .pos(cx - 40, cy - 55).selected(this.last)
-                .onValueChange((box, value) -> this.last = value).build());
-        this.repeatBox = addRenderableWidget(Checkbox.builder(Component.literal("repeat"), this.font)
-                .pos(cx + 15, cy - 55).selected(this.repeat)
-                .onValueChange((box, value) -> this.repeat = value).build());
-        this.reducedBox = addRenderableWidget(Checkbox.builder(Component.literal("Reduced Speed"), this.font)
-                .pos(cx + 85, cy - 55).selected(this.reducedSpeed)
-                .onValueChange((box, value) -> this.reducedSpeed = value).build());
+        //1.20.1 の Checkbox は builder/onValueChange が無いため、onPress override で値を同期する。
+        this.lastBox = addRenderableWidget(new Checkbox(cx - 40, cy - 55, 100, 20, Component.literal("last"), this.last) {
+            @Override
+            public void onPress() {
+                super.onPress();
+                SignalControllerScreen.this.last = this.selected();
+            }
+        });
+        this.repeatBox = addRenderableWidget(new Checkbox(cx + 15, cy - 55, 100, 20, Component.literal("repeat"), this.repeat) {
+            @Override
+            public void onPress() {
+                super.onPress();
+                SignalControllerScreen.this.repeat = this.selected();
+            }
+        });
+        this.reducedBox = addRenderableWidget(new Checkbox(cx + 85, cy - 55, 100, 20, Component.literal("Reduced Speed"), this.reducedSpeed) {
+            @Override
+            public void onPress() {
+                super.onPress();
+                SignalControllerScreen.this.reducedSpeed = this.selected();
+            }
+        });
         //"above" は使われていないうえ、画面外にはみ出して見切れていたので出さない。
         //値そのものは読み込んだままサーバーへ送り返すので、既存の設定は壊れない。
 

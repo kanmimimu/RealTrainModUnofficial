@@ -1257,12 +1257,11 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                                    float x, float y, float z, float u, float v,
                                    int packedLight, int packedOverlay, int color,
                                    float nx, float ny, float nz) {
-        consumer.vertex(pose.pose(), x, y, z)
+        com.portofino.realtrainmodunofficial.client.render.VertexWriter.setNormal(consumer.vertex(pose.pose(), x, y, z)
             .color((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, 255)
             .uv(u, v)
             .overlayCoords(packedOverlay)
-            .uv2(packedLight)
-            .normal(pose, nx, ny, nz).endVertex();
+            .uv2(packedLight), pose, nx, ny, nz).endVertex();
     }
 
     private void renderActiveLights(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
@@ -1450,7 +1449,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         return new int[] {255, 255, 255, 230};
     }
 
-    @Override
     public @NotNull AABB getRenderBoundingBox(InstalledObjectBlockEntity blockEntity) {
         if (blockEntity.getCategory() == InstalledObjectCategory.WIRE && blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
             Vec3 a = Vec3.atCenterOf(blockEntity.getWireStart());

@@ -63,7 +63,7 @@ public final class CameraClientEvents {
         if (!cam.isActive() || Minecraft.getInstance().screen != null) {
             return;
         }
-        double dy = event.getScrollDeltaY();
+        double dy = event.getScrollDelta();
         if (dy != 0.0D) {
             cam.state().zoom((float) dy * 3.0F);
             event.setCanceled(true);

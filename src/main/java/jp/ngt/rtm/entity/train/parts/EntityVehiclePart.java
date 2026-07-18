@@ -142,7 +142,7 @@ public abstract class EntityVehiclePart extends Entity {
      * 本家 setPositionAndRotation2: 車体追従中はトラッカー同期を無視
      */
     @Override
-    public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps) {
+    public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps, boolean teleport) {
         EntityVehicleBase<?> vehicle = this.getVehicle();
         if (vehicle == null) {
             this.setPos(x, y, z);

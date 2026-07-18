@@ -3110,14 +3110,14 @@ public final class MqoModelLoader {
             RenderSystem.enableCull();
             RenderSystem.disableBlend();
             RenderSystem.depthMask(true);
-            BufferBuilder b = Tesselator.getInstance().begin(
-                VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            BufferBuilder b = Tesselator.getInstance().getBuilder();
+            b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
             // 両巻きで2枚(自前の蓋なので両面OK)。どちらの視点からでも見える。
             capVertex(b, mat, minX, y, minZ); capVertex(b, mat, maxX, y, minZ);
             capVertex(b, mat, maxX, y, maxZ); capVertex(b, mat, minX, y, maxZ);
             capVertex(b, mat, minX, y, maxZ); capVertex(b, mat, maxX, y, maxZ);
             capVertex(b, mat, maxX, y, minZ); capVertex(b, mat, minX, y, minZ);
-            BufferUploader.drawWithShader(b.buildOrThrow());
+            BufferUploader.drawWithShader(b.end());
         }
 
         private static void capVertex(BufferBuilder b, Matrix4f mat, float x, float y, float z) {
@@ -3582,7 +3582,8 @@ public final class MqoModelLoader {
                         scriptRenderer.beginRecording(sig);
                     }
                 }
-                if (scriptEngine instanceof ScriptEngine engine) {
+                if (scriptEngine != null) {
+                    ScriptEngine engine = scriptEngine;
                     int renderedBatchesBefore = scriptRenderer != null ? scriptRenderer.getRenderedBatchCount() : 0;
                     // RTMレガシースクリプトは entity.getBogie(n) / entity.field_70177_z 等
                     // LegacyScriptExecutor のAPIを前提としている。生の TrainEntity ではなく
@@ -3723,7 +3724,7 @@ public final class MqoModelLoader {
                 // 「後ろから見るとボディが消える」ため(ユーザー報告)。半透明ガラスだけ片面にして
                 // 表裏二重ブレンドで暗くなるのを防ぐ。
                 // ループ全体で 1 度だけシェーダ・色を設定。
-                RenderSystem.setShader(GameRenderer::getRendertypeCloudsShader);
+                RenderSystem.setShader(GameRenderer::getRendertypeEntityTranslucentShader);
                 RenderSystem.setShaderColor(gr / 255f * lightFactor, gg / 255f * lightFactor, gb / 255f * lightFactor, ga / 255f);
             }
 
@@ -3871,12 +3872,12 @@ public final class MqoModelLoader {
                             cachedVbo.drawWithShader(
                                 mv,
                                 RenderSystem.getProjectionMatrix(),
-                                net.minecraft.client.renderer.GameRenderer.getRendertypeCloudsShader());
+                                net.minecraft.client.renderer.GameRenderer.getRendertypeEntityTranslucentShader());
                             com.mojang.blaze3d.vertex.VertexBuffer.unbind();
                         } else {
                             // CPU フォールバック (scriptRenderer の UV/色変換が必要なフレーム等)
-                            BufferBuilder builder = Tesselator.getInstance().begin(
-                                VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
+                            BufferBuilder builder = Tesselator.getInstance().getBuilder();
+                            builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
                             Matrix4f mat = poseStack.last().pose();
                             Matrix3f norm = poseStack.last().normal();
                             float[] normalOut = new float[3];
@@ -3906,8 +3907,8 @@ public final class MqoModelLoader {
                                     .normal(normalOut[0], normalOut[1], normalOut[2]).endVertex();
                             }
                             if (batch.vertexCount > 0) {
-                                RenderSystem.setShader(GameRenderer::getRendertypeCloudsShader);
-                                BufferUploader.drawWithShader(builder.buildOrThrow());
+                                RenderSystem.setShader(GameRenderer::getRendertypeEntityTranslucentShader);
+                                BufferUploader.drawWithShader(builder.end());
                             }
                         }
                     } else {
@@ -4752,9 +4753,8 @@ public final class MqoModelLoader {
                 return entityVbo;
             }
             try {
-                com.mojang.blaze3d.vertex.BufferBuilder bb = com.mojang.blaze3d.vertex.Tesselator.getInstance().begin(
-                    com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
-                    com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY);
+                com.mojang.blaze3d.vertex.BufferBuilder bb = com.mojang.blaze3d.vertex.Tesselator.getInstance().getBuilder();
+                bb.begin(com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS, com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY);
                 for (int i = 0; i < vertexCount; i++) {
                     int o = i * 8;
                     bb.vertex(data[o], data[o + 1], data[o + 2])
@@ -4764,7 +4764,7 @@ public final class MqoModelLoader {
                         .uv2(packedLight)
                         .normal(data[o + 3], data[o + 4], data[o + 5]).endVertex();
                 }
-                com.mojang.blaze3d.vertex.MeshData mesh = bb.build();
+                com.mojang.blaze3d.vertex.BufferBuilder.RenderedBuffer mesh = bb.end();
                 if (mesh == null) {
                     return null;
                 }
@@ -4822,9 +4822,8 @@ public final class MqoModelLoader {
         private com.mojang.blaze3d.vertex.VertexBuffer buildVbo(float bias) {
             if (vertexCount <= 0) return null;
             try {
-                com.mojang.blaze3d.vertex.BufferBuilder bb = com.mojang.blaze3d.vertex.Tesselator.getInstance().begin(
-                    com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
-                    com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
+                com.mojang.blaze3d.vertex.BufferBuilder bb = com.mojang.blaze3d.vertex.Tesselator.getInstance().getBuilder();
+                bb.begin(com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS, com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
                 for (int i = 0; i < vertexCount; i++) {
                     int o = i * 8;
                     float x = data[o], y = data[o + 1], z = data[o + 2];
@@ -4839,7 +4838,7 @@ public final class MqoModelLoader {
                         .color(255, 255, 255, 255)
                         .normal(nx, ny, nz).endVertex();
                 }
-                com.mojang.blaze3d.vertex.MeshData mesh = bb.build();
+                com.mojang.blaze3d.vertex.BufferBuilder.RenderedBuffer mesh = bb.end();
                 if (mesh == null) return null;
                 com.mojang.blaze3d.vertex.VertexBuffer vbo = new com.mojang.blaze3d.vertex.VertexBuffer(
                     com.mojang.blaze3d.vertex.VertexBuffer.Usage.STATIC);

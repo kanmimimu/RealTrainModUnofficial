@@ -467,7 +467,7 @@ public class SignboardScreen extends Screen {
             pendingRebuild = false;
             rebuildWidgets();
         }
-        renderBackground(graphics, mouseX, mouseY, partialTick);
+        renderBackground(graphics);
 
         //板のテクスチャ (backTexture==1 なら表裏が並んで写る)
         InstalledObjectDefinition def = definition();

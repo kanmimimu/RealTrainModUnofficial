@@ -2,7 +2,6 @@ package com.portofino.realtrainmodunofficial.signal;
 
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -11,7 +10,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 
@@ -30,12 +28,13 @@ public class SignalNetworkSavedData extends SavedData {
 
     public static SignalNetworkSavedData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
-            new SavedData.Factory<>(SignalNetworkSavedData::new, SignalNetworkSavedData::load, DataFixTypes.LEVEL),
+            SignalNetworkSavedData::load,
+            SignalNetworkSavedData::new,
             DATA_NAME
         );
     }
 
-    private static SignalNetworkSavedData load(CompoundTag tag, HolderLookup.Provider registries) {
+    private static SignalNetworkSavedData load(CompoundTag tag) {
         SignalNetworkSavedData data = new SignalNetworkSavedData();
         data.nextChannel = Math.max(1000, tag.getInt("NextChannel"));
         ListTag list = tag.getList("Entries", Tag.TAG_COMPOUND);

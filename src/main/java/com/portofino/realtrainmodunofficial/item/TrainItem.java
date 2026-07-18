@@ -146,7 +146,7 @@ public class TrainItem extends Item {
 
     private static boolean isLookingAtBlock(Level level, Player player) {
         Vec3 start = player.getEyePosition(1.0F);
-        Vec3 end = start.add(player.getViewVector(1.0F).scale(player.blockInteractionRange()));
+        Vec3 end = start.add(player.getViewVector(1.0F).scale(5.0D));
         HitResult hit = level.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
         return hit.getType() == HitResult.Type.BLOCK;
     }
@@ -379,7 +379,7 @@ public class TrainItem extends Item {
         java.util.Set<BlockPos> visitedCores = new java.util.HashSet<>();
         for (int cx = baseChunkX - chunkRadius; cx <= baseChunkX + chunkRadius; cx++) {
             for (int cz = baseChunkZ - chunkRadius; cz <= baseChunkZ + chunkRadius; cz++) {
-                net.minecraft.world.level.chunk.ChunkAccess chunk = level.getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false);
+                net.minecraft.world.level.chunk.ChunkAccess chunk = level.getChunk(cx, cz, net.minecraft.world.level.chunk.ChunkStatus.FULL, false);
                 if (!(chunk instanceof net.minecraft.world.level.chunk.LevelChunk levelChunk)) {
                     continue;
                 }

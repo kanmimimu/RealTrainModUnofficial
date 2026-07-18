@@ -58,19 +58,19 @@ public final class RealTrainModUnofficialClientModEvents {
             jp.ngt.rtm.entity.RTMEntities.FLOOR.get(),
             com.portofino.realtrainmodunofficial.client.renderer.RtmFloorRenderer::new
         );
-        if (RealTrainModUnofficialEntities.TRAIN.isBound()) {
+        if (RealTrainModUnofficialEntities.TRAIN.isPresent()) {
             event.registerEntityRenderer(
                 RealTrainModUnofficialEntities.TRAIN.get(),
                 TrainEntityRenderer::new
             );
         }
-        if (RealTrainModUnofficialEntities.TRAIN_BOGIE.isBound()) {
+        if (RealTrainModUnofficialEntities.TRAIN_BOGIE.isPresent()) {
             event.registerEntityRenderer(
                 RealTrainModUnofficialEntities.TRAIN_BOGIE.get(),
                 TrainBogieEntityRenderer::new
             );
         }
-        if (RealTrainModUnofficialEntities.TRAIN_SEAT.isBound()) {
+        if (RealTrainModUnofficialEntities.TRAIN_SEAT.isPresent()) {
             event.registerEntityRenderer(
                 RealTrainModUnofficialEntities.TRAIN_SEAT.get(),
                 TrainSeatEntityRenderer::new

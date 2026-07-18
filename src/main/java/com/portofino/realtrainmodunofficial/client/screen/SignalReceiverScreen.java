@@ -66,7 +66,7 @@ public class SignalReceiverScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics, mouseX, mouseY, partialTick);
+        renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(font, title, width / 2, height / 2 - 40, 0xFFFFFF);
         graphics.drawCenteredString(font, Component.literal("通信機で表示した番号を入力"), width / 2, height / 2 - 28, 0xAAAAAA);

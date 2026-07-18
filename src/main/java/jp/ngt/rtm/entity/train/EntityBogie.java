@@ -631,7 +631,7 @@ public class EntityBogie extends Entity {
     }
 
     @Override
-    public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps) {
+    public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps, boolean teleport) {
         this.carPosRotationInc = steps;
         this.carYaw = yaw;
         this.carPitch = pitch;

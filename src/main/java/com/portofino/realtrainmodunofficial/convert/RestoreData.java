@@ -134,11 +134,11 @@ public final class RestoreData {
             root.putIntArray("BlockData", data);
         }
 
-        NbtIo.writeCompressed(root, worldDir.resolve(FILE_NAME));
+        NbtIo.writeCompressed(root, worldDir.resolve(FILE_NAME).toFile());
     }
 
     public static RestoreData read(Path file) throws IOException {
-        CompoundTag root = NbtIo.readCompressed(file, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+        CompoundTag root = NbtIo.readCompressed(file.toFile());
         RestoreData data = new RestoreData();
 
         ListTag objectList = root.getList("Objects", Tag.TAG_COMPOUND);

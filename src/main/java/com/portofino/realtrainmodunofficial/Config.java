@@ -26,7 +26,7 @@ public class Config {
     // アイテムのリソース位置として扱われる文字列のリスト
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> ITEM_STRINGS = BUILDER
             .comment("A list of items to log on common setup.")
-            .defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), () -> "", Config::validateItemName);
+            .defineListAllowEmpty(List.of("items"), () -> List.of("minecraft:iron_ingot"), Config::validateItemName);
 
     public static final ForgeConfigSpec.IntValue MODEL_CACHE_LIMIT_MIB = BUILDER
             .comment("Maximum in-memory size of cached polygon models in MiB. Recently used models are protected from eviction for a short time.")

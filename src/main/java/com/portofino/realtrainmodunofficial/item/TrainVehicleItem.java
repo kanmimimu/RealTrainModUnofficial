@@ -367,7 +367,7 @@ public class TrainVehicleItem extends Item {
         java.util.Set<BlockPos> visitedCores = new java.util.HashSet<>();
         for (int cx = baseChunkX - chunkRadius; cx <= baseChunkX + chunkRadius; cx++) {
             for (int cz = baseChunkZ - chunkRadius; cz <= baseChunkZ + chunkRadius; cz++) {
-                net.minecraft.world.level.chunk.ChunkAccess chunk = level.getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false);
+                net.minecraft.world.level.chunk.ChunkAccess chunk = level.getChunk(cx, cz, net.minecraft.world.level.chunk.ChunkStatus.FULL, false);
                 if (!(chunk instanceof net.minecraft.world.level.chunk.LevelChunk levelChunk)) {
                     continue;
                 }

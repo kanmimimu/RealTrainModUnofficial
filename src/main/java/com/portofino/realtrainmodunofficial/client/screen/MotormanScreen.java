@@ -154,7 +154,7 @@ public class MotormanScreen extends Screen {
 
     /** ブラー無効化 (既定の renderBackground はぼかしを掛けて文字まで読めなくなる)。 */
     @Override
-    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    public void renderBackground(GuiGraphics g) {
         g.fill(0, 0, this.width, this.height, 0xC0101010);
     }
 

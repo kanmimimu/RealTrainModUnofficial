@@ -921,7 +921,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         }
     }
 
-    @Override
     public @NotNull AABB getRenderBoundingBox(TileEntityLargeRailCore be) {
         return be.getCachedRenderBounds();
     }

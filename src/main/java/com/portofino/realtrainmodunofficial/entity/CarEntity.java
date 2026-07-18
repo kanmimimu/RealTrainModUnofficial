@@ -12,7 +12,6 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.server.level.ServerEntity;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -162,7 +161,7 @@ public final class CarEntity extends Entity {
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.@NotNull Builder builder) {
+    protected void defineSynchedData() {
         this.entityData.define(DATA_VEHICLE_ID, "");
     }
 
@@ -353,7 +352,7 @@ public final class CarEntity extends Entity {
     @Override
     public LivingEntity getControllingPassenger() {
         final var passengers = this.getPassengers();
-        final var controllingEntity = passengers.isEmpty() ? null : passengers.getFirst();
+        final var controllingEntity = passengers.isEmpty() ? null : passengers.get(0);
         return controllingEntity instanceof LivingEntity controllingLivingEntity ? controllingLivingEntity : null;
     }
 
@@ -363,7 +362,6 @@ public final class CarEntity extends Entity {
     /// @param dimensions  自動車の情報 寸法、目の高さなど
     /// @param partialTick なぜ？
     /// @return 位置のベクトル
-    @Override
     @NotNull
     protected Vec3 getPassengerAttachmentPoint(@NotNull Entity passenger, @NotNull EntityDimensions dimensions, float partialTick) {
         // 友達がいないのでデバッグできません(泣)
@@ -378,14 +376,14 @@ public final class CarEntity extends Entity {
     }
 
     private Vec3 calcBaseOffset(int index, EntityDimensions dimensions) {
-        final var heightBase = dimensions.height() * 0.2;
+        final var heightBase = dimensions.height * 0.2;
         return switch (index) {
             case 0 -> new Vec3(-0.42, heightBase, 0.1);
             case 1 -> new Vec3(0.42, heightBase, 0.1);
             case 2 -> new Vec3(0.42, heightBase, -1.0);
             case 3 -> new Vec3(-0.42, heightBase, -1.0);
             case 4 -> new Vec3(0.0, heightBase, -1.0);
-            default -> new Vec3(0.0, dimensions.height() * 0.9, 0.0); // nullが返せないので、Mr.ビーンの場所にしとく
+            default -> new Vec3(0.0, dimensions.height * 0.9, 0.0); // nullが返せないので、Mr.ビーンの場所にしとく
         };
     }
 
@@ -438,8 +436,8 @@ public final class CarEntity extends Entity {
     /// 用途不明
     @Override
     @NotNull
-    public Packet<ClientGamePacketListener> getAddEntityPacket(@NotNull ServerEntity entity) {
-        return new ClientboundAddEntityPacket(this, entity);
+    public Packet<ClientGamePacketListener> getAddEntityPacket() {
+        return new ClientboundAddEntityPacket(this);
     }
 
     /// 毎Tick呼び出される

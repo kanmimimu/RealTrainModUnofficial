@@ -7,8 +7,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
-import net.minecraftforge.event.tick.ServerTickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -57,12 +57,13 @@ public final class ConvertEvents {
 
         @SubscribeEvent
         public static void onServerStarted(ServerStartedEvent event) {
-            LegacyRestorer.onServerStarted(event.getServer());
+            LegacyRestorer.onServerStarted(net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer());
         }
 
         @SubscribeEvent
-        public static void onServerTick(ServerTickEvent.Post event) {
-            LegacyRestorer.tick(event.getServer());
+        public static void onServerTick(TickEvent.ServerTickEvent event) {
+            if (event.phase != TickEvent.Phase.END) return;
+            LegacyRestorer.tick(net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer());
         }
 
         @SubscribeEvent

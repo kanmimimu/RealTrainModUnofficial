@@ -76,7 +76,7 @@ public class TrainDetectorScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics, mouseX, mouseY, partialTick);
+        renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
         int centerY = height / 2;
         graphics.drawCenteredString(font, title, width / 2, centerY - 62, 0xFFFFFF);

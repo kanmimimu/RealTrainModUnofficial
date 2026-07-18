@@ -60,7 +60,7 @@ public final class BannedScreen extends Screen {
 
     /** ブラー無効化 (Screen.render が内部で呼ぶため、既定実装だと文字までぼやける)。 */
     @Override
-    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    public void renderBackground(GuiGraphics g) {
         if (!backgroundAvailable()) {
             g.fill(0, 0, this.width, this.height, 0xFF100000);
             return;

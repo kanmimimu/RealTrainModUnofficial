@@ -1,6 +1,6 @@
 package com.portofino.realtrainmodunofficial.client;
 
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraftforge.api.distmarker.Dist;
@@ -25,7 +25,7 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 public final class DeferredTranslucentRenderer {
 
     private static final MultiBufferSource.BufferSource BUFFER =
-            MultiBufferSource.immediate(new ByteBufferBuilder(1536));
+            MultiBufferSource.immediate(new BufferBuilder(1536));
 
     private DeferredTranslucentRenderer() {
     }

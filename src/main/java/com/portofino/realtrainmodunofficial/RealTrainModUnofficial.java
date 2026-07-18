@@ -142,7 +142,7 @@ public class RealTrainModUnofficial {
                 }
             });
 
-        modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        net.minecraftforge.fml.ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

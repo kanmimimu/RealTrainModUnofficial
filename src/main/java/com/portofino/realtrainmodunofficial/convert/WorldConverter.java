@@ -306,7 +306,7 @@ public final class WorldConverter {
     private static void fixLevelDat(Path worldDir) {
         Path levelDat = worldDir.resolve("level.dat");
         try {
-            CompoundTag root = NbtIo.readCompressed(levelDat, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+            CompoundTag root = NbtIo.readCompressed(levelDat.toFile());
             if (!root.contains("Data")) {
                 return;
             }
@@ -328,7 +328,7 @@ public final class WorldConverter {
                         net.minecraft.util.datafix.DataFixers.getDataFixer(), data, version);
                 root.put("Data", fixed);
             }
-            NbtIo.writeCompressed(root, levelDat);
+            NbtIo.writeCompressed(root, levelDat.toFile());
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("[convert] level.dat の変換に失敗 (そのまま進めます)", e);
         }

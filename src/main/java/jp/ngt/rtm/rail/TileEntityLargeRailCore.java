@@ -389,13 +389,13 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
 
     public AABB getRenderBoundingBox() {
         if (!this.isLoaded()) {
-            return AABB.INFINITE;
+            return new net.minecraft.world.phys.AABB(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY);
         }
 
         if (this.renderAABB == null) {
             this.renderAABB = this.getRenderAABB();
             if (this.renderAABB == null) {
-                return AABB.INFINITE;
+                return new net.minecraft.world.phys.AABB(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY);
             }//ぬるぽ回避
         }
         return this.renderAABB;

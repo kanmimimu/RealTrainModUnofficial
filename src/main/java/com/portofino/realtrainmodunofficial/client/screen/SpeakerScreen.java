@@ -198,7 +198,7 @@ public class SpeakerScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
         int dir = -(int) Math.signum(scrollY);
         // 右のサウンド一覧の上 → サウンドをスクロール
         if (selectedSlot >= 0 && mouseX >= soundListX) {
@@ -213,7 +213,7 @@ public class SpeakerScreen extends Screen {
             rebuildSlots();
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolled(mouseX, mouseY, scrollY);
     }
 
     private String currentSound(int level) {
@@ -235,7 +235,7 @@ public class SpeakerScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics, mouseX, mouseY, partialTick);
+        renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(font, title, width / 2, 8, 0xFFFFFF);
 

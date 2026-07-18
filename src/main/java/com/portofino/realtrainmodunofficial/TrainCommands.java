@@ -28,7 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-@EventBusSubscriber(modid = RealTrainModUnofficial.MODID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = RealTrainModUnofficial.MODID, bus = EventBusSubscriber.Bus.FORGE)
 public final class TrainCommands {
     private TrainCommands() {
     }
@@ -212,9 +212,7 @@ public final class TrainCommands {
     }
 
     private static void removeRailCollisionBlocks(ServerLevel level) {
-        if (!(level.getChunkSource() instanceof ServerChunkCache cache)) {
-            return;
-        }
+        ServerChunkCache cache = level.getChunkSource();
 
         try {
             java.lang.reflect.Field field = ServerChunkCache.class.getDeclaredField("chunkMap");
@@ -227,7 +225,7 @@ public final class TrainCommands {
                 if (!(holderObject instanceof ChunkHolder holder)) {
                     continue;
                 }
-                Optional<ChunkAccess> optional = Optional.ofNullable(holder.getLatestChunk());
+                Optional<ChunkAccess> optional = Optional.ofNullable(holder.getLastAvailable());
                 if (optional.isEmpty() || !(optional.get() instanceof LevelChunk chunk)) {
                     continue;
                 }

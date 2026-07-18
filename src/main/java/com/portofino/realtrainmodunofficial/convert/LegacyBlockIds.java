@@ -27,7 +27,7 @@ public final class LegacyBlockIds {
     public static Map<Integer, String> read(Path worldDir) {
         Map<Integer, String> ids = new HashMap<>();
         try {
-            CompoundTag root = NbtIo.readCompressed(worldDir.resolve("level.dat"), NbtAccounter.unlimitedHeap());
+            CompoundTag root = NbtIo.readCompressed(worldDir.resolve("level.dat").toFile());
             CompoundTag fml = root.getCompound("FML");
 
             //1.12.2 形式

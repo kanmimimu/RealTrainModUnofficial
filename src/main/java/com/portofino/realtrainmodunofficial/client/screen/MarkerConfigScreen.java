@@ -90,7 +90,7 @@ public class MarkerConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        renderBackground(g, mx, my, pt);
+        renderBackground(g);
         super.render(g, mx, my, pt);
         int x = width / 2 - 45;
         int y = height / 2 - 60;

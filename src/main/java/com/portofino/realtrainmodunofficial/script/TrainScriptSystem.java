@@ -3428,11 +3428,11 @@ public class TrainScriptSystem {
                             vtx.x + nx * overlayBias,
                             vtx.y + ny * overlayBias,
                             vtx.z + nz * overlayBias)
-                        .setColor(r, g, b, a)
-                        .setUv(vtx.u, vtx.v)
-                        .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
-                        .setLight(packedLight)
-                        .setNormal(nx, ny, nz);
+                        .color(r, g, b, a)
+                        .uv(vtx.u, vtx.v)
+                        .overlayCoords(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                        .uv2(packedLight)
+                        .normal(nx, ny, nz).endVertex();
                 }
             }
             tessellatorVertices.clear();
@@ -3547,11 +3547,11 @@ public class TrainScriptSystem {
                 for (int c = 0; c < 4; c++) {
                     float vx = q[c * 3] + nx * off, vy = q[c * 3 + 1] + ny * off, vz = q[c * 3 + 2] + nz * off;
                     com.portofino.realtrainmodunofficial.client.render.VertexWriter.addVertex(vc, mat, vx, vy, vz)
-                        .setColor(255, 255, 255, 255)
-                        .setUv(uv[c][0], uv[c][1])
-                        .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
-                        .setLight(light)
-                        .setNormal(nx, ny, nz);
+                        .color(255, 255, 255, 255)
+                        .uv(uv[c][0], uv[c][1])
+                        .overlayCoords(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                        .uv2(light)
+                        .normal(nx, ny, nz).endVertex();
                 }
             }
         }

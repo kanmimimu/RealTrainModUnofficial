@@ -320,7 +320,7 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
      * float 同期 (EntityTrainBase の DATA_YAW/DATA_PITCH → vehicleYaw/vehiclePitch) を使う。
      */
     @Override
-    public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps) {
+    public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps, boolean teleport) {
         this.vehiclePosRotationInc = steps;
         this.vehicleX = x;
         this.vehicleY = y;

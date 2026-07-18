@@ -140,12 +140,12 @@ public class ModelSelectScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double scrollX, double scrollY) {
+    public boolean mouseScrolled(double mx, double my, double scrollY) {
         if (isInPreviewArea(mx, my)) {
             previewZoom = Mth.clamp(previewZoom * (scrollY > 0 ? 1.1f : 1.0f / 1.1f), 0.3f, 6.0f);
             return true;
         }
-        return super.mouseScrolled(mx, my, scrollX, scrollY);
+        return super.mouseScrolled(mx, my, scrollY);
     }
 
     @Override
@@ -177,7 +177,7 @@ public class ModelSelectScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics, mouseX, mouseY, partialTick);
+        renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(font, getTitle(), listWidth() / 2, 7, 0xFFFFFF);
 
@@ -459,7 +459,7 @@ public class ModelSelectScreen extends Screen {
 
     private class ModelList extends ObjectSelectionList<ModelList.ModelEntry> {
         ModelList(Minecraft mc, int width, int height, int top, int itemHeight) {
-            super(mc, width, height, top, itemHeight);
+            super(mc, width, height, top, top + height, itemHeight);
             setRenderHeader(false, 0);
             String lastCat = null;
             ModelEntry initialEntry = null;

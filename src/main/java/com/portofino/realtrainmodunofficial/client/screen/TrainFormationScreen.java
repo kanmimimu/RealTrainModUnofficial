@@ -116,7 +116,7 @@ public class TrainFormationScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics, mouseX, mouseY, partialTick);
+        renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
         
         graphics.drawCenteredString(font, getTitle(), width / 2, 10, 0xFFFFFF);
@@ -136,7 +136,7 @@ public class TrainFormationScreen extends Screen {
 
     private class FormationList extends ObjectSelectionList<FormationList.FormationEntry> {
         FormationList(Minecraft mc, int width, int height, int top, int itemHeight) {
-            super(mc, width, height, top, itemHeight);
+            super(mc, width, height, top, top + height, itemHeight);
             setRenderHeader(false, 0);
             refresh();
         }

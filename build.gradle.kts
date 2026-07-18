@@ -38,7 +38,7 @@ repositories {
     maven { url = uri("https://maven.minecraftforge.net/") }
 }
 
-// Configuration whose contents get shaded into the mod jar (Nashorn script engine).
+// Configuration whose contents get shaded into the mod jar (GraalJS script engine).
 val jsRuntime: Configuration by configurations.creating
 configurations["runtimeClasspath"].extendsFrom(jsRuntime)
 
@@ -89,10 +89,16 @@ dependencies {
     // Kotlin for Forge (language provider + kotlin stdlib at runtime).
     implementation("thedarkcolour:kotlinforforge:$kffVersion")
 
-    // Nashorn script engine — RTM/NGTLib scripts run through JSR-223. Shaded into the jar
-    // (Forge does not ship Nashorn, and there is no double-export conflict like on NeoForge).
-    implementation("org.openjdk.nashorn:nashorn-core:15.4")
-    jsRuntime("org.openjdk.nashorn:nashorn-core:15.4")
+    // GraalJS script engine — RTM/NGTLib vehicle-pack scripts run through the GraalVM polyglot
+    // API + GraalJSScriptEngine (JSR-223). Keeping GraalJS (not Nashorn) preserves ES2022+ so
+    // third-party packs written for the 1.21.1 GraalJS port stay compatible. GraalVM 23.0.x is the
+    // last release line supporting Java 17. Shaded into the jar (Forge does not ship GraalJS).
+    // TODO(Phase3 packaging): GraalJS の transitive (truffle-api/graal-sdk/regex/icu4j) shade と
+    //   META-INF/services / native-image 設定のマージを検証する。
+    implementation("org.graalvm.js:js:23.0.6")
+    implementation("org.graalvm.js:js-scriptengine:23.0.6")
+    jsRuntime("org.graalvm.js:js:23.0.6")
+    jsRuntime("org.graalvm.js:js-scriptengine:23.0.6")
 }
 
 tasks.withType<JavaCompile>().configureEach {

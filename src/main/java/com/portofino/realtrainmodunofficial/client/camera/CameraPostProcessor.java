@@ -4,6 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.client.ShaderCompat;
 import net.minecraft.client.Minecraft;
@@ -11,7 +12,6 @@ import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.event.RegisterShadersEvent;
 import org.joml.Matrix4f;
-import org.joml.Matrix4fStack;
 
 /**
  * カメラのポストエフェクト。<b>被写界深度 (ボケ)</b> と <b>流し撮り (残像)</b> を掛ける。
@@ -99,9 +99,9 @@ public final class CameraPostProcessor {
         //描画状態を退避 (ここは GUI 描画の直前なので、戻さないとバニラの GUI が壊れる)
         Matrix4f savedProj = RenderSystem.getProjectionMatrix();
         com.mojang.blaze3d.vertex.VertexSorting savedSort = RenderSystem.getVertexSorting();
-        Matrix4fStack mv = RenderSystem.getModelViewStack();
-        mv.pushMatrix();
-        mv.identity();
+        PoseStack mv = RenderSystem.getModelViewStack();
+        mv.pushPose();
+        mv.setIdentity();
         RenderSystem.applyModelViewMatrix();
         //クリップ空間へ直接頂点を出すので投影は単位行列
         RenderSystem.setProjectionMatrix(new Matrix4f(), com.mojang.blaze3d.vertex.VertexSorting.ORTHOGRAPHIC_Z);
@@ -161,7 +161,7 @@ public final class CameraPostProcessor {
             RenderSystem.enableDepthTest();
             RenderSystem.enableBlend();
             RenderSystem.setProjectionMatrix(savedProj, savedSort);
-            mv.popMatrix();
+            mv.popPose();
             RenderSystem.applyModelViewMatrix();
             main.bindWrite(true);
         }
@@ -212,13 +212,13 @@ public final class CameraPostProcessor {
 
     /** クリップ空間 (-1..1) に直接四角形を出す。投影/モデルビューは単位行列にしてある。 */
     private static void drawFullscreenQuad() {
-        BufferBuilder buffer = Tesselator.getInstance()
-            .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        BufferBuilder buffer = Tesselator.getInstance().getBuilder();
+        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
         buffer.vertex(-1.0F, -1.0F, 0.0F).uv(0.0F, 0.0F).endVertex();
         buffer.vertex(1.0F, -1.0F, 0.0F).uv(1.0F, 0.0F).endVertex();
         buffer.vertex(1.0F, 1.0F, 0.0F).uv(1.0F, 1.0F).endVertex();
         buffer.vertex(-1.0F, 1.0F, 0.0F).uv(0.0F, 1.0F).endVertex();
-        MeshData mesh = buffer.build();
+        BufferBuilder.RenderedBuffer mesh = buffer.end();
         if (mesh != null) {
             BufferUploader.drawWithShader(mesh);
         }

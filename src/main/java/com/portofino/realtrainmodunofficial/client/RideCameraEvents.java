@@ -46,7 +46,7 @@ public final class RideCameraEvents {
         if (!ridingTrain(mc) || !isThirdPerson(mc)) {
             return;
         }
-        double dy = event.getScrollDeltaY();
+        double dy = event.getScrollDelta();
         if (dy != 0.0D) {
             //ホイール奥 (up, dy>0) = 引く (遠ざける)、手前 (down) = 寄る。
             distance = Mth.clamp(distance + (float) dy * STEP, MIN_DISTANCE, MAX_DISTANCE);

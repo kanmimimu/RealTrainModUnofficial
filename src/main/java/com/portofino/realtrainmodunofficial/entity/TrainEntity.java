@@ -825,7 +825,7 @@ public class TrainEntity extends Entity {
     }
 
     @Override
-    public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps) {
+    public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps, boolean teleport) {
         clientLerpX = x;
         clientLerpY = y;
         clientLerpZ = z;
@@ -837,6 +837,22 @@ public class TrainEntity extends Entity {
         // Multi-step lerp would lag the body behind the bogies by several ticks at speed.
         clientLerpSteps = 1;
         setDeltaMovement(Vec3.ZERO);
+    }
+
+    /**
+     * 1.20.5 で Entity から削除された lerpPositionAndRotationStep の 1.20.1 向け再実装。
+     * clientLerpSteps 分だけ現在位置/回転をサーバ目標へ 1 ステップ寄せる。
+     */
+    private void lerpPositionAndRotationStep(int steps, double targetX, double targetY, double targetZ,
+                                             double targetYRot, double targetXRot) {
+        double d = 1.0D / (double) steps;
+        double nx = net.minecraft.util.Mth.lerp(d, getX(), targetX);
+        double ny = net.minecraft.util.Mth.lerp(d, getY(), targetY);
+        double nz = net.minecraft.util.Mth.lerp(d, getZ(), targetZ);
+        float nyRot = (float) net.minecraft.util.Mth.rotLerp((float) d, getYRot(), (float) targetYRot);
+        float nxRot = (float) net.minecraft.util.Mth.lerp(d, getXRot(), (float) targetXRot);
+        setPos(nx, ny, nz);
+        setRot(nyRot, nxRot);
     }
 
     private boolean isLocalPlayerOnThisTrain() {
@@ -854,27 +870,22 @@ public class TrainEntity extends Entity {
         return false;
     }
 
-    @Override
     public double lerpTargetX() {
         return clientLerpSteps > 0 ? clientLerpX : getX();
     }
 
-    @Override
     public double lerpTargetY() {
         return clientLerpSteps > 0 ? clientLerpY : getY();
     }
 
-    @Override
     public double lerpTargetZ() {
         return clientLerpSteps > 0 ? clientLerpZ : getZ();
     }
 
-    @Override
     public float lerpTargetXRot() {
         return clientLerpSteps > 0 ? (float) clientLerpXRot : getXRot();
     }
 
-    @Override
     public float lerpTargetYRot() {
         return clientLerpSteps > 0 ? (float) clientLerpYRot : getYRot();
     }
@@ -4603,7 +4614,6 @@ public class TrainEntity extends Entity {
         return false;
     }
 
-    @Override
     public Vec3 getPassengerRidingPosition(Entity passenger) {
         Vec3 seat = getAssignedSeatOffset(passenger);
         return localToWorld(seat);
@@ -4622,7 +4632,6 @@ public class TrainEntity extends Entity {
         return getYRot();
     }
 
-    @Override
     public Vec3 getVehicleAttachmentPoint(Entity passenger) {
         return localToWorld(getAssignedSeatOffset(passenger));
     }

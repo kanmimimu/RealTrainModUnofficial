@@ -499,7 +499,7 @@ public class MarkerBlock extends BaseEntityBlock {
             RailPosition end   = rp2.blockY >= rp1.blockY ? rp2 : rp1;
             return createNormalRail(level, start, end, prop, makeRail, isCreative, selectedModelId);
         } else if (rps.size() > 2) {
-            RailPosition root = rps.getFirst();
+            RailPosition root = rps.get(0);
             BlockPos switchCorePos = new BlockPos(root.blockX, root.blockY, root.blockZ);
             return createSwitchRail(level, switchCorePos, rps, prop, makeRail, isCreative, selectedModelId);
         }

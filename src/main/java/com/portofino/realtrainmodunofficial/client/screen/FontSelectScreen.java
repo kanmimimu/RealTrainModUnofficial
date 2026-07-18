@@ -93,7 +93,7 @@ public class FontSelectScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
         scroll = Mth.clamp(scroll - (int) scrollY, 0, maxScroll());
         return true;
     }
@@ -117,7 +117,7 @@ public class FontSelectScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics, mouseX, mouseY, partialTick);
+        renderBackground(graphics);
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFFFFF);
 
         int rows = visibleRows();

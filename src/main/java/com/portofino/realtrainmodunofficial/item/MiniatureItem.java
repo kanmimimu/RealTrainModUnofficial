@@ -92,7 +92,7 @@ public class MiniatureItem extends Item {
                     CompoundTag beTag = null;
                     var be = level.getBlockEntity(bp);
                     if (be != null) {
-                        beTag = be.saveWithoutMetadata(level.registryAccess());
+                        beTag = be.saveWithoutMetadata();
                     }
                     blocks.add(new BlockSet(x - minX, y - minY, z - minZ, state, beTag));
                 }

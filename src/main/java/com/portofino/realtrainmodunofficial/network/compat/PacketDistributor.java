@@ -12,22 +12,34 @@ public final class PacketDistributor {
     private PacketDistributor() {
     }
 
-    public static void sendToServer(CustomPacketPayload payload) {
+    public static void sendToServer(CustomPacketPayload payload, CustomPacketPayload... others) {
         RealTrainModUnofficialNetwork.CHANNEL.sendToServer(payload);
+        for (CustomPacketPayload o : others) {
+            RealTrainModUnofficialNetwork.CHANNEL.sendToServer(o);
+        }
     }
 
-    public static void sendToPlayer(ServerPlayer player, CustomPacketPayload payload) {
-        RealTrainModUnofficialNetwork.CHANNEL.send(
-                net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), payload);
+    public static void sendToPlayer(ServerPlayer player, CustomPacketPayload payload, CustomPacketPayload... others) {
+        var target = net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player);
+        RealTrainModUnofficialNetwork.CHANNEL.send(target, payload);
+        for (CustomPacketPayload o : others) {
+            RealTrainModUnofficialNetwork.CHANNEL.send(target, o);
+        }
     }
 
-    public static void sendToPlayersTrackingEntity(Entity entity, CustomPacketPayload payload) {
-        RealTrainModUnofficialNetwork.CHANNEL.send(
-                net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity), payload);
+    public static void sendToPlayersTrackingEntity(Entity entity, CustomPacketPayload payload, CustomPacketPayload... others) {
+        var target = net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity);
+        RealTrainModUnofficialNetwork.CHANNEL.send(target, payload);
+        for (CustomPacketPayload o : others) {
+            RealTrainModUnofficialNetwork.CHANNEL.send(target, o);
+        }
     }
 
-    public static void sendToPlayersTrackingEntityAndSelf(Entity entity, CustomPacketPayload payload) {
-        RealTrainModUnofficialNetwork.CHANNEL.send(
-                net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> entity), payload);
+    public static void sendToPlayersTrackingEntityAndSelf(Entity entity, CustomPacketPayload payload, CustomPacketPayload... others) {
+        var target = net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> entity);
+        RealTrainModUnofficialNetwork.CHANNEL.send(target, payload);
+        for (CustomPacketPayload o : others) {
+            RealTrainModUnofficialNetwork.CHANNEL.send(target, o);
+        }
     }
 }

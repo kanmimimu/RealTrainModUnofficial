@@ -591,8 +591,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         dy /= len;
         dz /= len;
         //LINES (POSITION_COLOR_NORMAL): 法線 = 線の方向 (lines シェーダが太さ展開に使用)
-        lines.vertex(m, x0, y0, z0).color(r, g, b, 1.0F).normal(pose, dx, dy, dz).endVertex();
-        lines.vertex(m, x1, y1, z1).color(r, g, b, 1.0F).normal(pose, dx, dy, dz).endVertex();
+        com.portofino.realtrainmodunofficial.client.render.VertexWriter.setNormal(lines.vertex(m, x0, y0, z0).color(r, g, b, 1.0F), pose, dx, dy, dz).endVertex();
+        com.portofino.realtrainmodunofficial.client.render.VertexWriter.setNormal(lines.vertex(m, x1, y1, z1).color(r, g, b, 1.0F), pose, dx, dy, dz).endVertex();
     }
 
     private void renderDistanceMark(TileEntityMarker marker, BlockMarker block, BlockState state,
@@ -719,8 +719,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         return true;
     }
 
-    @Override
     public AABB getRenderBoundingBox(TileEntityMarker marker) {
-        return AABB.INFINITE;
+        return new net.minecraft.world.phys.AABB(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY);
     }
 }
