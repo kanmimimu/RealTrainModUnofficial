@@ -43,7 +43,7 @@ public final class RtmuOnlineServices {
      * 1 行に 1 ユーザー名 (大文字小文字は無視、# で始まる行はコメント)。
      * サーバー上のテキストを編集するだけで BAN の追加/削除ができる (mod 更新不要)。
      */
-    private static final String BAN_LIST_URL = "https://rtmu.net/ban.txt";
+    private static final String BAN_LIST_URL = "https://example.org";
 
     //--- 結果 (バックグラウンドスレッドが書き、描画/イベントスレッドが読む) ---
     private static volatile String updateLatestVersion; //新しいバージョンがある時のみ非null
