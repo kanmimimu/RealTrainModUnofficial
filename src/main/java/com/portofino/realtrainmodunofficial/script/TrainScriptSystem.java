@@ -151,7 +151,7 @@ public class TrainScriptSystem {
         "  applyTextStyles: function() {}\n" +
         "};\n" +
         "NGTLog = { debug: function() {}, info: function() {}, warn: function() {}, error: function() {}, sendChatMessage: function(player, msg){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) __SRB__.chat(player, ''+msg); }catch(e){} }, sendChatMessageToAll: function(msg){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) __SRB__.chat((typeof __RTMU_MC__!=='undefined'&&__RTMU_MC__)?__RTMU_MC__.getPlayer():null, ''+msg); }catch(e){} } };\n" +
-        "NGTUtil = { getCurrentTime: function() { return java.lang.System.currentTimeMillis(); }, getUniqueId: function() { return java.lang.System.nanoTime(); }, isClient: function() { return true; }, getCurrentWorld: function() { return null; }, getCurrentPlayer: function() { return null; }, getMCVersion: function() { return '1.21.1'; }, isLanguage: function() { return false; } };\n" +
+        "NGTUtil = { getCurrentTime: function() { return java.lang.System.currentTimeMillis(); }, getUniqueId: function() { return java.lang.System.nanoTime(); }, isClient: function() { return true; }, getCurrentWorld: function() { return null; }, getCurrentPlayer: function() { return null; }, getMCVersion: function() { return '1.20.1'; }, isLanguage: function() { return false; } };\n" +
         "NGTMath = { toRadians: function(d) { return d * Math.PI / 180.0; }, toDegrees: function(r) { return r * 180.0 / Math.PI; }, sin: Math.sin, cos: Math.cos, tan: Math.tan, atan2: Math.atan2, sqrt: Math.sqrt, floor: Math.floor, ceil: Math.ceil, clamp: function(v,a,b) { return Math.max(a, Math.min(b, v)); }, normalizeAngle: function(a) { while(a>=180)a-=360; while(a<-180)a+=360; return a; } };\n" +
         // ★ ここまでの JS シムは「Java 実装が無いときのフォールバック」。
         // Java 側 (NGTUtilCompat 等) を put してあるなら、そちらを使う。
@@ -5338,7 +5338,7 @@ public class TrainScriptSystem {
                 return mc == null ? null : mc.player;
             } catch (Throwable t) { return null; }
         }
-        public String getMCVersion() { return "1.21.1"; }
+        public String getMCVersion() { return "1.20.1"; }
         public boolean isLanguage(String code) {
             try {
                 return code != null && code.equalsIgnoreCase(
