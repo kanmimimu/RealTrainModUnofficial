@@ -36,7 +36,7 @@ public final class RtmuOnlineServices {
 
     /** GitHub リポジトリ (最新リリースの取得先)。 */
     private static final String GITHUB_LATEST_API =
-            "https://api.github.com/repos/325-Sunnygo/RealTrainModUnofficial/releases/latest";
+            "https://api.github.com/repos/kanmimimu/RealTrainModUnofficial/releases/latest";
 
     /**
      * BAN リストの URL。RTMU 公式サイト (rtmu.net) 上の ban.txt。
