@@ -82,7 +82,7 @@ public class TicketItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level level, List<Component> tooltip, TooltipFlag flag) {
         //本家: 回数券だけ残り回数を出す。
         if (defaultRides > 1) {
             tooltip.add(Component.translatable("tooltip.realtrainmodunofficial.ticket.remaining", getRides(stack))

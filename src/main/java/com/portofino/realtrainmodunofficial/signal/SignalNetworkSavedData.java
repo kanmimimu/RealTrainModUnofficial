@@ -55,7 +55,7 @@ public class SignalNetworkSavedData extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
+    public CompoundTag save(CompoundTag tag) {
         tag.putInt("NextChannel", nextChannel);
         ListTag list = new ListTag();
         for (Map.Entry<Integer, SignalEntry> entry : entries.entrySet()) {

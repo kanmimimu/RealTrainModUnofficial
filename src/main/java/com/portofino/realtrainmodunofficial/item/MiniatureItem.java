@@ -112,7 +112,7 @@ public class MiniatureItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level level, List<Component> lines, TooltipFlag flag) {
         CompoundTag tag = getTag(stack);
         if (tag.contains("BlocksData")) {
             lines.add(Component.literal(String.format("%dx%dx%d",

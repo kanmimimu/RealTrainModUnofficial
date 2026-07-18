@@ -288,7 +288,7 @@ public class RtmWrenchItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level level, List<Component> tooltip, TooltipFlag flag) {
         if (isModeLocked(stack)) {
             tooltip.add(Component.literal("モード変更: ロック中").withStyle(ChatFormatting.GOLD));
         } else {

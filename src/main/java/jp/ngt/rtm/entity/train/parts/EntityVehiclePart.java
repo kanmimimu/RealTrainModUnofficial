@@ -39,11 +39,11 @@ public abstract class EntityVehiclePart extends Entity {
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        builder.define(DATA_VEHICLE, 0);
-        builder.define(DATA_VEC_X, 0.0F);
-        builder.define(DATA_VEC_Y, 0.0F);
-        builder.define(DATA_VEC_Z, 0.0F);
+    protected void defineSynchedData() {
+        this.entityData.define(DATA_VEHICLE, 0);
+        this.entityData.define(DATA_VEC_X, 0.0F);
+        this.entityData.define(DATA_VEC_Y, 0.0F);
+        this.entityData.define(DATA_VEC_Z, 0.0F);
     }
 
     @Override

@@ -34,9 +34,9 @@ public class EntityFloor extends EntityVehiclePart {
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        super.defineSynchedData(builder);
-        builder.define(DATA_SEAT_TYPE, (byte) 0);
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(DATA_SEAT_TYPE, (byte) 0);
     }
 
     @Override

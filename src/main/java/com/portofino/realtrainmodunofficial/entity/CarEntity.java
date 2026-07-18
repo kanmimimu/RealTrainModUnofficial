@@ -163,7 +163,7 @@ public final class CarEntity extends Entity {
 
     @Override
     protected void defineSynchedData(SynchedEntityData.@NotNull Builder builder) {
-        builder.define(DATA_VEHICLE_ID, "");
+        this.entityData.define(DATA_VEHICLE_ID, "");
     }
 
     public String getVehicleId() {

@@ -78,7 +78,7 @@ public class ItemRail extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack itemStack, TooltipContext context, List<Component> list, TooltipFlag flag) {
+    public void appendHoverText(ItemStack itemStack, net.minecraft.world.level.Level level, List<Component> list, TooltipFlag flag) {
         RailProperty prop = getProperty(itemStack);
         if (prop == null) {
             return;

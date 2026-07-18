@@ -134,7 +134,7 @@ public class RailItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level level, List<Component> lines, TooltipFlag flag) {
         String selectedId = RealTrainModUnofficialComponents.getString(stack, RealTrainModUnofficialComponents.SELECTED_MODEL_ID);
         if (selectedId != null && !selectedId.isBlank()) {
             RailDefinition def = RailRegistry.getById(selectedId);

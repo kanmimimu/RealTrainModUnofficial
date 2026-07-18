@@ -72,7 +72,7 @@ public class VehicleFormationItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level level, List<Component> tooltip, TooltipFlag flag) {
         TrainFormation formation = getFormation(stack);
         int size = formation.vehicles.size();
         if (size > 0) {

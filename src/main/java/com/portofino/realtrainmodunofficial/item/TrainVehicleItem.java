@@ -497,7 +497,7 @@ public class TrainVehicleItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<net.minecraft.network.chat.Component> tooltip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level level, List<net.minecraft.network.chat.Component> tooltip, TooltipFlag flag) {
         TrainFormation formation = TrainFormationData.getFormation(stack);
         if (formation != null && !formation.isEmpty()) {
             tooltip.add(net.minecraft.network.chat.Component.translatable("tooltip.realtrainmodunofficial.train_formation.cars", formation.getCarCount()));

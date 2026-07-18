@@ -62,10 +62,10 @@ public final class TrainBogieEntity extends Entity {
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        builder.define(TRAIN_ENTITY_ID, -1);
-        builder.define(BOGIE_INDEX, 0);
-        builder.define(ACTIVATED, false);
+    protected void defineSynchedData() {
+        this.entityData.define(TRAIN_ENTITY_ID, -1);
+        this.entityData.define(BOGIE_INDEX, 0);
+        this.entityData.define(ACTIVATED, false);
     }
 
     @Override

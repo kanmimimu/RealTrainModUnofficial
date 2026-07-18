@@ -79,10 +79,10 @@ public class EntityMotorman extends PathfinderMob {
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        super.defineSynchedData(builder);
-        builder.define(DIAGRAM, ItemStack.EMPTY);
-        builder.define(SKIN, "");
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(DIAGRAM, ItemStack.EMPTY);
+        this.entityData.define(SKIN, "");
     }
 
     //------------------------------------------------------------ スキン
@@ -125,7 +125,7 @@ public class EntityMotorman extends PathfinderMob {
         super.addAdditionalSaveData(nbt);
         ItemStack diagram = this.getDiagram();
         if (!diagram.isEmpty()) {
-            nbt.put("DiagramRTM", diagram.save(this.registryAccess()));
+            nbt.put("DiagramRTM", diagram.save(new CompoundTag()));
         }
         nbt.putString("SkinRTM", this.getSkin());
     }
@@ -134,8 +134,7 @@ public class EntityMotorman extends PathfinderMob {
     public void readAdditionalSaveData(CompoundTag nbt) {
         super.readAdditionalSaveData(nbt);
         if (nbt.contains("DiagramRTM")) {
-            this.setDiagram(ItemStack.parse(this.registryAccess(), nbt.getCompound("DiagramRTM"))
-                    .orElse(ItemStack.EMPTY));
+            this.setDiagram(ItemStack.of(nbt.getCompound("DiagramRTM")));
         }
         if (nbt.contains("SkinRTM")) {
             this.setSkin(nbt.getString("SkinRTM"));

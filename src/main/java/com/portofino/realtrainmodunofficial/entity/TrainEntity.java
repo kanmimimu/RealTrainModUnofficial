@@ -304,39 +304,39 @@ public class TrainEntity extends Entity {
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        builder.define(VEHICLE_ID, "");
-        builder.define(SPEED, 0.0f);
-        builder.define(TRAIN_DISTANCE, 4.5f);
-        builder.define(NOTCH, 0);
-        builder.define(HEADLIGHT_ON, false);
-        builder.define(DOOR_OPEN, false);
-        builder.define(DOOR_LEFT_OPEN, false);
-        builder.define(DOOR_RIGHT_OPEN, false);
-        builder.define(LIGHT_MODE, 0);
-        builder.define(PANTOGRAPH_UP, true);
-        builder.define(REVERSE, false);
-        builder.define(REVERSER, 1);
+    protected void defineSynchedData() {
+        this.entityData.define(VEHICLE_ID, "");
+        this.entityData.define(SPEED, 0.0f);
+        this.entityData.define(TRAIN_DISTANCE, 4.5f);
+        this.entityData.define(NOTCH, 0);
+        this.entityData.define(HEADLIGHT_ON, false);
+        this.entityData.define(DOOR_OPEN, false);
+        this.entityData.define(DOOR_LEFT_OPEN, false);
+        this.entityData.define(DOOR_RIGHT_OPEN, false);
+        this.entityData.define(LIGHT_MODE, 0);
+        this.entityData.define(PANTOGRAPH_UP, true);
+        this.entityData.define(REVERSE, false);
+        this.entityData.define(REVERSER, 1);
         //-1 = まだ誰も座っていない (進行方向に従う)
-        builder.define(SEAT_DIRECTION, -1);
-        builder.define(DESTINATION_INDEX, 0);
-        builder.define(SOUND_INDEX, 0);
-        builder.define(BODY_ROLL, 0.0F);
-        builder.define(CUSTOM_BUTTON_BITS, 0);
-        builder.define(RAIL_PROGRESS, 0.0F);
-        builder.define(SEAT_ASSIGNMENTS, "");
-        builder.define(COUPLED_FOLLOWER, Optional.empty());
-        builder.define(COUPLED_LEADER, Optional.empty());
-        builder.define(INTERIOR_LIGHT_ON, false);
-        builder.define(FRONT_BOGIE_DX, 0.0F);
-        builder.define(FRONT_BOGIE_DY, 0.0F);
-        builder.define(FRONT_BOGIE_DZ, 0.0F);
-        builder.define(REAR_BOGIE_DX, 0.0F);
-        builder.define(REAR_BOGIE_DY, 0.0F);
-        builder.define(REAR_BOGIE_DZ, 0.0F);
-        builder.define(BOGIE_SYNC_VALID, false);
-        builder.define(FRONT_BOGIE_YAW, 0.0F);
-        builder.define(REAR_BOGIE_YAW, 0.0F);
+        this.entityData.define(SEAT_DIRECTION, -1);
+        this.entityData.define(DESTINATION_INDEX, 0);
+        this.entityData.define(SOUND_INDEX, 0);
+        this.entityData.define(BODY_ROLL, 0.0F);
+        this.entityData.define(CUSTOM_BUTTON_BITS, 0);
+        this.entityData.define(RAIL_PROGRESS, 0.0F);
+        this.entityData.define(SEAT_ASSIGNMENTS, "");
+        this.entityData.define(COUPLED_FOLLOWER, Optional.empty());
+        this.entityData.define(COUPLED_LEADER, Optional.empty());
+        this.entityData.define(INTERIOR_LIGHT_ON, false);
+        this.entityData.define(FRONT_BOGIE_DX, 0.0F);
+        this.entityData.define(FRONT_BOGIE_DY, 0.0F);
+        this.entityData.define(FRONT_BOGIE_DZ, 0.0F);
+        this.entityData.define(REAR_BOGIE_DX, 0.0F);
+        this.entityData.define(REAR_BOGIE_DY, 0.0F);
+        this.entityData.define(REAR_BOGIE_DZ, 0.0F);
+        this.entityData.define(BOGIE_SYNC_VALID, false);
+        this.entityData.define(FRONT_BOGIE_YAW, 0.0F);
+        this.entityData.define(REAR_BOGIE_YAW, 0.0F);
     }
 
     public String getVehicleId() { return entityData.get(VEHICLE_ID); }

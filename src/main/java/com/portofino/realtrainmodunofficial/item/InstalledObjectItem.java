@@ -332,7 +332,7 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level level, List<Component> lines, TooltipFlag flag) {
         String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         if (selectedId != null && !selectedId.isBlank()) {
             InstalledObjectDefinition def = InstalledObjectRegistry.getById(selectedId);

@@ -91,10 +91,10 @@ public class EntityBogie extends Entity {
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        builder.define(DATA_TRAIN_ID, 0);
-        builder.define(DATA_IS_FRONT, (byte) 0);
-        builder.define(DATA_BOGIE_ID, (byte) 0);
+    protected void defineSynchedData() {
+        this.entityData.define(DATA_TRAIN_ID, 0);
+        this.entityData.define(DATA_IS_FRONT, (byte) 0);
+        this.entityData.define(DATA_BOGIE_ID, (byte) 0);
     }
 
     @Override

@@ -248,18 +248,18 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        builder.define(DATA_BOGIE0, 0);
-        builder.define(DATA_BOGIE1, 0);
-        builder.define(DATA_BYTE_ARRAY, Base64.getEncoder().encodeToString(new byte[16]));
-        builder.define(DATA_SPEED, 0.0F);
-        builder.define(DATA_CAB_DIR, (byte) 0);
-        builder.define(DATA_MODEL_NAME, "");
-        builder.define(DATA_ROLL, 0.0F);
-        builder.define(DATA_YAW, 0.0F);
-        builder.define(DATA_PITCH, 0.0F);
-        builder.define(DATA_SEATS, "");
-        builder.define(DATA_FORMATION, "");
+    protected void defineSynchedData() {
+        this.entityData.define(DATA_BOGIE0, 0);
+        this.entityData.define(DATA_BOGIE1, 0);
+        this.entityData.define(DATA_BYTE_ARRAY, Base64.getEncoder().encodeToString(new byte[16]));
+        this.entityData.define(DATA_SPEED, 0.0F);
+        this.entityData.define(DATA_CAB_DIR, (byte) 0);
+        this.entityData.define(DATA_MODEL_NAME, "");
+        this.entityData.define(DATA_ROLL, 0.0F);
+        this.entityData.define(DATA_YAW, 0.0F);
+        this.entityData.define(DATA_PITCH, 0.0F);
+        this.entityData.define(DATA_SEATS, "");
+        this.entityData.define(DATA_FORMATION, "");
     }
 
     @Override
