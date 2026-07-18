@@ -1,6 +1,5 @@
 package jp.ngt.rtm.electric;
 
-import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
@@ -23,7 +22,6 @@ import net.minecraft.world.phys.BlockHitResult;
  * ワイヤーで配線網に接続して使用する。
  */
 public class BlockSignalConverter extends BaseEntityBlock {
-    public static final MapCodec<BlockSignalConverter> CODEC = simpleCodec(p -> new BlockSignalConverter(p));
     public static final IntegerProperty TYPE = IntegerProperty.create("type", 0, 4);
 
     public BlockSignalConverter(Properties properties) {
@@ -31,10 +29,6 @@ public class BlockSignalConverter extends BaseEntityBlock {
         this.registerDefaultState(this.stateDefinition.any().setValue(TYPE, 0));
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return CODEC;
-    }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
@@ -65,7 +59,7 @@ public class BlockSignalConverter extends BaseEntityBlock {
      * 本家: 右クリックでタイプ切替
      */
     @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, net.minecraft.world.InteractionHand hand, BlockHitResult hit) {
         if (!level.isClientSide) {
             int next = (state.getValue(TYPE) + 1) % 5;
             level.setBlock(pos, state.setValue(TYPE, next), 3);
@@ -86,12 +80,12 @@ public class BlockSignalConverter extends BaseEntityBlock {
     }
 
     @Override
-    protected boolean isSignalSource(BlockState state) {
+    public boolean isSignalSource(BlockState state) {
         return state.getValue(TYPE) == SignalConverterType.RSOut.id;
     }
 
     @Override
-    protected int getSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos, net.minecraft.core.Direction direction) {
+    public int getSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos, net.minecraft.core.Direction direction) {
         if (state.getValue(TYPE) == SignalConverterType.RSOut.id
                 && getter.getBlockEntity(pos) instanceof TileEntitySignalConverter converter) {
             return net.minecraft.util.Mth.clamp(converter.getElectricity(), 0, 15);
@@ -100,7 +94,7 @@ public class BlockSignalConverter extends BaseEntityBlock {
     }
 
     @Override
-    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, BlockPos fromPos, boolean isMoving) {
+    public void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, BlockPos fromPos, boolean isMoving) {
         //RSIn の即時反応 (tick でも監視しているが応答性向上)
         if (!level.isClientSide && state.getValue(TYPE) == SignalConverterType.RSIn.id
                 && level.getBlockEntity(pos) instanceof TileEntitySignalConverter converter) {

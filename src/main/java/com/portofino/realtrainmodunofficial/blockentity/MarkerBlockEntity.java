@@ -4,7 +4,6 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import com.portofino.realtrainmodunofficial.block.MarkerBlock;
 import jp.ngt.rtm.rail.util.RailPosition;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -85,8 +84,8 @@ public class MarkerBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
+    protected void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
         tag.putBoolean("Configured", configured);
         tag.putFloat("A_Direction", anchorYaw);
         tag.putFloat("A_Pitch", anchorPitch);
@@ -98,8 +97,8 @@ public class MarkerBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
+    public void load(CompoundTag tag) {
+        super.load(tag);
         configured = tag.getBoolean("Configured");
         anchorYaw = tag.getFloat("A_Direction");
         anchorPitch = tag.getFloat("A_Pitch");
@@ -111,8 +110,8 @@ public class MarkerBlockEntity extends BlockEntity {
     }
 
     @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return saveWithoutMetadata(registries);
+    public CompoundTag getUpdateTag() {
+        return saveWithoutMetadata();
     }
 
     @Override

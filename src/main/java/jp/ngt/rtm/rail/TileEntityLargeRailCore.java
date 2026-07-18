@@ -5,7 +5,6 @@ import jp.ngt.rtm.rail.util.RailMapBasic;
 import jp.ngt.rtm.rail.util.RailPosition;
 import jp.ngt.rtm.rail.util.RailProperty;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -74,8 +73,8 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     }
 
     @Override
-    protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.loadAdditional(nbt, registries);
+    public void load(CompoundTag nbt) {
+        super.load(nbt);
 
         this.readRailProperties(nbt);
         this.readRailData(nbt);
@@ -107,8 +106,8 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.saveAdditional(nbt, registries);
+    protected void saveAdditional(CompoundTag nbt) {
+        super.saveAdditional(nbt);
 
         this.writeRailProperties(nbt);
         this.writeRailData(nbt);

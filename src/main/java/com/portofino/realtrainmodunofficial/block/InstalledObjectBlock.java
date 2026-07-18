@@ -1,6 +1,5 @@
 package com.portofino.realtrainmodunofficial.block;
 
-import com.mojang.serialization.MapCodec;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
@@ -10,7 +9,7 @@ import com.portofino.realtrainmodunofficial.signal.SignalNetworkSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
@@ -30,7 +29,6 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
 public class InstalledObjectBlock extends BaseEntityBlock {
-    public static final MapCodec<InstalledObjectBlock> CODEC = simpleCodec(InstalledObjectBlock::new);
     private static final VoxelShape RTM_SELECTION_SHAPE = box(0, 0, 0, 16, 16, 16);
     private static final VoxelShape EMPTY_SHAPE = Shapes.empty();
 
@@ -42,10 +40,6 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         this(BlockBehaviour.Properties.of().sound(SoundType.METAL).strength(0.4F, 2.0F).noOcclusion());
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return CODEC;
-    }
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
@@ -105,15 +99,16 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     }
 
     @Override
-    protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
-                                              Player player, InteractionHand hand, BlockHitResult hit) {
+    public InteractionResult use(BlockState state, Level level, BlockPos pos,
+                                 Player player, InteractionHand hand, BlockHitResult hit) {
+        ItemStack stack = player.getItemInHand(hand);
         if (stack.is(RealTrainModUnofficialItems.IC_CARD_ITEM.get())
             && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
             && be.getCategory() == InstalledObjectCategory.TICKET_GATE) {
             if (!level.isClientSide) {
                 be.activateTicketGate();
             }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+            return InteractionResult.sidedSuccess(level.isClientSide);
         }
         //切符での改札通過 (本家 BlockTurnstile.onEntityCollidedWithBlock 相当)。
         if (stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.TicketItem ticket
@@ -125,7 +120,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
                 player.setItemInHand(hand, remainder);
                 be.activateTicketGate();
             }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+            return InteractionResult.sidedSuccess(level.isClientSide);
         }
         //本家 BlockPoint.onBlockActivated: バールで右クリックすると move の符号が反転し、
         //転轍機の本体が線路の反対側に移る。
@@ -135,7 +130,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             if (!level.isClientSide) {
                 point.setPointMove(-point.getPointMove());
             }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+            return InteractionResult.sidedSuccess(level.isClientSide);
         }
         //本家 BlockMachineBase.clickMachine: バールで右クリック → 微調整 GUI (GuiChangeOffset)。
         //レンチのシフト右クリックでも開けるようにする (ユーザー要望)。
@@ -146,14 +141,8 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             if (level.isClientSide) {
                 com.portofino.realtrainmodunofficial.ClientHooks.openChangeOffsetScreen(be);
             }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+            return InteractionResult.sidedSuccess(level.isClientSide);
         }
-        return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
-    }
-
-    @Override
-    protected net.minecraft.world.InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
-            net.minecraft.world.entity.player.Player player, net.minecraft.world.phys.BlockHitResult hit) {
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be && be.isSpeaker()) {
             if (level.isClientSide) {
                 com.portofino.realtrainmodunofficial.ClientHooks.openSpeakerScreen(pos);
@@ -206,7 +195,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }
-        return super.useWithoutItem(state, level, pos, player, hit);
+        return super.use(state, level, pos, player, hand, hit);
     }
 
     @Override
@@ -221,12 +210,12 @@ public class InstalledObjectBlock extends BaseEntityBlock {
      * 本家 electric: 出力コネクタは配線網の信号レベルをレッドストーン出力する
      */
     @Override
-    protected boolean isSignalSource(BlockState state) {
+    public boolean isSignalSource(BlockState state) {
         return true;
     }
 
     @Override
-    protected int getSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos,
+    public int getSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos,
                             net.minecraft.core.Direction direction) {
         if (getter.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
             if (be.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
@@ -246,7 +235,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
      * これが無いと、転轍機を載せたブロック越しにレッドストーンを引けない。
      */
     @Override
-    protected int getDirectSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos,
+    public int getDirectSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos,
                                   net.minecraft.core.Direction direction) {
         if (getter.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
                 && be.getCategory() == InstalledObjectCategory.POINT) {

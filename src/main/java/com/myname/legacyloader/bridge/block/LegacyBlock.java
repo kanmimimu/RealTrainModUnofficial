@@ -11,7 +11,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -353,7 +352,7 @@ public class LegacyBlock extends Block implements ILegacyBlock {
     // Bridge modern block callbacks back into legacy override points. Without this,
     // blocks that recompute metadata/bounds from neighbours behave like inert cubes.
     @Override
-    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
+    public void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
         try { func_149695_a(level, pos.getX(), pos.getY(), pos.getZ(), neighborBlock); } catch (Throwable ignored) {}
         updateWireLineMetadata(level, pos, state);
         super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston);
@@ -370,7 +369,7 @@ public class LegacyBlock extends Block implements ILegacyBlock {
     public void func_149726_b(Level world, int x, int y, int z) { onBlockAdded(world, x, y, z); }
 
     @Override
-    protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
         try { breakBlock(level, pos.getX(), pos.getY(), pos.getZ(), this, getMetaFromState(state)); } catch (Throwable ignored) {}
         super.onRemove(state, level, pos, newState, movedByPiston);
     }
@@ -418,7 +417,7 @@ public class LegacyBlock extends Block implements ILegacyBlock {
     }
 
     @Override
-    protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
+    protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                              Player player, InteractionHand hand, BlockHitResult hit) {
         boolean handled = false;
         try {
@@ -429,7 +428,7 @@ public class LegacyBlock extends Block implements ILegacyBlock {
             handled = func_149727_a(level, pos.getX(), pos.getY(), pos.getZ(), player,
                     hit.getDirection().ordinal(), hitX, hitY, hitZ);
         } catch (Throwable ignored) {}
-        return handled ? ItemInteractionResult.SUCCESS : super.useItemOn(stack, state, level, pos, player, hand, hit);
+        return handled ? InteractionResult.SUCCESS : super.useItemOn(stack, state, level, pos, player, hand, hit);
     }
 
     private AABB makeAABB(int x, int y, int z) {
@@ -438,13 +437,13 @@ public class LegacyBlock extends Block implements ILegacyBlock {
     }
 
     @Override
-    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+    public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         updateLegacyBounds(level, pos);
         return currentShape();
     }
 
     @Override
-    protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         updateLegacyBounds(level, pos);
         return currentShape();
     }

@@ -6,6 +6,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
 import java.awt.*;
 import java.util.ArrayList;
@@ -93,7 +94,7 @@ public class FontSelectScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        scroll = Math.clamp(scroll - (int) scrollY, 0, maxScroll());
+        scroll = Mth.clamp(scroll - (int) scrollY, 0, maxScroll());
         return true;
     }
 

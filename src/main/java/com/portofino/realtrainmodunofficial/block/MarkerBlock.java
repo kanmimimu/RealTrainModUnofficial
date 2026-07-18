@@ -1,8 +1,5 @@
 package com.portofino.realtrainmodunofficial.block;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
@@ -21,7 +18,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -49,12 +46,6 @@ import java.util.List;
 import java.util.Set;
 
 public class MarkerBlock extends BaseEntityBlock {
-    public static final MapCodec<MarkerBlock> CODEC = RecordCodecBuilder.mapCodec(instance ->
-        instance.group(
-            Codec.BOOL.fieldOf("is_switch").forGetter(block -> block.isSwitch),
-            propertiesCodec()
-        ).apply(instance, MarkerBlock::new)
-    );
     public static final IntegerProperty FACING = IntegerProperty.create("facing", 0, 7);
     public final boolean isSwitch;
     private static final VoxelShape SHAPE = Block.box(0, 0, 0, 16, 1, 16);
@@ -75,10 +66,6 @@ public class MarkerBlock extends BaseEntityBlock {
             .noCollission());
     }
 
-    @Override
-    public MapCodec<? extends MarkerBlock> codec() {
-        return CODEC;
-    }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
@@ -141,7 +128,8 @@ public class MarkerBlock extends BaseEntityBlock {
     }
 
     @Override
-    protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult) {
+    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult) {
+        ItemStack stack = player.getItemInHand(hand);
         // RTM本家互換の使い方: マーカーをレールアイテムで右クリックすると、範囲内の全マーカーを
         // 探索して個数に応じたレール(2個=通常/3個以上=分岐)を生成する。プレビューや WrenchMode は
         // 使わない (RTM の BlockMarker.onBlockActivated → onMarkerActivated と同じ挙動)。
@@ -150,7 +138,7 @@ public class MarkerBlock extends BaseEntityBlock {
             if (level.isClientSide()) {
                 com.portofino.realtrainmodunofficial.ClientHooks.openMarkerConfigScreen(pos);
             }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide());
+            return InteractionResult.sidedSuccess(level.isClientSide());
         }
         if (stack.getItem() instanceof RailItem) {
             if (!level.isClientSide() && state.getBlock() instanceof MarkerBlock block) {
@@ -158,7 +146,7 @@ public class MarkerBlock extends BaseEntityBlock {
                 int markerCount = block.searchAllMarkers(level, pos).size();
                 if (markerCount < 2) {
                     player.displayClientMessage(Component.literal("接続できるマーカーが不足しています(2個以上必要)"), true);
-                    return ItemInteractionResult.sidedSuccess(false);
+                    return InteractionResult.sidedSuccess(false);
                 }
                 boolean created = block.onMarkerActivated(level, pos, player, true, selectedId);
                 if (created) {
@@ -170,9 +158,9 @@ public class MarkerBlock extends BaseEntityBlock {
                     player.displayClientMessage(Component.literal("ここにはレールを敷けません(障害物や形状を確認)"), true);
                 }
             }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide());
+            return InteractionResult.sidedSuccess(level.isClientSide());
         }
-        return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        return InteractionResult.PASS;
     }
 
     public static boolean placeRailFromItem(Level level, BlockPos pos, Player player, ItemStack stack, @Nullable String selectedModelId) {

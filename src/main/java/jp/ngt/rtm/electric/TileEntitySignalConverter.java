@@ -1,7 +1,6 @@
 package jp.ngt.rtm.electric;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -63,14 +62,14 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
     }
 
     @Override
-    protected void saveAdditional(CompoundTag nbt, HolderLookup.Provider provider) {
-        super.saveAdditional(nbt, provider);
+    protected void saveAdditional(CompoundTag nbt) {
+        super.saveAdditional(nbt);
         nbt.putInt("electricity", this.electricity);
     }
 
     @Override
-    protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider provider) {
-        super.loadAdditional(nbt, provider);
+    public void load(CompoundTag nbt) {
+        super.load(nbt);
         this.electricity = nbt.getInt("electricity");
     }
 }

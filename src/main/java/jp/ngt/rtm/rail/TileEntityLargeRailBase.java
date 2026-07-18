@@ -3,7 +3,6 @@ package jp.ngt.rtm.rail;
 import jp.ngt.ngtlib.math.NGTMath;
 import jp.ngt.rtm.rail.util.RailMap;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.util.Mth;
@@ -53,8 +52,8 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
     }
 
     @Override
-    protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.loadAdditional(nbt, registries);
+    public void load(CompoundTag nbt) {
+        super.load(nbt);
 
         this.startPoint[0] = nbt.getInt("spX");
         this.startPoint[1] = nbt.getInt("spY");
@@ -66,8 +65,8 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.saveAdditional(nbt, registries);
+    protected void saveAdditional(CompoundTag nbt) {
+        super.saveAdditional(nbt);
 
         nbt.putInt("spX", this.startPoint[0]);
         nbt.putInt("spY", this.startPoint[1]);
@@ -76,8 +75,8 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
 
     // クライアント同期 (本家 S35 相当): フル NBT を送る
     @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return this.saveWithoutMetadata(registries);
+    public CompoundTag getUpdateTag() {
+        return this.saveWithoutMetadata();
     }
 
     @Override

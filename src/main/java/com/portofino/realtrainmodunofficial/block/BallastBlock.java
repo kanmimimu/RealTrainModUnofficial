@@ -1,6 +1,5 @@
 package com.portofino.realtrainmodunofficial.block;
 
-import com.mojang.serialization.MapCodec;
 import com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity;
 import jp.ngt.rtm.rail.util.RailMap;
 import net.minecraft.core.BlockPos;
@@ -23,7 +22,6 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * 当たり判定はこのブロック自体(y-1)が持つため、列車/プレイヤーは道床の上に立つ。
  */
 public class BallastBlock extends BaseEntityBlock {
-    public static final MapCodec<BallastBlock> CODEC = simpleCodec(p -> new BallastBlock());
     /** 高さ1px のカーペット相当スラブ */
     private static final VoxelShape SHAPE = Block.box(0, 0, 0, 16, 1, 16);
 
@@ -36,10 +34,6 @@ public class BallastBlock extends BaseEntityBlock {
             .isViewBlocking((s, g, p) -> false));
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return CODEC;
-    }
 
     @Override
     public RenderShape getRenderShape(BlockState state) {

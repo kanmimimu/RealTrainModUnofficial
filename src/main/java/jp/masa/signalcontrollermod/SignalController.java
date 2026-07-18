@@ -1,6 +1,5 @@
 package jp.masa.signalcontrollermod;
 
-import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -21,16 +20,11 @@ import javax.annotation.Nullable;
  * の SignalController ブロック 1.21.1 移植。右クリックで設定 GUI。
  */
 public class SignalController extends BaseEntityBlock {
-    public static final MapCodec<SignalController> CODEC = simpleCodec(props -> new SignalController(props));
 
     public SignalController(Properties props) {
         super(props.strength(0.5F).sound(SoundType.STONE));
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return CODEC;
-    }
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
@@ -45,7 +39,7 @@ public class SignalController extends BaseEntityBlock {
     }
 
     @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
+    public InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, net.minecraft.world.InteractionHand hand, BlockHitResult hit) {
         if (world.isClientSide && world.getBlockEntity(pos) instanceof TileEntitySignalController controller) {
             com.portofino.realtrainmodunofficial.ClientHooks.openSignalControllerScreen(controller);
         }

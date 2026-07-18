@@ -3,7 +3,6 @@ package com.portofino.realtrainmodunofficial.blockentity;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import jp.ngt.rtm.rail.util.*;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -44,8 +43,8 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
+    protected void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
         if (isSwitchMarkerLayout(railPositions)) {
             tag.putByte("Size", (byte) railPositions.length);
             for (int i = 0; i < railPositions.length; i++) {
@@ -76,8 +75,8 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
+    public void load(CompoundTag tag) {
+        super.load(tag);
         this.railPositions = null;
         this.railMap = null;
         this.cachedAllRailMaps = new RailMap[0];
@@ -144,8 +143,8 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
     }
 
     @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return this.saveWithoutMetadata(registries);
+    public CompoundTag getUpdateTag() {
+        return this.saveWithoutMetadata();
     }
 
     @Override

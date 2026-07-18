@@ -1,6 +1,5 @@
 package com.portofino.realtrainmodunofficial.block;
 
-import com.mojang.serialization.MapCodec;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
@@ -29,7 +28,6 @@ import org.jetbrains.annotations.Nullable;
  * 見た目は描かず、破壊されたら対応するレールコアも削除する。
  */
 public class RailCollisionBlock extends BaseEntityBlock {
-    public static final MapCodec<RailCollisionBlock> CODEC = simpleCodec(RailCollisionBlock::new);
     // 本家RTM準拠: ブロック底からレール面の高さまでのスラブ box(0,0,0,16,railTop,16)。
     // 平坦レールは surfaceY=0 → 1px の薄いスラブ(=カーペット)。坂はレール面まで床から詰めるので
     // 「ブロック全体」にも「浮いた薄板」にもならず、レール形状に沿って当たる/狙える/壊せる。
@@ -55,10 +53,6 @@ public class RailCollisionBlock extends BaseEntityBlock {
             .isViewBlocking((s, g, p) -> false));
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return CODEC;
-    }
 
     @Override
     public RenderShape getRenderShape(BlockState state) {

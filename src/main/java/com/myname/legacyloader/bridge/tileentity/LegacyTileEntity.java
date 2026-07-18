@@ -3,7 +3,6 @@ package com.myname.legacyloader.bridge.tileentity;
 import com.myname.legacyloader.bridge.block.LegacyBlock;
 import com.myname.legacyloader.bridge.block.LegacyITileEntityProvider;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -216,14 +215,14 @@ public class LegacyTileEntity extends BlockEntity {
     public void func_145839_a(CompoundTag tag) { readFromNBT(tag); }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider providers) {
-        super.saveAdditional(tag, providers);
+    protected void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
         writeToNBT(tag);
     }
 
     @Override
-    public void loadAdditional(CompoundTag tag, HolderLookup.Provider providers) {
-        super.loadAdditional(tag, providers);
+    public void load(CompoundTag tag) {
+        super.load(tag);
         readFromNBT(tag);
     }
 

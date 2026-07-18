@@ -1,6 +1,5 @@
 package com.portofino.realtrainmodunofficial.block;
 
-import com.mojang.serialization.MapCodec;
 import com.portofino.realtrainmodunofficial.ClientHooks;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import com.portofino.realtrainmodunofficial.blockentity.ScriptBlockEntity;
@@ -28,7 +27,6 @@ import org.jetbrains.annotations.Nullable;
 
 public class ScriptBlock extends BaseEntityBlock {
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
-    private final MapCodec<ScriptBlock> codec;
 
     public ScriptBlock() {
         this(BlockBehaviour.Properties.of().sound(SoundType.METAL).strength(1.2F, 6.0F));
@@ -36,14 +34,9 @@ public class ScriptBlock extends BaseEntityBlock {
 
     public ScriptBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        this.codec = simpleCodec(ScriptBlock::new);
         registerDefaultState(stateDefinition.any().setValue(POWERED, false));
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return codec;
-    }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
@@ -80,7 +73,7 @@ public class ScriptBlock extends BaseEntityBlock {
     }
 
     @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, net.minecraft.world.InteractionHand hand, BlockHitResult hit) {
         if (level.isClientSide) {
             ClientHooks.openScriptBlockScreen(pos);
         }
@@ -88,7 +81,7 @@ public class ScriptBlock extends BaseEntityBlock {
     }
 
     @Override
-    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
+    public void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
         if (level.getBlockEntity(pos) instanceof ScriptBlockEntity blockEntity) {
             blockEntity.onNeighborSignalChanged(level.hasNeighborSignal(pos));
         }

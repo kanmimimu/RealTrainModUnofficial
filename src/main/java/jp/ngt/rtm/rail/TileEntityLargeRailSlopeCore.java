@@ -3,7 +3,6 @@ package jp.ngt.rtm.rail;
 import jp.ngt.rtm.rail.util.RailMap;
 import jp.ngt.rtm.rail.util.RailMapSlope;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -18,15 +17,15 @@ public class TileEntityLargeRailSlopeCore extends TileEntityLargeRailCore {
     }
 
     @Override
-    protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.loadAdditional(nbt, registries);
+    public void load(CompoundTag nbt) {
+        super.load(nbt);
 
         this.slopeType = nbt.getByte("slopeType");
     }
 
     @Override
-    protected void saveAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.saveAdditional(nbt, registries);
+    protected void saveAdditional(CompoundTag nbt) {
+        super.saveAdditional(nbt);
 
         nbt.putByte("slopeType", this.slopeType);
     }

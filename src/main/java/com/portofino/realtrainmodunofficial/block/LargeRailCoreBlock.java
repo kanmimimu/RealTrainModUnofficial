@@ -1,6 +1,5 @@
 package com.portofino.realtrainmodunofficial.block;
 
-import com.mojang.serialization.MapCodec;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
@@ -35,7 +34,6 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
 public class LargeRailCoreBlock extends BaseEntityBlock {
-    public static final MapCodec<LargeRailCoreBlock> CODEC = simpleCodec(LargeRailCoreBlock::new);
     private static final VoxelShape SHAPE = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 0.0625D, 1.0D);
 
     public LargeRailCoreBlock(BlockBehaviour.Properties props) {
@@ -46,10 +44,6 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
         this(BlockBehaviour.Properties.of().sound(SoundType.METAL).strength(0.5F, 6.0F).noOcclusion());
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return CODEC;
-    }
 
     @Override
     public RenderShape getRenderShape(BlockState state) {

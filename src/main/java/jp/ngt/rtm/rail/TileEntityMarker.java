@@ -2,7 +2,6 @@ package jp.ngt.rtm.rail;
 
 import jp.ngt.rtm.rail.util.*;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -76,8 +75,8 @@ public class TileEntityMarker extends BlockEntity {
     public static TileEntityMarker clientEditingMarker;
 
     @Override
-    protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.loadAdditional(nbt, registries);
+    public void load(CompoundTag nbt) {
+        super.load(nbt);
 
         if (nbt.contains("RP") && this != clientEditingMarker) {
             this.rp = RailPosition.readFromNBT(nbt.getCompound("RP"));
@@ -104,8 +103,8 @@ public class TileEntityMarker extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.saveAdditional(nbt, registries);
+    protected void saveAdditional(CompoundTag nbt) {
+        super.saveAdditional(nbt);
 
         if (this.rp != null) {
             nbt.put("RP", this.rp.writeToNBT());
@@ -117,8 +116,8 @@ public class TileEntityMarker extends BlockEntity {
     }
 
     @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        CompoundTag nbt = this.saveWithoutMetadata(registries);
+    public CompoundTag getUpdateTag() {
+        CompoundTag nbt = this.saveWithoutMetadata();
         ListTag list = new ListTag();
         for (int[] pos : this.markerPosList) {
             list.add(new net.minecraft.nbt.IntArrayTag(pos));

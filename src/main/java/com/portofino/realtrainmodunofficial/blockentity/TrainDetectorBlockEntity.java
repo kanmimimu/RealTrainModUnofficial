@@ -6,7 +6,6 @@ import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.signal.SignalAspect;
 import com.portofino.realtrainmodunofficial.signal.SignalNetworkSavedData;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
@@ -59,8 +58,8 @@ public class TrainDetectorBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
+    protected void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
         tag.putInt("LinkedChannel", linkedChannel);
         tag.putInt("DetectionRange", detectionRange);
         tag.putBoolean("Occupied", occupied);
@@ -68,8 +67,8 @@ public class TrainDetectorBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
+    public void load(CompoundTag tag) {
+        super.load(tag);
         linkedChannel = tag.getInt("LinkedChannel");
         detectionRange = clampRange(tag.getInt("DetectionRange"));
         occupied = tag.getBoolean("Occupied");
@@ -77,8 +76,8 @@ public class TrainDetectorBlockEntity extends BlockEntity {
     }
 
     @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return saveWithoutMetadata(registries);
+    public CompoundTag getUpdateTag() {
+        return saveWithoutMetadata();
     }
 
     @Override

@@ -13,6 +13,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerEntity;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -597,7 +598,7 @@ public final class CarEntity extends Entity {
                 this.isBraking = false;
 
                 final var stroke = this.acceleratorStroke + ACCELERATOR_STROKE_CHANGE_RATE; // 踏む量を増やす
-                this.acceleratorStroke = Math.clamp(stroke, 0.0f, 1.0f);
+                this.acceleratorStroke = Mth.clamp(stroke, 0.0f, 1.0f);
             } else { // 後進（ブレーキ）
                 this.acceleratorStroke = 0.0f;
 
@@ -606,14 +607,14 @@ public final class CarEntity extends Entity {
                     this.brakeStroke = 0.0f;
 
                     final var stroke = this.acceleratorStroke + ACCELERATOR_STROKE_CHANGE_RATE;
-                    this.acceleratorStroke = Math.clamp(stroke, 0.0f, 1.0f);
+                    this.acceleratorStroke = Mth.clamp(stroke, 0.0f, 1.0f);
                 } else {
                     // 通常のブレーキ処理
                     if (this.speed >= -SPEED_STOP_THRESHOLD) { // 転換しない場合ロックをセット
                         this.isReversalLocked = true;
                     }
                     final var stroke = this.brakeStroke + BRAKE_STROKE_CHANGE_RATE;
-                    this.brakeStroke = Math.clamp(stroke, 0.0f, 1.0f);
+                    this.brakeStroke = Mth.clamp(stroke, 0.0f, 1.0f);
                 }
             }
         } else if (wS < 0.0f) { // 後ろキー（S）
@@ -623,7 +624,7 @@ public final class CarEntity extends Entity {
                 this.isBraking = false;
 
                 final var stroke = this.acceleratorStroke + ACCELERATOR_STROKE_CHANGE_RATE;
-                this.acceleratorStroke = Math.clamp(stroke, 0.0f, 1.0f);
+                this.acceleratorStroke = Mth.clamp(stroke, 0.0f, 1.0f);
             } else { // 前進（ブレーキ）
                 this.acceleratorStroke = 0.0f;
 
@@ -632,14 +633,14 @@ public final class CarEntity extends Entity {
                     this.brakeStroke = 0.0f;
 
                     final var stroke = this.acceleratorStroke + ACCELERATOR_STROKE_CHANGE_RATE;
-                    this.acceleratorStroke = Math.clamp(stroke, 0.0f, 1.0f);
+                    this.acceleratorStroke = Mth.clamp(stroke, 0.0f, 1.0f);
                 } else {
                     // 通常のブレーキ処理
                     if (this.speed <= SPEED_STOP_THRESHOLD) {
                         this.isReversalLocked = true;
                     }
                     final var stroke = this.brakeStroke + BRAKE_STROKE_CHANGE_RATE;
-                    this.brakeStroke = Math.clamp(stroke, 0.0f, 1.0f);
+                    this.brakeStroke = Mth.clamp(stroke, 0.0f, 1.0f);
                 }
             }
         } else { // 操作されていない
@@ -653,7 +654,7 @@ public final class CarEntity extends Entity {
 
         if (aD != 0) {
             final var angle = this.currentSteeringWheelAngle + Math.signum(aD) * -STEERING_WHEEL_ANGULAR_VELOCITY_MANIPULATED; // Aが正、Dが負だが、ヨーは逆
-            this.currentSteeringWheelAngle = Math.clamp(angle, -STEERING_WHEEL_MAX_ANGLE, STEERING_WHEEL_MAX_ANGLE);
+            this.currentSteeringWheelAngle = Mth.clamp(angle, -STEERING_WHEEL_MAX_ANGLE, STEERING_WHEEL_MAX_ANGLE);
         } else { // 操作されていない
             // 無人の時と同様に処理
             this.updateSteeringAngle();
@@ -665,7 +666,7 @@ public final class CarEntity extends Entity {
 
 //        if (forward != 0) {
 //            acceleration += forward * 0.02f;
-//            acceleration = Math.clamp(acceleration, -maxSpeed, maxSpeed);
+//            acceleration = Mth.clamp(acceleration, -maxSpeed, maxSpeed);
 //            // 移動方向
 //            // Entity#yRotはたぶん度数法
 //            float yaw = this.getYRot() * (float) Math.PI / 180.0f;
@@ -686,9 +687,9 @@ public final class CarEntity extends Entity {
         // 踏んだ時と同じ割合で減らす
         // あるいは即時0？ どちらが実際の運転の感覚と似ているだろうか
         final var accelStroke = this.acceleratorStroke - ACCELERATOR_STROKE_CHANGE_RATE;
-        this.acceleratorStroke = Math.clamp(accelStroke, 0.0f, 1.0f);
+        this.acceleratorStroke = Mth.clamp(accelStroke, 0.0f, 1.0f);
         final var brakeStroke = this.brakeStroke - BRAKE_STROKE_CHANGE_RATE;
-        this.brakeStroke = Math.clamp(brakeStroke, 0.0f, 1.0f);
+        this.brakeStroke = Mth.clamp(brakeStroke, 0.0f, 1.0f);
     }
 
     /// 操作されていないときに自然にステアリングを処理する
@@ -714,12 +715,12 @@ public final class CarEntity extends Entity {
         }
 
         if (isReversing) {
-            newSpeed = Math.clamp(newSpeed, -MAX_SPEED * 0.2f, 0.0f);
+            newSpeed = Mth.clamp(newSpeed, -MAX_SPEED * 0.2f, 0.0f);
         } else {
-            newSpeed = Math.clamp(newSpeed, 0.0f, MAX_SPEED);
+            newSpeed = Mth.clamp(newSpeed, 0.0f, MAX_SPEED);
         }
 
-        this.speed = Math.clamp(newSpeed, -MAX_SPEED * 0.2f, MAX_SPEED);
+        this.speed = Mth.clamp(newSpeed, -MAX_SPEED * 0.2f, MAX_SPEED);
     }
 
 

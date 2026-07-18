@@ -3,7 +3,6 @@ package jp.masa.signalcontrollermod;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -156,8 +155,8 @@ public class TileEntitySignalController extends BlockEntity {
     }
 
     @Override
-    protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.loadAdditional(nbt, registries);
+    public void load(CompoundTag nbt) {
+        super.load(nbt);
         this.signalType = SignalType.getType(nbt.getString("signalType"));
         this.last = nbt.getBoolean("last");
         this.repeat = nbt.getBoolean("repeat");
@@ -178,8 +177,8 @@ public class TileEntitySignalController extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
-        super.saveAdditional(nbt, registries);
+    protected void saveAdditional(CompoundTag nbt) {
+        super.saveAdditional(nbt);
         nbt.putString("signalType", this.signalType.toString());
         nbt.putBoolean("last", this.last);
         nbt.putBoolean("repeat", this.repeat);
@@ -202,8 +201,8 @@ public class TileEntitySignalController extends BlockEntity {
     }
 
     @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return this.saveWithoutMetadata(registries);
+    public CompoundTag getUpdateTag() {
+        return this.saveWithoutMetadata();
     }
 
     @Override

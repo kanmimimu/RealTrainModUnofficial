@@ -6,7 +6,6 @@ import com.portofino.realtrainmodunofficial.signal.SignalAspect;
 import com.portofino.realtrainmodunofficial.signal.SignalNetworkSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
@@ -81,22 +80,22 @@ public class SignalStateBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
+    protected void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
         tag.putInt("LinkedChannel", linkedChannel);
         tag.putInt("AspectId", aspectId);
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
+    public void load(CompoundTag tag) {
+        super.load(tag);
         linkedChannel = tag.getInt("LinkedChannel");
         aspectId = tag.contains("AspectId") ? tag.getInt("AspectId") : SignalAspect.STOP.getId();
     }
 
     @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return saveWithoutMetadata(registries);
+    public CompoundTag getUpdateTag() {
+        return saveWithoutMetadata();
     }
 
     @Override

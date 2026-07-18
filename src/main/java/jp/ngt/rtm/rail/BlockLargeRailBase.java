@@ -1,6 +1,5 @@
 package jp.ngt.rtm.rail;
 
-import com.mojang.serialization.MapCodec;
 import jp.ngt.rtm.rail.util.RailMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
@@ -28,7 +27,6 @@ import java.util.Arrays;
  * 当たり判定は BE の getBlockHeights (4隅カント) の平均高さによる動的 VoxelShape (本家準拠)。
  */
 public class BlockLargeRailBase extends BaseEntityBlock {
-    public static final MapCodec<BlockLargeRailBase> CODEC = simpleCodec(props -> new BlockLargeRailBase(2, props));
 
     public static final float THICKNESS = 0.0625F;
     /**
@@ -47,10 +45,6 @@ public class BlockLargeRailBase extends BaseEntityBlock {
         this.railTextureType = par1;
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return CODEC;
-    }
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
@@ -70,12 +64,12 @@ public class BlockLargeRailBase extends BaseEntityBlock {
     }
 
     @Override
-    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+    public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         return this.getRailShape(level, pos, false);
     }
 
     @Override
-    protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         boolean preventMob = false;
         if (context instanceof EntityCollisionContext ecc && ecc.getEntity() instanceof Mob) {
             preventMob = this.preventMobMovement(level, pos);
@@ -130,7 +124,7 @@ public class BlockLargeRailBase extends BaseEntityBlock {
     private static boolean DIAG_LOGGED;
 
     @Override
-    protected void onRemove(BlockState state, Level world, BlockPos pos, BlockState newState, boolean movedByPiston) {
+    public void onRemove(BlockState state, Level world, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock())) {
             if (!DIAG_LOGGED && !world.isClientSide) {
                 DIAG_LOGGED = true;
@@ -184,7 +178,7 @@ public class BlockLargeRailBase extends BaseEntityBlock {
     }
 
     @Override
-    protected void neighborChanged(BlockState state, Level world, BlockPos pos, net.minecraft.world.level.block.Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
+    public void neighborChanged(BlockState state, Level world, BlockPos pos, net.minecraft.world.level.block.Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
         super.neighborChanged(state, world, pos, neighborBlock, neighborPos, movedByPiston);
         //RS 変化で分岐の開通状態 (isOpen/activeRails) を更新
         if (!world.isClientSide) {

@@ -1,6 +1,5 @@
 package jp.ngt.rtm.rail;
 
-import com.mojang.serialization.MapCodec;
 import jp.ngt.ngtlib.io.NGTLog;
 import jp.ngt.ngtlib.math.NGTMath;
 import jp.ngt.ngtlib.math.Vec3;
@@ -9,7 +8,6 @@ import jp.ngt.rtm.rail.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -43,7 +41,6 @@ import java.util.stream.Collectors;
  * TODO(Phase 4): ItemRail (レール種選択) / GUI (GuiRailMarker) の接続。
  */
 public class BlockMarker extends BaseEntityBlock {
-    public static final MapCodec<BlockMarker> CODEC = simpleCodec(props -> new BlockMarker(0, props));
 
     /**
      * 本家 metadata 相当 (0-7)。ID は既存アセット (blockstates) と互換の "facing"。
@@ -68,10 +65,6 @@ public class BlockMarker extends BaseEntityBlock {
         this.registerDefaultState(this.stateDefinition.any().setValue(META, 0));
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return CODEC;
-    }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
@@ -84,7 +77,7 @@ public class BlockMarker extends BaseEntityBlock {
     }
 
     @Override
-    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+    public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         return SHAPE;
     }
 
@@ -148,10 +141,11 @@ public class BlockMarker extends BaseEntityBlock {
     }
 
     @Override
-    protected ItemInteractionResult useItemOn(ItemStack item, BlockState state, Level world, BlockPos pos, Player player, net.minecraft.world.InteractionHand hand, BlockHitResult hit) {
+    public InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, net.minecraft.world.InteractionHand hand, BlockHitResult hit) {
+        ItemStack item = player.getItemInHand(hand);
         BlockEntity tile = world.getBlockEntity(pos);
         if (!(tile instanceof TileEntityMarker marker)) {
-            return ItemInteractionResult.SUCCESS;
+            return InteractionResult.SUCCESS;
         }
 
         if (!item.isEmpty()) {
@@ -163,19 +157,19 @@ public class BlockMarker extends BaseEntityBlock {
                     if (world.isClientSide) {
                         com.portofino.realtrainmodunofficial.ClientHooks.openMarkerCantScreen(marker);
                     }
-                    return ItemInteractionResult.SUCCESS;
+                    return InteractionResult.SUCCESS;
                 }
                 if (!world.isClientSide) {
                     this.makeRailMap(marker, pos.getX(), pos.getY(), pos.getZ(), player);
                 }
                 wrench.onRightClickMarker(item, world, player, marker);
-                return ItemInteractionResult.SUCCESS;
+                return InteractionResult.SUCCESS;
             } else if (Block.byItem(item.getItem()) instanceof BlockMarker && (this.markerType == 0 || this.markerType == 1)) {
                 if (!world.isClientSide) {
                     this.makeRailMap(marker, pos.getX(), pos.getY(), pos.getZ(), player);
                 }
                 //TODO(Phase 4): GuiRailMarker を開く
-                return ItemInteractionResult.SUCCESS;
+                return InteractionResult.SUCCESS;
             }
         }
 
@@ -187,14 +181,6 @@ public class BlockMarker extends BaseEntityBlock {
             }
         }
 
-        return ItemInteractionResult.SUCCESS;
-    }
-
-    @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
-        if (!world.isClientSide) {
-            this.onMarkerActivated(world, pos.getX(), pos.getY(), pos.getZ(), player, true);
-        }
         return InteractionResult.SUCCESS;
     }
 

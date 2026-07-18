@@ -1,6 +1,5 @@
 package com.portofino.realtrainmodunofficial.block;
 
-import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -23,7 +22,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class CrossingGateBlock extends Block {
-    public static final MapCodec<CrossingGateBlock> CODEC = simpleCodec(CrossingGateBlock::new);
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
 
@@ -42,10 +40,6 @@ public class CrossingGateBlock extends Block {
         this(BlockBehaviour.Properties.of().sound(SoundType.METAL).strength(1.0F, 6.0F).noOcclusion());
     }
 
-    @Override
-    protected @NotNull MapCodec<? extends Block> codec() {
-        return CODEC;
-    }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {

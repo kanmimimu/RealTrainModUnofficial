@@ -1,13 +1,10 @@
 package com.portofino.realtrainmodunofficial.block;
 
-import com.mojang.serialization.MapCodec;
 import com.portofino.realtrainmodunofficial.ClientHooks;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities;
 import com.portofino.realtrainmodunofficial.blockentity.SignalStateBlockEntity;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -31,7 +28,6 @@ import org.jetbrains.annotations.Nullable;
 public class SignalStateBlock extends BaseEntityBlock {
     public static final IntegerProperty ASPECT = IntegerProperty.create("aspect", 0, 6);
     public static final net.minecraft.world.level.block.state.properties.DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
-    private final MapCodec<SignalStateBlock> codec;
 
     public SignalStateBlock() {
         this(BlockBehaviour.Properties.of().sound(SoundType.METAL).strength(1.2F, 6.0F));
@@ -39,14 +35,9 @@ public class SignalStateBlock extends BaseEntityBlock {
 
     public SignalStateBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        this.codec = simpleCodec(SignalStateBlock::new);
         registerDefaultState(stateDefinition.any().setValue(ASPECT, 0).setValue(FACING, net.minecraft.core.Direction.NORTH));
     }
 
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return codec;
-    }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
@@ -88,14 +79,8 @@ public class SignalStateBlock extends BaseEntityBlock {
     }
 
     @Override
-    protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, net.minecraft.core.BlockPos pos, Player player,
-                                              net.minecraft.world.InteractionHand hand, BlockHitResult hit) {
-        openScreen(level, pos);
-        return ItemInteractionResult.sidedSuccess(level.isClientSide);
-    }
-
-    @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, net.minecraft.core.BlockPos pos, Player player, BlockHitResult hit) {
+    public InteractionResult use(BlockState state, Level level, net.minecraft.core.BlockPos pos, Player player,
+                                 net.minecraft.world.InteractionHand hand, BlockHitResult hit) {
         openScreen(level, pos);
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
