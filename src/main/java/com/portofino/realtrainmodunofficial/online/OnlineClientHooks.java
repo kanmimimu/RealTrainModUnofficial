@@ -1,20 +1,17 @@
 package com.portofino.realtrainmodunofficial.online;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import com.portofino.realtrainmodunofficial.client.screen.BannedScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 
 /**
  * オンライン連携のクライアントフック。
  * <ul>
- *   <li>BAN されたユーザー: どの画面を開こうとしても {@link BannedScreen} に差し替え、先へ進めない。</li>
  *   <li>アップデート通知: タイトル画面の右上に「新しいバージョンがあります」を表示。</li>
  * </ul>
  */
@@ -22,32 +19,6 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 public final class OnlineClientHooks {
 
     private OnlineClientHooks() {
-    }
-
-    /** BAN 中はどの画面 (ワールド選択/設定等) を開こうとしても BAN 画面へ差し替える。 */
-    @SubscribeEvent
-    public static void onScreenOpening(ScreenEvent.Opening event) {
-        if (RtmuOnlineServices.isBanned() && !(event.getNewScreen() instanceof BannedScreen)) {
-            event.setNewScreen(new BannedScreen());
-        }
-    }
-
-    /**
-     * BAN 判定はバックグラウンドで届くため、既に画面が開いた後でも次 tick で強制する。
-     * (ワールド内に居ても BAN 画面を被せて操作不能にする)
-     */
-    @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
-        if (!RtmuOnlineServices.isBanned()) {
-            return;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        if (!(mc.screen instanceof BannedScreen)) {
-            mc.setScreen(new BannedScreen());
-        }
     }
 
     /** タイトル画面右上にアップデート通知を出す。 */
