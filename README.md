@@ -2,10 +2,6 @@
 
 このmodはRealTrainModの非公式1.21.1移植版である[RealTrainModUnofficial](https://github.com/325-Sunnygo/RealTrainModUnofficial)を1.20.1 Forgeに移植したmodです。
 
-## 状態
-
-<img src="libraries/image1.png" alt="OMG ITS DOESNT WORK !!!">
-
 ## 動作環境
 
 - Minecraft **1.20.1**
@@ -17,8 +13,6 @@
 ```bash
 ./gradlew build
 ```
-
-生成された jar は `build/libs/` に出力されます。
 
 ## クレジット/Special thanks
 
