@@ -109,6 +109,7 @@ val replaceProperties = mapOf(
     "mod_license" to (project.property("mod_license") as String),
     "mod_version" to modVersion,
     "mod_authors" to (project.property("mod_authors") as String),
+    "mod_credits" to (project.property("mod_credits") as String),
     "mod_description" to (project.property("mod_description") as String),
 )
 
