@@ -73,14 +73,6 @@ minecraft {
 
 sourceSets.named("main") {
     resources.srcDir("src/generated/resources")
-    // Exclude the 1.7.10 LegacyLoader (out of scope for the 1.20.1 Forge port) and its
-    // legacy-only shadow stubs. RTM core has zero imports from these.
-    java {
-        exclude("com/myname/**")
-        exclude("net/minecraft/**")
-        exclude("net/minecraftforge/**")
-        exclude("gnu/trove/**")
-    }
 }
 
 dependencies {
