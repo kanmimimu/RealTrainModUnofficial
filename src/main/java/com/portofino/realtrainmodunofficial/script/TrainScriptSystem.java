@@ -512,7 +512,15 @@ public class TrainScriptSystem {
                         .option("js.nashorn-compat", "true")
                         .option("js.syntax-extensions", "true")
                         .option("js.ecmascript-version", ecmaVersion);
-                    ScriptEngine scriptEngine = com.oracle.truffle.js.scriptengine.GraalJSScriptEngine.create(polyglotEngine, contextBuilder);
+                    ScriptEngine scriptEngine;
+                    try {
+                        Class<?> gjsEngineClass = Class.forName("com.oracle.truffle.js.scriptengine.GraalJSScriptEngine");
+                        java.lang.reflect.Method createMethod = gjsEngineClass.getMethod("create",
+                            org.graalvm.polyglot.Engine.class, org.graalvm.polyglot.Context.Builder.class);
+                        scriptEngine = (ScriptEngine) createMethod.invoke(null, polyglotEngine, contextBuilder);
+                    } catch (Exception ex) {
+                        throw new RuntimeException(ex);
+                    }
                     if (scriptEngine != null) {
                         RealTrainModUnofficial.LOGGER.info("Using Graal.js with RTM compatibility on ECMAScript {}.", ecmaVersion);
                         return scriptEngine;

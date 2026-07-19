@@ -25,11 +25,13 @@ base {
 }
 
 java {
-    toolchain.languageVersion = JavaLanguageVersion.of(17)
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(25)
 }
 
 repositories {
@@ -83,14 +85,15 @@ dependencies {
 
     // GraalJS script engine — RTM/NGTLib vehicle-pack scripts run through the GraalVM polyglot
     // API + GraalJSScriptEngine (JSR-223). Keeping GraalJS (not Nashorn) preserves ES2022+ so
-    // third-party packs written for the 1.21.1 GraalJS port stay compatible. GraalVM 23.0.x is the
-    // last release line supporting Java 17. Shaded into the jar (Forge does not ship GraalJS).
-    // TODO(Phase3 packaging): GraalJS の transitive (truffle-api/graal-sdk/regex/icu4j) shade と
-    //   META-INF/services / native-image 設定のマージを検証する。
-    implementation("org.graalvm.js:js:23.0.6")
-    implementation("org.graalvm.js:js-scriptengine:23.0.6")
-    jsRuntime("org.graalvm.js:js:23.0.6")
-    jsRuntime("org.graalvm.js:js-scriptengine:23.0.6")
+    // third-party packs written for the 1.21.1 GraalJS port stay compatible. GraalJS 25.1.3
+    // supports Java 25. Shaded into the jar (Forge does not ship GraalJS).
+    // js-language replaces the old org.graalvm.js:js monolithic JAR (which is POM-only in 25.x).
+    // js-scriptengine provides JSR-223 bridge and pulls in org.graalvm.polyglot:polyglot.
+    implementation("org.graalvm.js:js-language:25.1.3")
+    implementation("org.graalvm.js:js-scriptengine:25.1.3")
+    jsRuntime("org.graalvm.js:js-language:25.1.3")
+    jsRuntime("org.graalvm.js:js-scriptengine:25.1.3")
+    jsRuntime("org.graalvm.truffle:truffle-runtime:25.1.3")
 }
 
 tasks.withType<JavaCompile>().configureEach {
