@@ -117,6 +117,15 @@ public final class PackConsentScreen extends Screen {
             try {
                 com.portofino.realtrainmodunofficial.vehicle.VehiclePackLoader.reload();
                 com.portofino.realtrainmodunofficial.rail.RailPackLoader.reload();
+                //★車両/レールだけでなくサウンドも作り直す。以前はここで音を作り直していなかったため、
+                //  README 同意が必要な SL パック等では「車両は出るのに走行音だけ鳴らない」状態になっていた。
+                //  原因: 生成サウンドパックは起動時 (AddPackFindersEvent=同意より前) に一度だけ作られ、
+                //  タイトルで同意したパックの名前空間がその時点では未同意で除外されるため。生成パックは
+                //  リソース扱いなので、作り直した後にリソースを再読込しないと SoundManager に登録されない。
+                com.portofino.realtrainmodunofficial.client.sound.ExternalSoundPackBridge.rebuild();
+                this.minecraft.setScreen(this.parent);
+                this.minecraft.reloadResourcePacks();
+                return;
             } catch (Throwable t) {
                 RealTrainModUnofficial.LOGGER.warn("[PackConsent] 同意後の再読み込みに失敗: {}", t.toString());
             }

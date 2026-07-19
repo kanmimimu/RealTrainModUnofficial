@@ -35,6 +35,22 @@ public final class LegacyScriptSoundManager {
     private LegacyScriptSoundManager() {
     }
 
+    /** NaN/異常値を安全な音量にクランプする (0除算やフェード計算ミスでNaNが渡ってくるパック対策)。 */
+    static float safeVolume(float v, float max) {
+        if (Float.isNaN(v)) {
+            return 0.0F;
+        }
+        return Mth.clamp(v, 0.0F, max);
+    }
+
+    /** NaN/異常値を安全なピッチにクランプする。 */
+    static float safePitch(float p) {
+        if (Float.isNaN(p)) {
+            return 1.0F;
+        }
+        return Mth.clamp(p, 0.05F, 4.0F);
+    }
+
     // ---- 列車エンティティの両対応 ----
     //
     // RTMU には列車エンティティが 2 系統ある:
@@ -147,8 +163,8 @@ public final class LegacyScriptSoundManager {
             minecraft.getSoundManager().play(new SimpleSoundInstance(
                 soundId,
                 SoundSource.NEUTRAL,
-                Mth.clamp(volume, 0.0F, 8.0F),
-                Mth.clamp(pitch, 0.05F, 4.0F),
+                safeVolume(volume, 8.0F),
+                safePitch(pitch),
                 SoundInstance.createUnseededRandom(),
                 false,
                 0,
@@ -173,6 +189,13 @@ public final class LegacyScriptSoundManager {
         if (sound != null) {
             //明示 stop 済み / 列車消滅で止まった残骸 → 作り直す
             ACTIVE.remove(key, sound);
+        }
+        //音量が 0/NaN のまま新規登録すると、SoundEngine が「無音の音」として無視し、
+        //後で音量を上げて update() しても実体が既に破棄されていて鳴らない
+        //(ACTIVE に居座り続けるだけの死骸になる) パックがあった。
+        //新規作成時だけは安全な音量になるまで登録自体を見送る (既存の音の一時的な無音化は妨げない)。
+        if (safeVolume(volume, 8.0F) <= 0.0F) {
+            return;
         }
         sound = new TrainScriptSound(train, soundId, looping);
         sound.update(volume, pitch);
@@ -442,10 +465,17 @@ public final class LegacyScriptSoundManager {
      * ACTIVE の登録が残り続け、stopSound されるまで再発火しない = 本家のラッチ)。
      */
     private static final class TrainScriptSound extends AbstractTickableSoundInstance {
+        //本家 SoundUpdater 系は固定 45 ブロックの減衰距離で鳴る (可変レンジではない)。
+        private static final int ATTENUATION_DISTANCE = 45;
+        //ループ音がこの時間 (ms) 更新 (update呼び出し) されなかったら、スクリプト側が
+        //例外等で要求を止めたとみなして自動停止する (要求し続けている限りは鳴り続ける)。
+        private static final long STALE_TIMEOUT_MS = 400L;
+
         private final Entity train;
+        private long lastUpdateMs;
 
         private TrainScriptSound(Entity train, ResourceLocation soundId, boolean repeat) {
-            super(SoundEvent.createVariableRangeEvent(soundId), SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
+            super(SoundEvent.createFixedRangeEvent(soundId, ATTENUATION_DISTANCE), SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
             this.train = train;
             this.looping = repeat;
             this.delay = 0;
@@ -455,14 +485,16 @@ public final class LegacyScriptSoundManager {
             this.x = train.getX();
             this.y = train.getY();
             this.z = train.getZ();
+            this.lastUpdateMs = System.currentTimeMillis();
         }
 
         private void update(float volume, float pitch) {
-            this.volume = Mth.clamp(volume, 0.0F, 8.0F);
-            this.pitch = Mth.clamp(pitch, 0.05F, 4.0F);
+            this.volume = safeVolume(volume, 8.0F);
+            this.pitch = safePitch(pitch);
             this.x = train.getX();
             this.y = train.getY();
             this.z = train.getZ();
+            this.lastUpdateMs = System.currentTimeMillis();
         }
 
         private void requestStop() {
@@ -475,6 +507,13 @@ public final class LegacyScriptSoundManager {
             if (!train.isAlive()) {
                 ACTIVE.remove(key(train.getUUID(), this.getLocation()), this);
                 AUTO_RUNNING.remove(train.getUUID());
+                stop();
+                return;
+            }
+            //ループ音がしばらく再要求されない = スクリプトが止まった (例外等) 可能性が高いので、
+            //鳴りっぱなしにならないよう自動停止する。
+            if (this.looping && System.currentTimeMillis() - this.lastUpdateMs > STALE_TIMEOUT_MS) {
+                ACTIVE.remove(key(train.getUUID(), this.getLocation()), this);
                 stop();
                 return;
             }

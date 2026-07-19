@@ -60,6 +60,7 @@ public final class RealTrainModUnofficialNetwork {
         reg(MotormanMacroPayload.class, MotormanMacroPayload.STREAM_CODEC, MotormanMacroPayload::handleOnServer);
         reg(MotormanSkinPayload.class, MotormanSkinPayload.STREAM_CODEC, MotormanSkinPayload::handleOnServer);
         reg(DataMapSyncPayload.class, DataMapSyncPayload.STREAM_CODEC, DataMapSyncPayload::handleOnClient);
+        reg(RtmuSettingsPayload.class, RtmuSettingsPayload.STREAM_CODEC, RtmuSettingsPayload::handleOnServer);
     }
 
     private static <MSG extends CustomPacketPayload> void reg(

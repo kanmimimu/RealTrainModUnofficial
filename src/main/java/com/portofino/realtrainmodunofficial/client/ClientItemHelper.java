@@ -13,6 +13,7 @@ import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
@@ -35,7 +36,7 @@ public final class ClientItemHelper {
         Minecraft.getInstance().setScreen(new ModelSelectScreen(
             Component.translatable("screen.realtrainmodunofficial.select_rail"),
             infos,
-            selection -> PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue())),
+            selection -> commitSelection(stack, selection),
             LegacyItemStackBridge.getSelectedModelId(stack),
             LegacyItemStackBridge.getSelectedDataMap(stack)
         ));
@@ -53,7 +54,7 @@ public final class ClientItemHelper {
         Minecraft.getInstance().setScreen(new ModelSelectScreen(
             Component.translatable("screen.realtrainmodunofficial.select_train"),
             infos,
-            selection -> PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue())),
+            selection -> commitSelection(stack, selection),
             LegacyItemStackBridge.getSelectedModelId(stack),
             LegacyItemStackBridge.getSelectedDataMap(stack)
         ));
@@ -74,10 +75,11 @@ public final class ClientItemHelper {
 
     public static void openTrainSelectScreen() {
         List<ModelSelectScreen.ModelInfo> infos = getVisibleTrainModels();
+        ItemStack heldStack = findHeldSelectableStack(Minecraft.getInstance().player);
         Minecraft.getInstance().setScreen(new ModelSelectScreen(
             Component.translatable("screen.realtrainmodunofficial.select_train"),
             infos,
-            selection -> PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue())),
+            selection -> commitSelection(heldStack, selection),
             null,
             ""
         ));
@@ -136,7 +138,7 @@ public final class ClientItemHelper {
         Minecraft.getInstance().setScreen(new ModelSelectScreen(
             Component.translatable("screen.realtrainmodunofficial.select_car"),
             infos,
-            selection -> PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue())),
+            selection -> commitSelection(stack, selection),
             LegacyItemStackBridge.getSelectedModelId(stack),
             LegacyItemStackBridge.getSelectedDataMap(stack)
         ));
@@ -153,7 +155,7 @@ public final class ClientItemHelper {
         Minecraft.getInstance().setScreen(new ModelSelectScreen(
             Component.translatable(getInstalledObjectTitleKey(category)),
             infos,
-            selection -> PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue())),
+            selection -> commitSelection(stack, selection),
             LegacyItemStackBridge.getSelectedModelId(stack),
             LegacyItemStackBridge.getSelectedDataMap(stack)
         ));
@@ -180,6 +182,39 @@ public final class ClientItemHelper {
             blockEntity.getDefinitionId(),
             ""
         ));
+    }
+
+    /**
+     * 選択をサーバーへ送ると同時に、クライアント側の手持ちスタックにも反映する。
+     * <p>
+     * クライアント側を更新しないと、クリエイティブでは選択直後の SetCreativeModeSlot 同期で
+     * サーバー側スタックが「選択情報無し」の版に上書きされ、選択が消える。すると設置時に
+     * 既定 (先頭の ELECTRIC 車両 = 223系5000番台Tc) にフォールバックし、どの車両を選んでも
+     * 223系5000番台Tc が湧く (マルチプレイのみで再現。シングルはクライアント=サーバーで
+     * 上書きが起きないため顕在化しない)。
+     * <p>
+     * 両方を更新すればサバイバル (ペイロードでサーバー確定) とクリエイティブ (スタック同期で
+     * サーバー確定) の双方で確実に選択が届く。
+     */
+    private static void commitSelection(ItemStack stack, ModelSelectScreen.SelectionResult selection) {
+        if (stack != null && !stack.isEmpty()) {
+            LegacyItemStackBridge.setSelectedModelData(stack, selection.modelId(), selection.dataMapValue());
+        }
+        PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue()));
+    }
+
+    /** 特定のスタック参照を持たない呼び出し元向け: 現在保持中の選択可能アイテムを両手から探す。 */
+    private static ItemStack findHeldSelectableStack(Player player) {
+        if (player == null) {
+            return ItemStack.EMPTY;
+        }
+        for (InteractionHand hand : InteractionHand.values()) {
+            ItemStack stack = player.getItemInHand(hand);
+            if (stack.getItem() instanceof TrainItem) {
+                return stack;
+            }
+        }
+        return ItemStack.EMPTY;
     }
 
     private static String getInstalledObjectTitleKey(InstalledObjectCategory category) {

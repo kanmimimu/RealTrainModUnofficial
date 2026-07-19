@@ -7,6 +7,8 @@ import com.portofino.realtrainmodunofficial.network.compat.PacketDistributor;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
+import jp.ngt.rtm.entity.train.util.Formation;
+import jp.ngt.rtm.entity.train.util.FormationEntry;
 import jp.ngt.rtm.entity.train.util.TrainState.TrainStateType;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -143,6 +145,12 @@ public class RtmTrainControlScreen extends Screen {
                 addRenderableWidget(Button.builder(Component.literal(text), b -> send("cycle_custom_button", packed))
                         .bounds(x, y, 52, 22).build());
             }
+        } else if (selectedTab == ControlTab.DEDICATED) {
+            //専用タブ: 内容は将来拡張用の枠のみ確保。押しても何も起きないプレースホルダボタンだけ置く。
+            Button placeholder = Button.builder(Component.literal("このタブのアイデア募集"), b -> { })
+                    .bounds(left + 8, top + 8, PANEL_W - 16, 20).build();
+            placeholder.active = false;
+            addRenderableWidget(placeholder);
         }
         addRenderableWidget(new DoorButton(left + PANEL_W + 20, top + 20, false));
         addRenderableWidget(new DoorButton(left - 84, top + 20, true));
@@ -368,12 +376,41 @@ public class RtmTrainControlScreen extends Screen {
         if (selectedTab != ControlTab.FORMATION) {
             return;
         }
-        //TODO PacketFormation 移植後に編成全体を表示
-        VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
-        String name = def == null ? train.getModelName() : def.getDisplayName();
         graphics.drawString(font, Component.literal("編成"), left + 8, top + 10, 0x404040, false);
-        graphics.renderFakeItem(new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get()), left + 10, top + 26);
-        graphics.drawString(font, Component.literal("1  " + name), left + 30, top + 30, 0x404040, false);
+        //DATA_FORMATION (各号車が自分の編成ID/位置/両数を同期するエンティティデータ) 経由で、
+        //クライアント側 FormationManager にも各車両が自分のエントリを登録し合うため、
+        //全号車が視界に入っていれば getFormation() から編成全体を辿れる。
+        Formation formation = train.getFormation();
+        List<FormationEntry> entries = formation == null
+                ? List.of()
+                : formation.getFormationEntryStream().sorted().toList();
+        if (entries.isEmpty()) {
+            //編成データ未同期 (単車、または他号車の同期がまだ届いていない) — 自車のみ表示。
+            VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
+            String name = def == null ? train.getModelName() : def.getDisplayName();
+            graphics.renderFakeItem(new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get()), left + 10, top + 22);
+            graphics.drawString(font, Component.literal("1  " + name), left + 30, top + 26, 0x404040, false);
+            return;
+        }
+        final int rowH = 16;
+        final int maxRows = 4;
+        int y = top + 22;
+        int shown = Math.min(entries.size(), maxRows);
+        for (int i = 0; i < shown; i++) {
+            FormationEntry entry = entries.get(i);
+            EntityTrainBase car = entry.train;
+            VehicleDefinition def = car == null ? null : VehicleRegistry.getById(car.getModelName());
+            String name = def != null ? def.getDisplayName() : (car == null ? "?" : car.getModelName());
+            boolean isSelf = car == train;
+            graphics.renderFakeItem(new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get()), left + 10, y - 4);
+            graphics.drawString(font, Component.literal((entry.entryId + 1) + "  " + name),
+                    left + 30, y, isSelf ? 0x0000AA : 0x404040, false);
+            y += rowH;
+        }
+        if (entries.size() > maxRows) {
+            graphics.drawString(font, Component.literal("...ほか " + (entries.size() - maxRows) + "両"),
+                    left + 30, y, 0x404040, false);
+        }
     }
 
     private void renderPlayerInventory(GuiGraphics graphics, int left, int top) {
@@ -460,10 +497,12 @@ public class RtmTrainControlScreen extends Screen {
     //触らない (入れ替えるとインベントリ内の全アイテムの見た目が変わってしまう)。
     //ここで持たせるアイテムだけを差し替えて、タブの絵柄を変える。
     private enum ControlTab {
+        INVENTORY(TAB_INVENTORY_TEXTURE, new ItemStack(Blocks.CHEST)),
         SETTING(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.CROWBAR_ITEM.get())),
         FUNCTION(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.WRENCH_ITEM.get())),
         FORMATION(TAB_FORMATION_TEXTURE, new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get())),
-        INVENTORY(TAB_INVENTORY_TEXTURE, new ItemStack(Blocks.CHEST));
+        //専用タブ: ドアカット・連結解除など運転士の追加操作用に確保 (中身は未定、プレースホルダのみ)。
+        DEDICATED(TAB_SETTING_TEXTURE, new ItemStack(net.minecraft.world.item.Items.IRON_DOOR));
 
         final ResourceLocation background;
         final ItemStack icon;

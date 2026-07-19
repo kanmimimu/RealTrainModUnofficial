@@ -23,6 +23,11 @@ public final class TrainBogieEntityRenderer extends EntityRenderer<TrainBogieEnt
     @Override
     public boolean shouldRender(TrainBogieEntity entity, Frustum frustum, double camX, double camY, double camZ) {
         if (entity == null || entity.isRemoved()) return false;
+        //RTMU設定「車両描画距離」: 0=無制限なら常に false (=このチェックでは弾かない)。
+        if (com.portofino.realtrainmodunofficial.RtmuSettings.beyondVehicleRenderDistance(
+                entity.getX(), entity.getY(), entity.getZ(), camX, camY, camZ)) {
+            return false;
+        }
         // 台車のフラスタムカリングは AABB が小さすぎて誤って消えやすい。
         // 親列車の AABB を含めた広めの範囲で判定し、見えるはずの台車が
         // 一瞬でも消失するのを防ぐ。

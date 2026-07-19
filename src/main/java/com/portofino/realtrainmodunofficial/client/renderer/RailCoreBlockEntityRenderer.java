@@ -103,14 +103,19 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             //  スクリプトが renderer.renderStaticParts を呼んだ時のみ (位置毎 shouldRenderObject
             //  = 端トリミング/枕木循環)。スクリプト無し: renderStaticParts 相当のみ。
             //  分岐コアのみ既存パイプラインへフォールバック (トング描画未移植)。
+            //本レール側が be.shouldRerenderRail を消費 (false へリセット) してしまう前に、
+            //サブレールの再構築要否判定用に値を捕まえておく。
+            boolean subRailsForceRebuild = be.shouldRerenderRail;
             com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
                 com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
             if (scripted != null) {
                 if (scripted.render(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
+                    renderSubRails(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, subRailsForceRebuild);
                     return;
                 }
             } else if (com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.renderPlain(
                     be, maps, poseStack, buffer, packedLight, packedOverlay, model)) {
+                renderSubRails(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, subRailsForceRebuild);
                 return;
             }
             //ここから下は旧パイプライン。トング (可動レール) を持つ分岐コアだけがここに来る。
@@ -151,6 +156,34 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn("Skipping rail render at {} after renderer failure", be.getBlockPos(), t);
         } finally {
             ClientRenderProfiler.endRail(profilerStart);
+        }
+    }
+
+    /**
+     * 重ねレール (サブレール) の描画を各サブレール定義ごとにディスパッチする。
+     * 追加・保存・同期はされていたが、以前は本レールと同じ内容を重複描画するだけで
+     * サブレール自身のモデル/スクリプトが一切呼ばれていなかった。
+     */
+    private void renderSubRails(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
+                                PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay,
+                                boolean forceRebuild) {
+        if (be.subRails == null || be.subRails.isEmpty()) {
+            return;
+        }
+        for (jp.ngt.rtm.rail.util.RailProperty sub : be.subRails) {
+            if (sub == null || sub.railModel == null || sub.railModel.isBlank()) {
+                continue;
+            }
+            RailDefinition subDef = RailRegistry.getById(sub.railModel);
+            if (subDef == null) {
+                continue;
+            }
+            MqoModelLoader.MqoModel subModel = MqoModelLoader.loadModelForRail(subDef);
+            if (subModel == null) {
+                continue;
+            }
+            com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.renderSubRail(
+                be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, subDef, subModel, forceRebuild);
         }
     }
 

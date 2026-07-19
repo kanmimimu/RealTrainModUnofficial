@@ -91,6 +91,11 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
 
     @Override
     public boolean shouldRender(TrainEntity entity, Frustum frustum, double camX, double camY, double camZ) {
+        //RTMU設定「車両描画距離」: 0=無制限なら常に false (=このチェックでは弾かない)。
+        if (com.portofino.realtrainmodunofficial.RtmuSettings.beyondVehicleRenderDistance(
+                entity.getX(), entity.getY(), entity.getZ(), camX, camY, camZ)) {
+            return false;
+        }
         // Use a square box (halfLength on all horizontal axes) so the train stays
         // visible regardless of rotation. A Z-only offset disappears when the train
         // faces east/west and the camera is slightly off-center.

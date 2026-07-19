@@ -223,8 +223,13 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
      */
     @Override
     public jp.ngt.ngtlib.math.Vec3 getWirePos() {
+        //碍子 (INSULATOR) も対象に含める。NGTO Builder / Baru's Pole の架線スクリプトは碍子の
+        //wirePos (JSON の wirePos=[x,y,z]) を金具・接続点の計算に使い、null だと
+        //render_Wire2 の getAroundInsulatorPosData が wirePos.getX() で落ちる。
+        //碍子/コネクタ以外 (照明・看板等) は従来どおり null (=スクリプト側の `=== null` ガードで弾く)。
         InstalledObjectCategory cat = getCategory();
-        if (cat != InstalledObjectCategory.CONNECTOR_INPUT && cat != InstalledObjectCategory.CONNECTOR_OUTPUT) {
+        if (cat != InstalledObjectCategory.CONNECTOR_INPUT && cat != InstalledObjectCategory.CONNECTOR_OUTPUT
+                && cat != InstalledObjectCategory.INSULATOR) {
             return null;
         }
         InstalledObjectDefinition def = InstalledObjectRegistry.getById(this.definitionId);
@@ -233,6 +238,24 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         }
         net.minecraft.world.phys.Vec3 wp = def.getWireAttachPos();
         return wp == null ? null : new jp.ngt.ngtlib.math.Vec3(wp.x, wp.y, wp.z);
+    }
+
+    /**
+     * NGTO Builder の Wire ツール互換: スクリプトの setModelName
+     * ({@code NGTUtil.setValueToField(TileEntityConnectorBase.class, tile, name, "modelName")}) を
+     * {@link jp.ngt.ngtlib.util.NGTUtil} がここへブリッジする。bare name から碍子定義を解決して適用する。
+     */
+    public void applyScriptModelName(String bareName) {
+        InstalledObjectDefinition def = InstalledObjectRegistry.getByBareName(bareName, InstalledObjectCategory.INSULATOR);
+        if (def == null) {
+            return;
+        }
+        this.definitionId = def.getId();
+        this.category = def.getCategory().name();
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
     }
 
     @Override
@@ -994,6 +1017,51 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
 
     public InstalledObjectDefinition getDefinition() {
         return InstalledObjectRegistry.getById(definitionId);
+    }
+
+    // --- NGTO Builder の Wire ツール互換 ---
+
+    /** Wire ツールが碍子の微調整オフセットを設定する (本家 TileEntityConnectorBase.setOffset)。 */
+    public void setOffset(double x, double y, double z, boolean sync) {
+        this.offsetX = x;
+        this.offsetY = y;
+        this.offsetZ = z;
+        setChanged();
+        if (sync && level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    /**
+     * Wire ツールが「この碍子から (x,y,z) の碍子へワイヤーを張る」ときに呼ぶ (本家 setConnectionTo)。
+     * RTMU の配線描画は wireStart/wireEnd を持つ設置物に対して行われるので、両端を設定して描画対象にする。
+     * connectionType/modelState は本家 API 互換で受け取るだけ (現状 WIRE のケーブルを描くのみ)。
+     */
+    public void setConnectionTo(int x, int y, int z, Object connectionType, Object modelState) {
+        this.wireStart = this.worldPosition;
+        this.wireEnd = new net.minecraft.core.BlockPos(x, y, z);
+        // RTMU の配線描画は「WIRE カテゴリの設置物が、その定義(モデル)のケーブルを wireStart→wireEnd に描く」。
+        // なので接続された碍子を WIRE オブジェクト化する: 定義=選択ワイヤーモデル、category=WIRE。
+        // modelState は WireItem.getModelState() が返す WireModelState (modelId を持つ) か、
+        // 生の modelId 文字列で渡ってくる。
+        String wireModelId = null;
+        if (modelState instanceof com.portofino.realtrainmodunofficial.item.WireItem.WireModelState wms) {
+            wireModelId = wms.modelId;
+        } else if (modelState instanceof String s) {
+            wireModelId = s;
+        }
+        if (wireModelId != null && !wireModelId.isEmpty()) {
+            this.definitionId = wireModelId;
+            this.category = InstalledObjectCategory.WIRE.name();
+        }
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            //WIRE の電気グラフにも登録 (再読込時は onLoad が category==WIRE で再登録する)。
+            if (getCategory() == InstalledObjectCategory.WIRE) {
+                jp.ngt.rtm.electric.WireManager.register(level, this.wireStart, this.wireEnd);
+            }
+        }
     }
 
     /** ロード済み設置物 (WebCTC の信号地図 API が使用。レールコアの LOADED_CORES と同じ方式)。 */

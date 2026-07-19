@@ -52,6 +52,12 @@ public final class RailScriptRenderers {
     private static final RailPartsRenderer PLAIN = new RailPartsRenderer();
     private static final Map<BlockPos, GLRecorder> PLAIN_CACHE = new HashMap<>();
 
+    /**
+     * 重ねレール (サブレール) 用の記録キャッシュ。1 コア位置に複数のサブレール定義が乗りうるため
+     * (座標|定義ID) をキーにする (本レールの staticCache/PLAIN_CACHE とは別管理)。
+     */
+    private static final Map<String, GLRecorder> SUB_CACHE = new ConcurrentHashMap<>();
+
     private RailScriptRenderers() {
     }
 
@@ -130,6 +136,50 @@ public final class RailScriptRenderers {
         return true;
     }
 
+    /**
+     * 重ねレール (サブレール) の描画。各サブレール定義自身のモデル+スクリプト (無ければ
+     * デフォルト配置) で、本レールと同じ RailMap 上に描く。分岐コアは対象外
+     * (トング可動アニメと衝突するため)。
+     *
+     * @param forceRebuild 呼び出し元が判定した「再描画が必要か」(本レール側が
+     *                     be.shouldRerenderRail を消費してしまった後でも、サブレール側の
+     *                     再構築判定に使えるよう呼び出し元から明示的に渡す)。
+     */
+    public static void renderSubRail(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
+                                     PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay,
+                                     RailDefinition subDef, MqoModelLoader.MqoModel subModel, boolean forceRebuild) {
+        if (be instanceof TileEntityLargeRailSwitchCore || subDef == null || subModel == null) {
+            return;
+        }
+        BlockPos pos = be.getBlockPos();
+        String key = pos.asLong() + "|" + subDef.getId();
+        GLRecorder rec = SUB_CACHE.get(key);
+        if (rec == null || forceRebuild) {
+            rec = new GLRecorder();
+            GLRecorder.activate(rec);
+            try {
+                Scripted sc = get(subDef);
+                if (sc != null) {
+                    sc.renderer.modelGroupNames = subModel.getOriginalGroupNames();
+                    sc.renderer.currentRailIndex = 0;
+                    sc.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+                    sc.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+                } else {
+                    PLAIN.modelGroupNames = subModel.getOriginalGroupNames();
+                    PLAIN.renderStaticParts(be, 0.0D, 0.0D, 0.0D);
+                }
+            } catch (Throwable t) {
+                RealTrainModUnofficial.LOGGER.warn("Sub-rail script render failed at {} ({})", pos, subDef.getId(), t);
+            } finally {
+                GLRecorder.deactivate();
+            }
+            SUB_CACHE.put(key, rec);
+        }
+        if (!rec.isEmpty()) {
+            replay(rec, poseStack, buffer, packedLight, packedOverlay, subModel);
+        }
+    }
+
     public static final class Scripted {
         private final RailPartsRenderer renderer;
         private final ScriptEngine engine;
@@ -184,17 +234,18 @@ public final class RailScriptRenderers {
                             }
                         }
                     } else {
-                        int railCount = 1 + be.subRails.size();
-                        for (int i = 0; i < railCount; i++) {
-                            this.renderer.currentRailIndex = i;
-                            this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
-                            //本家 RailPartsRendererBase.renderRail は static の<b>直後に dynamic も呼ぶ</b>。
-                            //こちらは分岐 (トング可動) でしか dynamic を呼んでいなかったため、
-                            //描画を全部 renderRailDynamic に書いているパック
-                            //(Baru's Roof 等、レールに沿って屋根を並べる系) が<b>何も表示されなかった</b>。
-                            //中身は動かない静的な形状なので、static と同じ記録に入れて焼いてよい。
-                            this.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
-                        }
+                        //本家レール本体の描画は1回だけ (重ねレールは別途 renderSubRail が
+                        //各サブレール定義自身のモデル+スクリプトで描く。ここで railCount 分
+                        //ループしても同じ本レールを重複描画するだけで、サブレールは一切
+                        //描かれていなかった)。
+                        this.renderer.currentRailIndex = 0;
+                        this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+                        //本家 RailPartsRendererBase.renderRail は static の<b>直後に dynamic も呼ぶ</b>。
+                        //こちらは分岐 (トング可動) でしか dynamic を呼んでいなかったため、
+                        //描画を全部 renderRailDynamic に書いているパック
+                        //(Baru's Roof 等、レールに沿って屋根を並べる系) が<b>何も表示されなかった</b>。
+                        //中身は動かない静的な形状なので、static と同じ記録に入れて焼いてよい。
+                        this.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
                     }
                 } catch (Throwable t) {
                     RealTrainModUnofficial.LOGGER.warn("Rail script render failed at {}", pos, t);

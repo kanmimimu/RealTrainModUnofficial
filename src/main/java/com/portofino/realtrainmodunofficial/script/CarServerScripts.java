@@ -8,6 +8,7 @@ import jp.ngt.ngtlib.io.ScriptUtil;
 import javax.script.Invocable;
 import javax.script.ScriptEngine;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -59,6 +60,10 @@ public final class CarServerScripts {
         private final ScriptEngine engine;
         private boolean broken;
         private boolean warned;
+        //エンティティごとの ScriptExecuter (NGTO Builder の Measure が executer.count % 20 を使う。
+        //null を渡すと毎 tick TypeError で onUpdate が中断していた)。
+        private final Map<Object, jp.ngt.rtm.modelpack.ScriptExecuter> executers =
+                java.util.Collections.synchronizedMap(new WeakHashMap<>());
 
         Entry(ScriptEngine engine) {
             this.engine = engine;
@@ -72,7 +77,11 @@ public final class CarServerScripts {
                 return;
             }
             try {
-                ((Invocable) engine).invokeFunction("onUpdate", entity, null);
+                jp.ngt.rtm.modelpack.ScriptExecuter executer = executerFor(entity);
+                ((Invocable) engine).invokeFunction("onUpdate", entity, executer);
+                if (executer != null) {
+                    executer.count++;
+                }
             } catch (NoSuchMethodException e) {
                 broken = true;
             } catch (Throwable t) {
@@ -81,6 +90,15 @@ public final class CarServerScripts {
                     RealTrainModUnofficial.LOGGER.warn("[ScriptUtil] server onUpdate failed: {}", t.toString());
                 }
             }
+        }
+
+        private jp.ngt.rtm.modelpack.ScriptExecuter executerFor(Object entity) {
+            if (!(entity instanceof net.minecraft.world.entity.Entity e)
+                    || !(e.level() instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
+                return null;
+            }
+            return executers.computeIfAbsent(entity, k ->
+                    new jp.ngt.rtm.modelpack.ScriptExecuter(serverLevel, e.position(), e.getName().getString()));
         }
     }
 }

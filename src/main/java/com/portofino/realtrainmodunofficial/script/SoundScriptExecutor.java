@@ -42,9 +42,15 @@ public final class SoundScriptExecutor {
         return this.train;
     }
 
-    /** スクリプトが見る速度 (km/h)。 */
+    /**
+     * スクリプトが見る速度 (km/h)。常に絶対値 (0以上)。
+     * <p>
+     * 列車の内部速度は進行方向(リバーサ)で符号が付き、後進時は負になる。一方サウンドスクリプトは
+     * 非負の閾値としてしか比較しないため、符号付きのまま渡すと後進時に速度が負→「停車」と
+     * 誤判定され、走行音が止まってしまう。
+     */
     public float getSpeed() {
-        return this.rawSpeed() * SPEED_TO_KMH;
+        return Math.abs(this.rawSpeed()) * SPEED_TO_KMH;
     }
 
     /** エンティティ内部の速度 (ブロック/tick)。 */

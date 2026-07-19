@@ -77,9 +77,12 @@ public final class ExternalSoundPackBridge {
                 }
             }
             boolean wroteAnyJson = writeMergedSoundsJson(mergedSoundDefs);
+            //中身が空でも pack.mcmeta を書いて有効なパックとして常に返す。こうしておくと、起動時に
+            //同意済みの音パックが1つも無くても pack が登録され、後からタイトル画面で README 同意 →
+            //rebuild() + reloadResourcePacks したときに新しい音を足せる。以前は空だと pack ごと
+            //削除して null=未登録にしていたため、その状況では同意しても再読込で音が復活しなかった。
             if (!copiedAnySoundAsset && !wroteAnyJson) {
-                deleteDirectoryIfExists(GENERATED_PACK_ROOT);
-                return null;
+                RealTrainModUnofficial.LOGGER.debug("External sound bridge: no external sounds yet (empty pack registered)");
             }
             writePackMeta();
             return GENERATED_PACK_ROOT;
@@ -87,6 +90,17 @@ public final class ExternalSoundPackBridge {
             RealTrainModUnofficial.LOGGER.warn("Could not build external sound bridge pack", e);
             return null;
         }
+    }
+
+    /**
+     * 生成サウンドパックを作り直す (パック同意状態が変わった後などに呼ぶ)。
+     * <p>生成パックはリソースパックとして扱われるため、ファイルを作り直すだけでは
+     * {@link net.minecraft.client.Minecraft#reloadResourcePacks()} を呼ぶまで反映されない。
+     * これをしないと、タイトル画面で README 同意したパックの走行音等が
+     * 「パックには入っているのに次回起動まで鳴らない」状態になる。
+     */
+    public static void rebuild() {
+        rebuildGeneratedPack();
     }
 
     private static List<Path> collectCandidatePacks() {
@@ -297,6 +311,10 @@ public final class ExternalSoundPackBridge {
         JsonArray sounds = new JsonArray();
         sounds.add(namespace + ":" + soundPath);
         event.add("sounds", sounds);
+        //Javaコード側 (LegacyScriptSoundManager) の SoundEvent も固定45ブロックの減衰距離で
+        //作っているため、ここで合成する sounds.json エントリも揃えておく
+        //(パック側で独自に sounds.json を持つ場合はそちらの指定を尊重し、ここでは上書きしない)。
+        event.addProperty("attenuation_distance", 45);
         target.add(eventKey, event);
     }
 

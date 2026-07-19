@@ -37,22 +37,26 @@ public final class TrainHudOverlay {
     /**
      * HUD が旧 TrainEntity / 新 jp.ngt EntityTrainBase の両方を描けるようにする共通ビュー。
      */
-    private record HudData(int notch, float speed, int maxBrakeNotch, String modelId) {
+    private record HudData(int notch, float speed, int maxBrakeNotch, String modelId, boolean doorsClosed) {
     }
 
     private static HudData getHudData(Minecraft mc) {
         TrainEntity train = getControlledTrain(mc);
         if (train != null && train.isDriverPassenger(mc.player)) {
-            return new HudData(train.getNotch(), train.getSpeed(), train.getMaxBrakeNotch(), train.getVehicleId());
+            return new HudData(train.getNotch(), train.getSpeed(), train.getMaxBrakeNotch(), train.getVehicleId(),
+                !train.isDoorOpen());
         }
         // Phase 2: 本家忠実列車 — 運転士のみ表示 (客席 = 座席オフセット搭乗は非表示)
         if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain
                 && !rtmTrain.hasSeat(mc.player)) {
+            boolean doorsClosed = rtmTrain.getTrainStateData(
+                jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Door.id) == 0;
             return new HudData(
                 rtmTrain.getNotch(),
                 rtmTrain.getSpeed(),
                 rtmTrain.getConfig().deccelerations.length - 1,
-                rtmTrain.getModelName());
+                rtmTrain.getModelName(),
+                doorsClosed);
         }
         return null;
     }
@@ -121,7 +125,20 @@ public final class TrainHudOverlay {
         graphics.drawString(font, Integer.toString(Math.max(0, -train.notch())), 30, 37, 0x00FF00, false);
         graphics.drawString(font, Integer.toString(getWorldTime()), 338, 8, 0x00FF00, false);
         graphics.drawString(font, getClockText(), 338, 18, 0x00FF00, false);
+        drawDoorLamp(graphics, 386, 8, train.doorsClosed());
         pose.popPose();
+    }
+
+    /**
+     * 戸閉め灯: ドアが閉まっていれば点灯、開いていれば消灯。新規テクスチャは使わず
+     * 単純な塗りつぶし矩形で表現する。
+     */
+    private static void drawDoorLamp(GuiGraphics graphics, int x, int y, boolean doorsClosed) {
+        int housing = 0xFF202020;
+        int lampOn = 0xFF33FF55;
+        int lampOff = 0xFF264024;
+        graphics.fill(x - 1, y - 1, x + 13, y + 9, housing);
+        graphics.fill(x, y, x + 12, y + 8, doorsClosed ? lampOn : lampOff);
     }
 
     private static TrainEntity getControlledTrain(Minecraft mc) {
