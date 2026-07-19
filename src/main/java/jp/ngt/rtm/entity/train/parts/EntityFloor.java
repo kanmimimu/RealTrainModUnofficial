@@ -152,8 +152,7 @@ public class EntityFloor extends EntityVehiclePart {
     @Override
     protected void positionRider(Entity rider, Entity.MoveFunction move) {
         if (this.hasPassenger(rider)) {
-            //本家: posY + height + 0.25 (1.21 は着座姿勢分を引く)
-            move.accept(rider, this.getX(), this.getY() + this.getBbHeight() + 0.25D - 0.45D, this.getZ());
+            move.accept(rider, this.getX(), this.getY() + this.getBbHeight() + 0.25D, this.getZ());
         }
     }
 

@@ -1,5 +1,7 @@
 package jp.ngt.rtm.entity.train;
 
+import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
+import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
 import jp.ngt.ngtlib.math.NGTMath;
 import jp.ngt.ngtlib.math.Vec3;
 import jp.ngt.rtm.entity.train.util.*;
@@ -759,10 +761,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 sv = sv.rotateAroundZ(-this.rotationRoll);
                 sv = sv.rotateAroundX(this.getXRot());
                 sv = sv.rotateAroundY(this.getYRot());
-                //旧 EntityFloor 搭乗時の実効高さ (floorY + 0.15) に合わせる
                 move.accept(rider,
                         this.getX() + sv.getX(),
-                        this.getY() + sv.getY() + 0.15D,
+                        this.getY() + sv.getY(),
                         this.getZ() + sv.getZ());
                 return;
             }
@@ -772,17 +773,40 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             v31 = v31.rotateAroundZ(-this.rotationRoll);
             v31 = v31.rotateAroundX(this.getXRot());
             v31 = v31.rotateAroundY(this.getYRot());
-            //座位: playerPos は本家で搭乗者の腰位置。1.21 は渡した Y がほぼ腰になるため
-            //追加リフトはせず、モデル床に合うよう少し下げる。
             move.accept(rider,
                     this.getX() + v31.getX(),
-                    this.getY() + v31.getY() - 0.35D,
+                    this.getY() + v31.getY(),
                     this.getZ() + v31.getZ());
         }
     }
 
     public double getInteriorFloorY() {
-        return this.getY() + TRAIN_HEIGHT + INTERIOR_FLOOR_OFFSET;
+        EntityBogie bogie0 = getBogie(0);
+        EntityBogie bogie1 = getBogie(1);
+        if (bogie0 == null && bogie1 == null) {
+            return this.getY() + TRAIN_HEIGHT + INTERIOR_FLOOR_OFFSET;
+        }
+
+        double bodyY = this.getY();
+
+        VehicleDefinition def = VehicleRegistry.getById(getModelName());
+        double modelOffsetY = def != null ? def.getModelOffset().y : 0.0;
+
+        float[][] slots = getConfig().getSlotPos();
+        double floorOffset = 0;
+        if (slots != null && slots.length > 0) {
+            double sum = 0;
+            int count = 0;
+            for (float[] slot : slots) {
+                if (slot != null && slot.length >= 2) {
+                    sum += slot[1];
+                    count++;
+                }
+            }
+            if (count > 0) floorOffset = sum / count;
+        }
+
+        return bodyY + modelOffsetY + floorOffset;
     }
 
     public net.minecraft.world.phys.Vec3 localToWorldVec(double lx, double ly, double lz) {
@@ -810,7 +834,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
     public net.minecraft.world.phys.Vec3 getSeatWorldPos(float[] seat) {
         net.minecraft.world.phys.Vec3 w = localToWorldVec(seat[0], seat[1], seat[2]);
-        return new net.minecraft.world.phys.Vec3(w.x, w.y + 0.15D, w.z);
+        return new net.minecraft.world.phys.Vec3(w.x, w.y, w.z);
     }
 
     /**
