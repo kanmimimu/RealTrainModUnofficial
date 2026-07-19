@@ -1424,6 +1424,7 @@ public class TrainScriptSystem {
         try {
             scriptEngine.put("executer", su);
             scriptEngine.put("executor", su);
+            scriptEngine.put("su", su);
         } catch (Throwable ignored) {
         }
         if (!(scriptEngine instanceof Invocable invocable)) {

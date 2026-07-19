@@ -75,6 +75,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     public static final short MIN_AIR_COUNT = 2480;
     public static final float TRAIN_WIDTH = 2.75F;
     public static final float TRAIN_HEIGHT = 1.25F - 0.0625F;//レールに合わせ高さ修正
+    public static final double INTERIOR_FLOOR_OFFSET = -0.75D;
 
     public BogieController bogieController = new BogieController();
     private Formation formation;
@@ -355,6 +356,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
         if (this.level().isClientSide()) {
             this.tickSound();
+            com.portofino.realtrainmodunofficial.client.StandingRideClient.tick(this);
         } else {
             this.syncFormationData();
             this.syncDataMap();
@@ -779,6 +781,38 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
+    public double getInteriorFloorY() {
+        return this.getY() + TRAIN_HEIGHT + INTERIOR_FLOOR_OFFSET;
+    }
+
+    public net.minecraft.world.phys.Vec3 localToWorldVec(double lx, double ly, double lz) {
+        Vec3 v = new Vec3(lx, ly, lz);
+        v = v.rotateAroundZ(-this.rotationRoll);
+        v = v.rotateAroundX(this.getXRot());
+        v = v.rotateAroundY(this.getYRot());
+        return new net.minecraft.world.phys.Vec3(
+                this.getX() + v.getX(), this.getY() + v.getY(), this.getZ() + v.getZ());
+    }
+
+    public net.minecraft.world.phys.Vec3 worldToLocalVec(double wx, double wy, double wz) {
+        Vec3 v = new Vec3(wx - this.getX(), wy - this.getY(), wz - this.getZ());
+        v = v.rotateAroundY(-this.getYRot());
+        v = v.rotateAroundX(-this.getXRot());
+        v = v.rotateAroundZ(this.rotationRoll);
+        return new net.minecraft.world.phys.Vec3(v.getX(), v.getY(), v.getZ());
+    }
+
+    @javax.annotation.Nullable
+    public float[] getSeatOffset(net.minecraft.world.entity.Entity rider) {
+        float[] s = this.seatOffsets.get(rider.getUUID());
+        return s == null ? null : s.clone();
+    }
+
+    public net.minecraft.world.phys.Vec3 getSeatWorldPos(float[] seat) {
+        net.minecraft.world.phys.Vec3 w = localToWorldVec(seat[0], seat[1], seat[2]);
+        return new net.minecraft.world.phys.Vec3(w.x, w.y + 0.15D, w.z);
+    }
+
     /**
      * 本家 attackEntityFrom 相当: バール/クリエイティブで撤去
      */
@@ -1131,13 +1165,18 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return type == null ? 0 : this.getTrainStateData(type.id);
     }
 
-    /**
-     * 本家 EntityVehicleBase.setVehicleState。
-     */
+    public byte getVehicleState(int stateTypeId) {
+        return this.getTrainStateData(stateTypeId);
+    }
+
     public void setVehicleState(TrainState.TrainStateType type, byte data) {
         if (type != null) {
             this.setTrainStateData(type.id, data);
         }
+    }
+
+    public void setVehicleState(int stateTypeId, int data) {
+        this.setTrainStateData(stateTypeId, (byte) data);
     }
 
     /**

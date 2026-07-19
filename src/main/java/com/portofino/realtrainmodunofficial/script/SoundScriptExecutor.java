@@ -86,6 +86,25 @@ public final class SoundScriptExecutor {
         return 0;
     }
 
+    public Object getData(int id) {
+        if (this.train instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
+            return t.getResourceState().getDataMap().getDouble("SU" + id);
+        }
+        if (this.train instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity t) {
+            return t.getResourceState().getDataMap().getDouble("SU" + id);
+        }
+        return 0.0D;
+    }
+
+    public void setData(int id, Object value) {
+        double v = value instanceof Number n ? n.doubleValue() : 0.0D;
+        if (this.train instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
+            t.getResourceState().getDataMap().setDouble("SU" + id, v, 0);
+        } else if (this.train instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity t) {
+            t.getResourceState().getDataMap().setDouble("SU" + id, v, 0);
+        }
+    }
+
     /**
      * トンネル内か。本家は車体の四隅 (x±1, z±1) がいずれも空を見上げられないときに true
      * (橋の下や木の下で誤爆しないよう 4 点見る)。223 系はこれで走行音を切り替える。
