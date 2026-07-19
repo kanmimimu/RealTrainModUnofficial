@@ -599,8 +599,10 @@ public class TrainEntity extends Entity {
         double x = getX();
         double y = getY();
         double z = getZ();
-        double half = BODY_HITBOX_SIZE * 0.5D;
-        return new AABB(x - half, y - half, z - half, x + half, y + half, z + half);
+        double halfWidth = jp.ngt.rtm.entity.train.EntityTrainBase.TRAIN_WIDTH * 0.5D;
+        double halfLength = getTrainHalfLength();
+        double height = 2.0D;
+        return new AABB(x - halfWidth, y - 0.5D, z - halfLength, x + halfWidth, y + height, z + halfLength);
     }
 
     public double getBodyHalfLengthForPlacement() {
@@ -5681,6 +5683,30 @@ public class TrainEntity extends Entity {
         return bestIndex;
     }
 
+    private int findNearestSeatIndex(VehicleDefinition def, Vec3 localClick) {
+        if (def == null) return -1;
+
+        var seats = getSelectableSeats(def);
+        if (seats.isEmpty()) {
+            return def.hasSeatOffset() ? 0 : -1;
+        }
+
+        int bestIndex = 0;
+        double bestDistance = Double.MAX_VALUE;
+        for (int i = 0; i < seats.size(); i++) {
+            Vec3 seat = seats.get(i);
+            double dx = seat.x - localClick.x;
+            double dy = seat.y - localClick.y;
+            double dz = seat.z - localClick.z;
+            double distance = dx * dx + dy * dy + dz * dz;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
     private List<VehicleDefinition.SeatMarker> getSelectableSeatMarkers(VehicleDefinition def) {
         if (def == null) {
             return List.of();
@@ -5784,25 +5810,11 @@ public class TrainEntity extends Entity {
 
         int byBogie = findSeatByClickedBogie(def, clickOffsetWorld);
         if (byBogie >= 0) {
-            RealTrainModUnofficial.LOGGER.debug(
-                "Selected seat by bogie click: vehicle={}, seatIndex={}, clickOffset={}, player={}",
-                getVehicleId(),
-                byBogie,
-                clickOffsetWorld,
-                player.getName().getString()
-            );
             return byBogie;
         }
 
-        int fallback = findNearestSeatToLocalClick(def, worldToLocal(position().add(clickOffsetWorld)));
-        RealTrainModUnofficial.LOGGER.debug(
-            "Selected seat by nearest JSON seat: vehicle={}, seatIndex={}, clickOffset={}, player={}",
-            getVehicleId(),
-            fallback,
-            clickOffsetWorld,
-            player.getName().getString()
-        );
-        return fallback;
+        Vec3 localClick = worldToLocal(position().add(clickOffsetWorld));
+        return findNearestSeatToLocalClick(def, localClick);
     }
 
     private int findNearestSeatToLocalClick(VehicleDefinition def, Vec3 localClick) {
@@ -5811,10 +5823,18 @@ public class TrainEntity extends Entity {
             return def != null && def.hasSeatOffset() ? 0 : -1;
         }
 
-        int bestIndex = 0;
+        int bestIndex = -1;
         double bestScore = Double.MAX_VALUE;
+        double yThreshold = 0.5D;
+
         for (int i = 0; i < seats.size(); i++) {
             Vec3 seat = seats.get(i);
+            double dy = Math.abs(seat.y - localClick.y);
+            
+            if (dy > yThreshold) {
+                continue;
+            }
+            
             double dx = Math.abs(seat.x - localClick.x);
             double dz = Math.abs(seat.z - localClick.z);
             double sameSideBonus = Math.abs(localClick.x) > 0.25D && Math.signum(seat.x) == Math.signum(localClick.x) ? -0.25D : 0.0D;
@@ -5824,6 +5844,11 @@ public class TrainEntity extends Entity {
                 bestIndex = i;
             }
         }
+        
+        if (bestIndex < 0) {
+            return findNearestSeatIndex(def, localClick);
+        }
+        
         return bestIndex;
     }
 
@@ -5847,7 +5872,8 @@ public class TrainEntity extends Entity {
                 nearestIndex = i;
             }
         }
-        if (nearest == null || bestDistance > 4.0D) {
+        double maxInteractionDistance = 5.0D;
+        if (nearest == null || bestDistance > maxInteractionDistance * maxInteractionDistance) {
             return -1;
         }
         double yawRad = Math.toRadians(getYRot());
@@ -5855,15 +5881,6 @@ public class TrainEntity extends Entity {
         Vec3 nearestOffset = localToWorld(nearest.position()).subtract(position());
         boolean frontBogie = nearestOffset.dot(forward) >= 0.0D;
         int seatIndex = frontBogie ? resolveFrontSeatIndex(def) : resolveRearSeatIndex(def);
-        RealTrainModUnofficial.LOGGER.debug(
-            "Clicked bogie resolved to seat: vehicle={}, bogieIndex={}, frontBogie={}, seatIndex={}, clickOffset={}, bestDistance={}",
-            getVehicleId(),
-            nearestIndex,
-            frontBogie,
-            seatIndex,
-            clickOffsetWorld,
-            bestDistance
-        );
         return seatIndex;
     }
 

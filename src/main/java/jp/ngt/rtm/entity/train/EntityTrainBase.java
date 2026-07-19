@@ -13,6 +13,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -20,6 +21,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
 import java.util.Base64;
+import java.util.List;
 
 /**
  * 本家 jp.ngt.rtm.entity.train.EntityTrainBase (KaizPatchX) の忠実移植 (物理コア)。
@@ -835,6 +837,93 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     public net.minecraft.world.phys.Vec3 getSeatWorldPos(float[] seat) {
         net.minecraft.world.phys.Vec3 w = localToWorldVec(seat[0], seat[1], seat[2]);
         return new net.minecraft.world.phys.Vec3(w.x, w.y, w.z);
+    }
+
+    @Override
+    public InteractionResult interact(Player player, InteractionHand hand) {
+        if (isSeatInteractionBlocked(player)) {
+            return InteractionResult.PASS;
+        }
+        net.minecraft.world.phys.Vec3 seat = findNearestSeatToPlayer(player);
+        if (seat == null) {
+            return InteractionResult.PASS;
+        }
+        return mountToSeat(player, new float[]{(float) seat.x, (float) seat.y, (float) seat.z})
+            ? InteractionResult.sidedSuccess(this.level().isClientSide())
+            : InteractionResult.PASS;
+    }
+
+    @Override
+    public InteractionResult interactAt(Player player, net.minecraft.world.phys.Vec3 vec, InteractionHand hand) {
+        if (isSeatInteractionBlocked(player)) {
+            return InteractionResult.PASS;
+        }
+        net.minecraft.world.phys.Vec3 seat = findNearestSeatToClick(vec);
+        if (seat == null) {
+            return InteractionResult.PASS;
+        }
+        return mountToSeat(player, new float[]{(float) seat.x, (float) seat.y, (float) seat.z})
+            ? InteractionResult.sidedSuccess(this.level().isClientSide())
+            : InteractionResult.PASS;
+    }
+
+    private boolean isSeatInteractionBlocked(Player player) {
+        if (player == null || player.getVehicle() != null) {
+            return true;
+        }
+        if (player.isSecondaryUseActive()) {
+            return true;
+        }
+        return player.getMainHandItem().getItem() instanceof com.portofino.realtrainmodunofficial.item.CrowbarItem
+            || player.getOffhandItem().getItem() instanceof com.portofino.realtrainmodunofficial.item.CrowbarItem;
+    }
+
+    private net.minecraft.world.phys.Vec3 findNearestSeatToClick(net.minecraft.world.phys.Vec3 localClick) {
+        VehicleDefinition def = VehicleRegistry.getById(getModelName());
+        if (def == null) {
+            return null;
+        }
+        List<net.minecraft.world.phys.Vec3> seats = def.getRideableSeatPositions();
+        if (seats.isEmpty()) {
+            return null;
+        }
+        net.minecraft.world.phys.Vec3 best = null;
+        double bestDist = Double.MAX_VALUE;
+        double threshold = 2.0D;
+        for (net.minecraft.world.phys.Vec3 seat : seats) {
+            double d = seat.distanceToSqr(localClick);
+            if (d < bestDist && d <= threshold * threshold) {
+                bestDist = d;
+                best = seat;
+            }
+        }
+        return best;
+    }
+
+    private net.minecraft.world.phys.Vec3 findNearestSeatToPlayer(Player player) {
+        if (player == null) {
+            return null;
+        }
+        VehicleDefinition def = VehicleRegistry.getById(getModelName());
+        if (def == null) {
+            return null;
+        }
+        List<net.minecraft.world.phys.Vec3> seats = def.getRideableSeatPositions();
+        if (seats.isEmpty()) {
+            return null;
+        }
+        net.minecraft.world.phys.Vec3 localPos = worldToLocalVec(player.getX(), player.getY(), player.getZ());
+        net.minecraft.world.phys.Vec3 best = null;
+        double bestDist = Double.MAX_VALUE;
+        double threshold = 3.0D;
+        for (net.minecraft.world.phys.Vec3 seat : seats) {
+            double d = seat.distanceToSqr(localPos);
+            if (d < bestDist && d <= threshold * threshold) {
+                bestDist = d;
+                best = seat;
+            }
+        }
+        return best;
     }
 
     /**
